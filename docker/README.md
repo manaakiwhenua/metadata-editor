@@ -31,6 +31,8 @@ Open:
 - Mailpit: http://localhost:8025
 - FastAPI: http://localhost:8000
 - MySQL from host: `localhost:3307`
+- API docs for editor tasks: http://localhost:8080/api-documentation/editor/
+- API docs for job tasks: http://localhost:8080/api-documentation/jobs/
 
 On the first run, open http://localhost:8080/index.php/install and use the
 installer to create the database tables and initial admin user.
