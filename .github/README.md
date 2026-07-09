@@ -4,6 +4,10 @@ This is our fork of [`worldbank/metadata-editor`](https://github.com/worldbank/m
 
 For the **application's own** documentation, see the upstream [`README.md`](../README.md). This page covers how **we** work in the fork: which branch is live, and how to name branches so our build/deploy changes stay cleanly separable from upstream (and so genuine fixes can still go back).
 
+## Running it locally
+
+To run the full stack (web + queue worker + MySQL + Mailpit + FastAPI) on your machine, see [`docker/README.md`](../docker/README.md).
+
 ## Which branch is live?
 
 **`deploy`** — not `main`.
