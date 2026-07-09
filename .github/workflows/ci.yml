@@ -1,0 +1,53 @@
+# CI for metadata-editor (web). Builds the image via the central reusable
+# workflow (manaakiwhenua/github-workflows) and triggers a nonprod (dev)
+# deploy through k8s-apps-config. Fork-only (CICD-ADR-008): lives on downstream.
+#
+# PREREQUISITES (not yet configured - MT-35):
+#   - Repo variables:  REGISTRY_HOST, REGISTRY_USERNAME
+#   - Repo secrets:    REGISTRY_TOKEN, REGISTRY_CA_CERT, K8S_APPS_CONFIG_TRIGGER_TOKEN
+#   - A Harbor robot account for the push + a self-hosted `tak-k8s-ci` runner
+#   - The Dockerfile must be on `downstream` first (web PR #3 merged)
+#   - REGISTRY TARGET IS AN OPEN ITEM: our decision is Harbor
+#     (registry.landcareresearch.co.nz); the reusable workflow currently builds an
+#     Artifactory-shaped path (`<host>/docker/<ns>/<name>`) - see MT-35 / the
+#     artifactory->Harbor migration before enabling.
+name: CI
+on:
+  push:
+    branches: [downstream]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    uses: manaakiwhenua/github-workflows/.github/workflows/docker-build.yml@main
+    with:
+      bake_file: docker-bake.hcl
+      bake_target: default
+      image_name: metadata-editor
+      image_namespace: mwlr-private
+      runs_on: tak-k8s-ci
+      push: true
+      registry_host: ${{ vars.REGISTRY_HOST }}
+      registry_username: ${{ vars.REGISTRY_USERNAME }}
+    secrets:
+      ARTIFACTORY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+      REGISTRY_CA_CERT: ${{ secrets.REGISTRY_CA_CERT }}
+  deploy-dev:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: k8s-dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: manaakiwhenua/github-workflows
+          sparse-checkout: actions/k8s-deploy
+          path: .github-workflows
+      - name: Deploy to nonprod (dev)
+        uses: ./.github-workflows/actions/k8s-deploy
+        with:
+          app_name: metadata-editor
+          environment: dev
+          cluster: tak-k8s-nonprod
+          build_key: ${{ needs.build.outputs.build_id }}
+          bitbucket_token: ${{ secrets.K8S_APPS_CONFIG_TRIGGER_TOKEN }}
