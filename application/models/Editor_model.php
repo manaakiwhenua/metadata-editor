@@ -20,7 +20,9 @@ use Swaggest\JsonDiff\JsonMergePatch;
 class Editor_model extends CI_Model {
 
 	private $storage_path='datafiles/editor';
-	private $tmp_storage_path='datafiles/editor';	
+	private $tmp_storage_path='datafiles/editor';
+	/** @var string|null Cached absolute storage root */
+	private $resolved_storage_path = null;
 	private $schema_registry_cache = null;
 	private $schema_list_cache = null;
 
@@ -57,6 +59,7 @@ class Editor_model extends CI_Model {
 		$this->load->helper("Array");
 		$this->load->library("form_validation");
 		$this->load->library("Audit_log");
+		$this->load->library("Metadata_change_log");
 		$this->load->library("Metadata_helper");
 		$this->load->model("Editor_variable_model");
 		$this->load->model("Editor_datafile_model");		
@@ -69,26 +72,96 @@ class Editor_model extends CI_Model {
 
 
 	/**
-	 * 
-	 * Editor projects storage path
-	 * 
+	 * Editor projects storage path (absolute, canonical when the directory exists).
 	 */
 	function get_storage_path()
 	{
-		return $this->storage_path;
+		if ($this->resolved_storage_path !== null) {
+			return $this->resolved_storage_path;
+		}
+
+		$this->resolved_storage_path = $this->resolve_configured_path($this->storage_path);
+
+		return $this->resolved_storage_path;
 	}
 
 	function get_temp_storage_path()
 	{
-		return $this->tmp_storage_path;
+		return $this->resolve_configured_path($this->tmp_storage_path);
 	}
 
+	/**
+	 * Resolve a configured path to an absolute path (relative paths are anchored to FCPATH).
+	 *
+	 * @param string $path
+	 * @return string
+	 */
+	function resolve_configured_path($path)
+	{
+		$path = trim(str_replace('\\', '/', (string) $path));
+		if ($path === '') {
+			return $path;
+		}
+
+		if ($path[0] !== '/') {
+			$path = rtrim(str_replace('\\', '/', FCPATH), '/') . '/' . ltrim($path, '/');
+		}
+
+		$resolved = realpath($path);
+
+		return $resolved !== false ? $resolved : $path;
+	}
+
+	/**
+	 * Canonical absolute path for a file (works when the file itself does not exist yet).
+	 *
+	 * @param string $file_path
+	 * @return string|null
+	 */
+	function resolve_absolute_file_path($file_path)
+	{
+		$file_path = trim(str_replace('\\', '/', (string) $file_path));
+		if ($file_path === '') {
+			return null;
+		}
+
+		$resolved = realpath($file_path);
+		if ($resolved !== false) {
+			return $resolved;
+		}
+
+		$dir = dirname($file_path);
+		$base = basename($file_path);
+		$resolved_dir = realpath($dir);
+		if ($resolved_dir !== false) {
+			return $resolved_dir . '/' . $base;
+		}
+
+		return $this->resolve_configured_path($file_path);
+	}
+
+	/**
+	 * Absolute path to a file under a project folder (may not exist yet).
+	 *
+	 * @param int|string $sid
+	 * @param string $relative_path e.g. data/indicator_data.csv
+	 * @return string|null
+	 */
+	function resolve_project_file_path($sid, $relative_path)
+	{
+		$folder = $this->get_project_folder($sid);
+		if (!$folder) {
+			return null;
+		}
+
+		return $this->resolve_absolute_file_path($folder . '/' . ltrim($relative_path, '/'));
+	}
 
 	function get_project_folder($sid)
 	{
 		$path = $this->get_project_dirpath($sid);
 		if ($path !== false && $path !== '') {
-			return $this->get_storage_path() . '/' . $path;
+			return $this->resolve_absolute_file_path($this->get_storage_path() . '/' . $path);
 		}
 		return false;
 	}
@@ -239,6 +312,9 @@ class Editor_model extends CI_Model {
 			'metafile', 'dirpath', 'thumbnail',
 			'varcount', 'published', 'is_shared', 'is_locked',
 			'created', 'changed', 'created_by', 'changed_by',
+			'created_utc', 'changed_utc',
+			'schema', 'schema_version',
+			'user_id',
 			'template_uid', 'version_number', 'version_created', 
 			'version_created_by', 'version_notes',
 			'attributes', 'metadata', 			
@@ -302,7 +378,7 @@ class Editor_model extends CI_Model {
 			$survey=$this->decode_encoded_fields($survey);
 		}
 
-		if (!is_array($survey['metadata']) && !empty($survey['metadata'])){
+		if (!is_array($survey['metadata']) || empty($survey['metadata'])){
 			$survey['metadata']=array(
 				'type'=>$survey['type']			
 			);
@@ -329,6 +405,33 @@ class Editor_model extends CI_Model {
 			return $project['metadata'];
 		}
 	}
+
+	/**
+	 * Persist metadata blob directly without table-field extraction/filtering.
+	 * Use for small metadata patches (e.g. data_structure_reference) where
+	 * update_project would strip sparse metadata to an empty array.
+	 *
+	 * @param int $sid
+	 * @param array $metadata
+	 * @param int|null $user_id
+	 */
+	function update_metadata_array($sid, array $metadata, $user_id = null)
+	{
+		$this->check_project_editable($sid);
+
+		$update = array(
+			'metadata' => $this->encode_metadata($metadata),
+			'changed' => time(),
+		);
+
+		if ($user_id) {
+			$update['changed_by'] = (int) $user_id;
+		}
+
+		$this->db->where('id', (int) $sid);
+		$this->db->update('editor_projects', $update);
+	}
+
 
 	//get project basic info
     function get_basic_info($sid)
@@ -497,9 +600,7 @@ class Editor_model extends CI_Model {
 			$this->validate_schema($type,$options);
 		}
 
-		//generate/log diff
-		$diff=$this->get_metadata_diff($this->get_metadata($id),$options, $ignore_errors=true);
-		$this->audit_log->log_event($obj_type='project',$obj_id=$id,$action='update', $metadata=$diff, isset($options['changed_by']) ? $options['changed_by'] : null);
+		$metadata_before = $this->get_metadata($id);
 
 		//partial update metadata
 		if (isset($options['partial_update'])){
@@ -511,6 +612,20 @@ class Editor_model extends CI_Model {
 
 		// Store original options for idno check
 		$original_options = $options;
+
+		// Indicator/timeseries: preserve DSD reference when form save omits it but binding exists
+		if (in_array($type, array('indicator', 'timeseries'))) {
+			$has_ref_idno = isset($options['data_structure_reference'])
+				&& is_array($options['data_structure_reference'])
+				&& !empty($options['data_structure_reference']['idno']);
+			if (!$has_ref_idno) {
+				$this->load->library('Data_structure_util');
+				$resolved = $this->data_structure_util->resolve_project_reference($id, false);
+				if ($resolved && !empty($resolved['idno'])) {
+					$options['data_structure_reference'] = $resolved;
+				}
+			}
+		}
 
 		$db_options=array(
 			'changed'=>isset($options['changed']) ? $options['changed'] : date("U"),
@@ -540,6 +655,14 @@ class Editor_model extends CI_Model {
 
 		$this->db->where('id',$id);
 		$this->db->update('editor_projects',$options);
+
+		$this->metadata_change_log->record_project_metadata_change(
+			$id,
+			$metadata_before,
+			$metadata_only,
+			'update',
+			isset($original_options['changed_by']) ? $original_options['changed_by'] : null
+		);
 	}
 
 	/**
@@ -625,7 +748,8 @@ class Editor_model extends CI_Model {
 			throw new Exception("PROJECT_NOT_FOUND: ".$id);
 		}
 
-		$metadata=$project['metadata'];
+		$metadata_before = $project['metadata'];
+		$metadata=$metadata_before;
 
 		if (!is_object($metadata)){
 			$metadata=json_decode(json_encode($metadata));
@@ -661,6 +785,14 @@ class Editor_model extends CI_Model {
 
 		$this->db->where('id',$id);
 		$this->db->update('editor_projects',$db_options);
+
+		$this->metadata_change_log->record_project_metadata_change(
+			$id,
+			$metadata_before,
+			$metadata_only,
+			'patch',
+			isset($options['changed_by']) ? $options['changed_by'] : null
+		);
 	}
 
 	function update_project_template($sid,$type,$template_uid)
@@ -740,6 +872,12 @@ class Editor_model extends CI_Model {
 	{
 		$resolved_type = $this->resolve_canonical_type($type);
 		$schema_type = ($resolved_type !== false) ? $resolved_type : $type;
+
+		// Project metadata may include app-managed root keys; variable schema must not strip those names if present
+		if ($schema_type !== 'variable') {
+			$this->load->library('Project_validation');
+			$data = Project_validation::strip_application_managed_metadata_for_schema($data);
+		}
 		
 		// Get schema file path using schema registry (handles aliases and custom schemas)
 		try {
@@ -1546,6 +1684,7 @@ class Editor_model extends CI_Model {
         }
 
         $data_files=array();
+        $known_file_ids=array(); //token -> true, used to validate <var @files> tokens during fan-out
         foreach($files as $file){
             if(trim($file['id'])=='' && trim($file['file_id'])!='' ){
                 $file['id']=$file['file_id'];
@@ -1559,6 +1698,7 @@ class Editor_model extends CI_Model {
                 'var_count'     =>$file['varQnty']
             );
 			$data_files[]=$data_file;
+			$known_file_ids[$file['id']]=true;
 
 			if(!$parseOnly){
 				$this->Editor_datafile_model->delete($sid,$data_file['file_id']);
@@ -1568,26 +1708,106 @@ class Editor_model extends CI_Model {
         unset($files);
 
 		$output['data_files']=$data_files;
-		
+
         //import variables
         //$variables_imported=$this->import_variables($sid,$data_files, 
+		$this->load->library('DDI_Utils');
 		$variable_iterator=$parser->get_variable_iterator();
+		$vid_to_uid = array();
+		$pending_wgt_updates = array();
+		$variable_warnings = array(); //surfaced to API response
 
 		foreach($variable_iterator as $var_obj){
 			if($parseOnly){
 				$output['variables'][]=$var_obj->get_metadata_array();
-			}else{
-				
-				if (!$var_obj){
+				continue;
+			}
+
+			if (!$var_obj){
+				continue;
+			}
+
+			$base_variable=$var_obj->get_metadata_array();
+
+			// DDI 2.x @files is IDREFS (whitespace-separated list). A variable can
+			// reference multiple data files (e.g. hierarchical IPUMS H+P layouts).
+			// Fan out into one editor_variables row per referenced file so the
+			// per-file UI listings, counts and joins all work unchanged.
+			$file_id_tokens=DDI_Utils::split_file_ids($base_variable['file_id']);
+
+			if (empty($file_id_tokens)){
+				$variable_warnings[]=array(
+					'vid'   => isset($base_variable['vid']) ? $base_variable['vid'] : '',
+					'name'  => isset($base_variable['name']) ? $base_variable['name'] : '',
+					'files' => $base_variable['file_id'],
+					'message' => 'Variable has no @files attribute; not imported.'
+				);
+				continue;
+			}
+
+			// Capture weight reference (VID) before stripping; resolve to UID after all variables are inserted
+			$var_wgt_ref = isset($base_variable['var_wgt_ref']) && trim($base_variable['var_wgt_ref']) !== '' ? trim($base_variable['var_wgt_ref']) : null;
+			unset($base_variable['var_wgt_ref']);
+
+			$inserted_tokens=array();
+			$unknown_tokens=array();
+
+			foreach($file_id_tokens as $fid_token){
+				if (!isset($known_file_ids[$fid_token])){
+					$unknown_tokens[]=$fid_token;
 					continue;
 				}
 
-				$variable=$var_obj->get_metadata_array();
-				$variable['fid']=$variable['file_id'];
+				$variable=$base_variable;
+				$variable['file_id']=$fid_token;
+				$variable['fid']=$fid_token;
 				$variable['var_catgry_labels']=$this->get_variable_category_value_labels($variable);
 				$variable['metadata']=$variable;
-				$this->Editor_variable_model->insert($sid,$variable);
+
+				$insert_id = $this->Editor_variable_model->insert($sid,$variable);
+
+				// Key by fid|vid so the same VID in different data files maps to the correct UID
+				$vid_key = $variable['fid'] . '|' . strtoupper(trim($variable['vid']));
+				$vid_to_uid[$vid_key] = $insert_id;
+				if ($var_wgt_ref !== null) {
+					$pending_wgt_updates[] = array('uid' => $insert_id, 'vid_ref' => $var_wgt_ref, 'fid' => $variable['fid']);
+				}
+
+				$inserted_tokens[]=$fid_token;
 			}
+
+			if (count($file_id_tokens) > 1 && !empty($inserted_tokens)){
+				$variable_warnings[]=array(
+					'vid'   => isset($base_variable['vid']) ? $base_variable['vid'] : '',
+					'name'  => isset($base_variable['name']) ? $base_variable['name'] : '',
+					'files' => $base_variable['file_id'],
+					'message' => 'Variable referenced multiple files; imported into: '.implode(', ', $inserted_tokens).'.'
+				);
+			}
+
+			if (!empty($unknown_tokens)){
+				$variable_warnings[]=array(
+					'vid'   => isset($base_variable['vid']) ? $base_variable['vid'] : '',
+					'name'  => isset($base_variable['name']) ? $base_variable['name'] : '',
+					'files' => $base_variable['file_id'],
+					'message' => 'Variable referenced unknown data file(s): '.implode(', ', $unknown_tokens).' (skipped for those files).'
+				);
+			}
+		}
+
+		// Resolve var_wgt_id for variables that reference a weight variable (VID -> UID, within same file)
+		if (!$parseOnly && !empty($pending_wgt_updates)) {
+			foreach ($pending_wgt_updates as $p) {
+				$vid_key = $p['fid'] . '|' . strtoupper(trim($p['vid_ref']));
+				$ref_uid = isset($vid_to_uid[$vid_key]) ? $vid_to_uid[$vid_key] : null;
+				if ($ref_uid !== null) {
+					$this->Editor_variable_model->update($sid, $p['uid'], array('var_wgt_id' => $ref_uid));
+				}
+			}
+		}
+
+		if (!empty($variable_warnings)){
+			$output['variable_warnings']=$variable_warnings;
 		}
 
 		if($parseOnly){
@@ -1926,6 +2146,29 @@ class Editor_model extends CI_Model {
 		}
 	}
 
+	/**
+	 * Return the primary idno for a project: study_idno if non-empty, else idno.
+	 * Used for export ZIP naming and other display purposes.
+	 *
+	 * @param int $sid Project id
+	 * @return string|null study_idno if set, else idno; null if both empty
+	 */
+	function get_project_primary_idno($sid)
+	{
+		$this->db->select("study_idno, idno");
+		$this->db->where("id", $sid);
+		$row = $this->db->get("editor_projects")->row_array();
+		if (!$row) {
+			return null;
+		}
+		$study_idno = isset($row['study_idno']) ? trim((string) $row['study_idno']) : '';
+		if ($study_idno !== '') {
+			return $study_idno;
+		}
+		$idno = isset($row['idno']) ? trim((string) $row['idno']) : '';
+		return $idno !== '' ? $idno : null;
+	}
+
 	function validate_idno($idno)
 	{
 		if (is_numeric($idno)){
@@ -1999,58 +2242,26 @@ class Editor_model extends CI_Model {
 	 * Return patch for metadata diff
 	 * 
 	 */
-	function get_metadata_diff($metadata_original, $metadata_updated, $ignore_errors=false)
+	/**
+	 * @deprecated Use Metadata_change_log::build_change_record_safe() instead.
+	 */
+	function get_metadata_diff($metadata_original, $metadata_updated, $ignore_errors=false, $scope=Metadata_change_log::SCOPE_STUDY)
 	{
-		try{
-			//remove fields that are not needed for diff
-			$fields_to_remove=[
-				'schema',
-				'schema_version',
-				'type',				
-				'created_by',
-				'created',
-				'changed'
-			];
+		$record = Metadata_change_log::build_change_record_safe(
+			$metadata_original,
+			$metadata_updated,
+			$scope
+		);
 
-			foreach($fields_to_remove as $field){
-				if (isset($metadata_original[$field])){
-					unset($metadata_original[$field]);
-				}
-				if (isset($metadata_updated[$field])){
-					unset($metadata_updated[$field]);
-				}
-			}
-
-			$diff = new JsonDiff($metadata_original, $metadata_updated, JsonDiff::TOLERATE_ASSOCIATIVE_ARRAYS);
-
-			$patch=$diff->getPatch();
-
-			$json_patch=[				
-				//'added'=>$diff->getAdded(),
-				//'changed'=>$diff->getModifiedNew(),
-				'removed'=>$diff->getRemoved(),
-				'patch'=>$patch,
-			];
-
-			$json_patch= array_filter($json_patch, function($value) {
-				return !empty($value);
-			});
-
-			if (empty($json_patch)){
-				return false; //no changes
-			}
-
-			//encode
-			$json_patch=json_decode(json_encode($json_patch),true);
-
-			return $json_patch;
-		} catch (Exception $e) {
-			if ($ignore_errors==true){
-				return false;
-			}
-			throw new Exception("Metadata diff failed: ".$e->getMessage());
+		if ($record === null) {
+			return false;
 		}
-		
+
+		if ($ignore_errors && isset($record['status']) && $record['status'] === 'diff_failed') {
+			return false;
+		}
+
+		return $record;
 	}
 
 

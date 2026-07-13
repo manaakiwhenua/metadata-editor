@@ -11,11 +11,14 @@ use React\EventLoop\Factory;
  * Usage:
  *   php index.php cli/worker/run
  *   php index.php cli/worker/run --poll-interval=5
+ *   php index.php cli/worker/run --max-jobs=500
  */
 class Worker extends CI_Controller
 {
     private $loop;
     private $poll_interval = 5; // seconds
+    private $max_jobs = 0;      // 0 = unlimited; exit after N jobs to prevent memory leaks
+    private $jobs_processed = 0;
     private $worker_id;
     private $pid_file;
     private $heartbeat_file;
@@ -40,6 +43,7 @@ class Worker extends CI_Controller
         
         // Load required models and config
         $this->load->database();
+        $this->load->library('db_keepalive');
         $this->load->model('Job_queue_model');
         $this->load->config('editor');
         
@@ -74,6 +78,9 @@ class Worker extends CI_Controller
             if (strpos($arg, '--poll-interval=') === 0) {
                 $this->poll_interval = (int) substr($arg, 16);
             }
+            if (strpos($arg, '--max-jobs=') === 0) {
+                $this->max_jobs = (int) substr($arg, 11);
+            }
         }
     }
     
@@ -83,12 +90,18 @@ class Worker extends CI_Controller
      */
     public function run()
     {
-        
+        // Long-running daemon: do not inherit web PHP max_execution_time limits
+        set_time_limit(0);
+        ini_set('max_execution_time', '0');
+
         $this->loop = Factory::create();
         
         echo "[Worker] Starting job queue worker\n";
         echo "[Worker] Worker ID: {$this->worker_id}\n";
         echo "[Worker] Poll interval: {$this->poll_interval} seconds\n";
+        if ($this->max_jobs > 0) {
+            echo "[Worker] Max jobs per run: {$this->max_jobs} (exit after to prevent memory leaks)\n";
+        }
         echo "[Worker] PID file: {$this->pid_file}\n";
         echo "[Worker] Heartbeat file: {$this->heartbeat_file}\n";
         echo "[Worker] Press Ctrl+C to stop\n\n";
@@ -96,10 +109,13 @@ class Worker extends CI_Controller
         // Create PID file
         $this->create_pid_file();
         
-        // Reset any stuck jobs on startup
-        $stuck_count = $this->Job_queue_model->reset_stuck_jobs(2);
-        if ($stuck_count > 0) {
-            echo "[Worker] Reset {$stuck_count} stuck job(s)\n";
+        // Maintenance: reset stuck processing jobs and expire ancient pending jobs
+        $maintenance = $this->Job_queue_model->run_job_maintenance();
+        if ($maintenance['reset_stuck'] > 0) {
+            echo "[Worker] Reset {$maintenance['reset_stuck']} stuck job(s)\n";
+        }
+        if ($maintenance['expired_pending'] > 0) {
+            echo "[Worker] Expired {$maintenance['expired_pending']} stale pending job(s)\n";
         }
         
         // Update heartbeat immediately
@@ -114,14 +130,11 @@ class Worker extends CI_Controller
         $this->loop->addPeriodicTimer($this->poll_interval, function() {
             $this->process_queue();
         });
-        
-        // Clean up old jobs (older than 3 hours) every hour
-        $this->loop->addPeriodicTimer(3600, function() { // 3600 seconds = 1 hour
-            $this->cleanup_old_jobs();
+
+        // Periodic maintenance (stuck reset + pending expiry)
+        $this->loop->addPeriodicTimer(3600, function() {
+            $this->run_job_maintenance();
         });
-        
-        // Run cleanup immediately on startup
-        $this->cleanup_old_jobs();
         
         // Handle graceful shutdown
         if (function_exists('pcntl_signal')) {
@@ -199,7 +212,11 @@ class Worker extends CI_Controller
      */
     private function process_queue()
     {
+        $job = null;
+
         try {
+            $this->db_keepalive->ping();
+
             // Get next pending job
             $job = $this->Job_queue_model->get_next_job($this->worker_id);
             
@@ -214,13 +231,20 @@ class Worker extends CI_Controller
             // Job is already marked as processing by get_next_job()
             // Handle the job
             $this->handle_job($job);
-            
-        } catch (Exception $e) {
+
+            $this->jobs_processed++;
+            if ($this->max_jobs > 0 && $this->jobs_processed >= $this->max_jobs) {
+                echo "[Worker] Reached max jobs ({$this->max_jobs}), exiting for restart (memory leak prevention)\n";
+                $this->loop->stop();
+                return;
+            }
+
+        } catch (Throwable $e) {
             log_message('error', 'Worker::process_queue error: ' . $e->getMessage());
             echo "[Worker] Error: " . $e->getMessage() . "\n";
             
-            // If we have a job, mark it as failed
-            if (isset($job) && isset($job['id'])) {
+            if (isset($job['id'])) {
+                $this->db_keepalive->ping();
                 $this->Job_queue_model->mark_failed($job['id'], $e->getMessage());
             }
         }
@@ -246,13 +270,13 @@ class Worker extends CI_Controller
             // Process the job using the handler
             $result = $handler->process($job, $payload);
             
-            // Mark job as completed
+            $this->db_keepalive->ping();
             $this->Job_queue_model->mark_completed($job['id'], $result);
             $job_uuid = isset($job['uuid']) ? $job['uuid'] : 'N/A';
             echo "[Worker] Job #{$job['id']} (UUID: {$job_uuid}) completed successfully\n";
             
-        } catch (Exception $e) {
-            // Mark job as failed
+        } catch (Throwable $e) {
+            $this->db_keepalive->ping();
             $this->Job_queue_model->mark_failed($job['id'], $e->getMessage());
             $job_uuid = isset($job['uuid']) ? $job['uuid'] : 'N/A';
             echo "[Worker] Job #{$job['id']} (UUID: {$job_uuid}) failed: " . $e->getMessage() . "\n";
@@ -261,18 +285,22 @@ class Worker extends CI_Controller
     }
     
     /**
-     * Clean up old jobs (older than 3 hours)
+     * Reset stuck processing jobs and expire stale pending jobs (records kept as failed)
      */
-    private function cleanup_old_jobs()
+    private function run_job_maintenance()
     {
         try {
-            $deleted_count = $this->Job_queue_model->cleanup_old_jobs_by_hours(12);
-            if ($deleted_count > 0) {
-                echo "[Worker] Cleaned up {$deleted_count} old job(s) (older than 12 hours)\n";
+            $this->db_keepalive->ping();
+            $maintenance = $this->Job_queue_model->run_job_maintenance();
+            if ($maintenance['reset_stuck'] > 0) {
+                echo "[Worker] Reset {$maintenance['reset_stuck']} stuck job(s)\n";
             }
-        } catch (Exception $e) {
-            log_message('error', 'Worker::cleanup_old_jobs error: ' . $e->getMessage());
-            echo "[Worker] Error cleaning up old jobs: " . $e->getMessage() . "\n";
+            if ($maintenance['expired_pending'] > 0) {
+                echo "[Worker] Expired {$maintenance['expired_pending']} stale pending job(s)\n";
+            }
+        } catch (Throwable $e) {
+            log_message('error', 'Worker::run_job_maintenance error: ' . $e->getMessage());
+            echo "[Worker] Error during job maintenance: " . $e->getMessage() . "\n";
         }
     }
     

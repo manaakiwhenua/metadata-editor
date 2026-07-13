@@ -18,23 +18,7 @@
 
 
 <?php
-  $user=$this->session->userdata('username');
-  $this->load->library('Editor_acl');
-  
-  $has_schema_permission = false;
-  try {
-      $has_schema_permission = $this->editor_acl->has_access('schema', 'view');
-  } catch (Exception $e) {
-      $has_schema_permission = false;
-  }
-
-  $user_info=[
-    'username'=> $user,
-    'is_logged_in'=> !empty($user),
-    'is_admin'=> $this->ion_auth->is_admin(),
-    'has_schema_permission'=> $has_schema_permission,
-  ];
-  
+  $user_info = build_editor_user_info();
 ?>
 
 
@@ -492,6 +476,9 @@
     <vue-create-revision-dialog v-model="dialog_project_revision" v-bind="dialog_project_revision_options" v-on:revision-created="search" :key="dialog_project_revision_key">
     </vue-create-revision-dialog>
 
+    <vue-duplicate-project-dialog v-model="dialog_duplicate_project" v-bind="dialog_duplicate_project_options" v-on:project-duplicated="search" :key="dialog_duplicate_project_key">
+    </vue-duplicate-project-dialog>
+
 
     
 
@@ -655,6 +642,10 @@
           </v-list-item>
 
           <v-list-item>
+            <v-list-item-title @click="duplicateProject(menu_active_project_id)"><v-btn text>{{$t('duplicate_project')}}</v-btn></v-list-item-title>
+          </v-list-item>
+
+          <v-list-item>
             <v-list-item-title @click="transferOwnership(menu_active_project_id)" ><v-btn text>{{$t('transfer_ownership')}}</v-btn></v-list-item-title>
           </v-list-item>
           
@@ -718,6 +709,7 @@
     echo $this->load->view("metadata_editor/vue-login-component.js", null, true);
     echo $this->load->view("editor_common/global-site-header-component.js", null, true);
     echo $this->load->view("project/vue-create-revision-component.js", null, true);
+    echo $this->load->view("project/vue-duplicate-project-component.js", null, true);
     echo $this->load->view("project/vue-list-revisions-component.js", null, true);
     echo $this->load->view("project/vue-user-filter-component.js", null, true);
     echo $this->load->view("project/vue-tag-filter-component.js", null, true);
@@ -875,6 +867,9 @@
         dialog_project_revision: false,
         dialog_project_revision_options: {},
         dialog_project_revision_key: 0,
+        dialog_duplicate_project: false,
+        dialog_duplicate_project_options: {},
+        dialog_duplicate_project_key: 0,
       },
       created: async function() {
         //reload projects on window focus
@@ -996,6 +991,16 @@
           };
           this.dialog_project_revision_key++;
           this.dialog_project_revision = true;
+        },
+        duplicateProject: function(project_id) {
+          this.show_project_menu = false;
+          let project = this.Projects.find(x => x.id == project_id);
+          this.dialog_duplicate_project_options = {
+            'project_id': project_id,
+            'project': project || {}
+          };
+          this.dialog_duplicate_project_key++;
+          this.dialog_duplicate_project = true;
         },
 
 
@@ -1279,7 +1284,7 @@
             '&' + urlParams.toString();
 
           if (keywords && keywords.length>0){
-            url += '&keywords=' + keywords;
+            url += '&keywords=' + encodeURIComponent(keywords);
           }
 
           // Ensure exclude_collections parameter is passed

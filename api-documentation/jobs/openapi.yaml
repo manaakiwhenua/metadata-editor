@@ -1,0 +1,1492 @@
+openapi: 3.0.3
+info:
+  description: >-
+    Metadata Editor Jobs API
+
+    Background job queue management API for processing asynchronous tasks.
+
+    **Registered job types** (create via `POST /jobs` with `job_type` + `payload`, or use a
+    convenience endpoint where listed):
+
+    | job_type | Convenience endpoint | Payload schema | Result schema |
+    | --- | --- | --- | --- |
+    | `generate_pdf` | `POST /jobs/generate_pdf` | GeneratePdfJobPayload | GeneratePdfJobResult |
+    | `generate_microdata_resource` | `POST /jobs/generate_microdata_resource` | GenerateMicrodataResourceJobPayload | GenerateMicrodataResourceJobResult |
+    | `import_microdata` | `POST /jobs/import_microdata/{project_id}` (multipart upload) | ImportMicrodataJobPayload | ImportMicrodataJobResult |
+    | `import_indicator_data` | `POST /jobs/import_indicator_data` | ImportIndicatorDataJobPayload | ImportIndicatorDataJobResult |
+    | `publish_project` | `POST /jobs/publish_to_nada` | PublishProjectJobPayload | PublishProjectJobResult |
+    | `hello_world` | _(generic `POST /jobs` only — testing)_ | HelloWorldJobPayload | HelloWorldJobResult |
+
+    Use `GET /jobs/types` for the live handler list. Alias `pdf_generation` is accepted and maps to `generate_pdf`.
+
+    Find out more about Editor at
+    [https://github.com/worldbank/metadata-editor](https://github.com/worldbank/metadata-editor).
+
+  version: 1.0.0
+  title: Metadata Editor Jobs API
+  x-logo:
+    url: ""
+    backgroundColor: "#FFFFFF"
+    altText: ""
+
+servers:
+  - url: https://localhost/index.php/api
+    description: HTTPS
+  - url: http://localhost/index.php/api
+    description: HTTP
+
+tags:
+  - name: Jobs
+    description: Background job queue management
+  - name: Job Types
+    description: Convenience endpoints for specific job types
+
+paths:
+  /jobs:
+    get:
+      tags:
+        - Jobs
+      summary: List jobs
+      description: Get a list of background jobs. Returns basic job information. Use GET /jobs/{uuid} for full details including payload and result.
+      operationId: listJobs
+      parameters:
+        - name: status
+          in: query
+          description: Filter by job status
+          schema:
+            type: string
+            enum:
+              - pending
+              - held
+              - processing
+              - completed
+              - failed
+        - name: job_type
+          in: query
+          description: Filter by job type
+          schema:
+            $ref: "#/components/schemas/RegisteredJobType"
+        - name: user_id
+          in: query
+          description: Filter by user ID (admin only, or own jobs for regular users)
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          description: Number of jobs to return
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          description: Offset for pagination
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobListResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+      security:
+        - ApiKeyAuth: []
+
+    post:
+      tags:
+        - Jobs
+      summary: Create a new job
+      description: Enqueue a new background job for processing
+      operationId: createJob
+      requestBody:
+        required: true
+        description: Job creation request
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobCreateRequest"
+      responses:
+        "201":
+          description: Job created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobCreateResponse"
+        "400":
+          description: Bad request (invalid job type or payload)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+      security:
+        - ApiKeyAuth: []
+
+  /jobs/{uuid}:
+    get:
+      tags:
+        - Jobs
+      summary: Get job details
+      description: Get full details of a specific job including payload and result. Accepts UUID (recommended) or numeric ID for backward compatibility.
+      operationId: getJobDetails
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          description: Job UUID (or numeric ID for backward compatibility)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobDetailResponse"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: Access denied (user can only view their own jobs unless admin)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+      security:
+        - ApiKeyAuth: []
+
+  /jobs/generate_pdf:
+    post:
+      tags:
+        - Job Types
+      summary: Create PDF generation job
+      description: Convenience endpoint for creating PDF generation jobs. Automatically sets job_type to 'generate_pdf'. This is equivalent to POST /jobs with job_type='generate_pdf' in the payload.
+      operationId: createPdfGenerationJob
+      requestBody:
+        required: true
+        description: PDF generation job request
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeneratePdfJobRequest"
+      responses:
+        "201":
+          description: Job created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobCreateResponse"
+        "400":
+          description: Bad request (invalid project_id or options)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+      security:
+        - ApiKeyAuth: []
+
+  /jobs/generate_microdata_resource:
+    post:
+      tags:
+        - Job Types
+      summary: Create microdata resource generation job
+      description: >
+        Export project data files and create a dat/micro external resource in the background.
+        Equivalent to POST /jobs with job_type generate_microdata_resource.
+      operationId: createGenerateMicrodataResourceJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateMicrodataResourceJobRequest"
+      responses:
+        "201":
+          description: Job created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobCreateResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+      security:
+        - ApiKeyAuth: []
+
+  /jobs/import_microdata/{project_id}:
+    post:
+      tags:
+        - Job Types
+      summary: Import Microdata files
+      description: >
+        Upload and import a data file in one step (multipart/form-data). Creates an import_microdata
+        background job after upload. Equivalent to uploading separately then POST /jobs with
+        job_type import_microdata and payload file_id + project_id.
+      operationId: createImportMicrodataJob
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          description: Project ID where the data file will be imported
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The data file to upload (CSV, DTA, SAV, etc.)
+                overwrite:
+                  type: integer
+                  enum:
+                    - 0
+                    - 1
+                  default: 0
+                  description: Whether to overwrite existing file (0 or 1)
+                store_data:
+                  type: string
+                  enum:
+                    - store
+                    - remove
+                  default: store
+                  description: Whether to store data ("store" or "remove")
+                description:
+                  type: string
+                  description: File description (datafile-schema.json)
+                producer:
+                  type: string
+                  maxLength: 255
+                  description: File producer
+                data_checks:
+                  type: string
+                  description: Processing / data checks
+                missing_data:
+                  type: string
+                  description: Missing data documentation
+                version:
+                  type: string
+                  maxLength: 255
+                  description: File version
+                notes:
+                  type: string
+                  description: File notes
+                priority:
+                  type: integer
+                  description: Job queue priority; higher values are processed before lower ones
+                  default: 0
+      responses:
+        "201":
+          description: File uploaded and job created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportMicrodataJobResponse"
+        "400":
+          description: Bad request (invalid file, project not found, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+      security:
+        - ApiKeyAuth: []
+
+  /jobs/import_indicator_data:
+    post:
+      tags:
+        - Job Types
+      summary: Import indicator timeseries data from CSV
+      description: >
+        Import rows for one indicator value from a completed resumable CSV upload into an
+        indicator/timeseries project. Upload the CSV first via POST /api/uploads/* to obtain
+        upload_id. Equivalent to POST /jobs with job_type import_indicator_data.
+      operationId: createImportIndicatorDataJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportIndicatorDataJobRequest"
+      responses:
+        "201":
+          description: Job created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobCreateResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+      security:
+        - ApiKeyAuth: []
+
+  /jobs/publish_to_nada:
+    post:
+      tags:
+        - Job Types
+      summary: Publish project to NADA
+      description: >
+        Publish a project to a NADA catalog in the background. Sets job_type to publish_project.
+        Equivalent to POST /jobs with job_type publish_project (user_id is set automatically).
+      operationId: createNadaPublishJob
+      requestBody:
+        required: true
+        description: Publish options
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishProjectJobRequest"
+      responses:
+        "201":
+          description: Publish job created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishProjectJobResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+      security:
+        - ApiKeyAuth: []
+
+  /jobs/types:
+    get:
+      tags:
+        - Jobs
+      summary: Get available job types
+      description: >
+        Returns all registered job types that can be created via POST /jobs or a convenience endpoint.
+        Payload and result shapes are documented in component schemas *JobPayload and *JobResult; see also
+        RegisteredJobType enum and the job types table in the API info description.
+      operationId: getJobTypes
+      responses:
+        "200":
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobTypesResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+      security:
+        - ApiKeyAuth: []
+
+  /jobs/status:
+    get:
+      tags:
+        - Jobs
+      summary: Get queue status
+      description: Get overall queue statistics including counts by status. Optionally filter by user_id (admin only, or own stats for regular users).
+      operationId: getQueueStatus
+      parameters:
+        - name: user_id
+          in: query
+          description: Filter statistics by user ID (admin only, or own stats for regular users)
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueStatusResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+      security:
+        - ApiKeyAuth: []
+
+  /jobs/worker_status:
+    get:
+      tags:
+        - Jobs
+      summary: Get worker daemon status
+      description: Check if the background job worker daemon is running by checking PID and heartbeat files
+      operationId: getWorkerStatus
+      responses:
+        "200":
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkerStatusResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+      security:
+        - ApiKeyAuth: []
+
+  /jobs/hold_all:
+    post:
+      tags:
+        - Jobs
+      summary: Hold all pending jobs
+      description: >
+        Admin only. Sets all pending jobs to held status so the worker skips them.
+        Use this to pause the queue for testing without deleting jobs.
+      operationId: holdAllJobs
+      responses:
+        "200":
+          description: Jobs held successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  held_count:
+                    type: integer
+        "403":
+          description: Access denied (admin only)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+      security:
+        - ApiKeyAuth: []
+
+  /jobs/release_all:
+    post:
+      tags:
+        - Jobs
+      summary: Release all held jobs
+      description: Admin only. Restores all held jobs to pending so the worker can process them again.
+      operationId: releaseAllJobs
+      responses:
+        "200":
+          description: Jobs released successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  released_count:
+                    type: integer
+        "403":
+          description: Access denied (admin only)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+      security:
+        - ApiKeyAuth: []
+
+  /jobs/{uuid}/hold:
+    post:
+      tags:
+        - Jobs
+      summary: Hold a pending job
+      description: Admin only. Sets a pending job to held status.
+      operationId: holdJob
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job held
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobDetailResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+      security:
+        - ApiKeyAuth: []
+
+  /jobs/{uuid}/release:
+    post:
+      tags:
+        - Jobs
+      summary: Release a held job
+      description: Admin only. Restores a held job to pending status.
+      operationId: releaseJob
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job released
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobDetailResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+      security:
+        - ApiKeyAuth: []
+
+components:
+  schemas:
+    RegisteredJobType:
+      type: string
+      description: Registered background job type identifier
+      enum:
+        - generate_pdf
+        - generate_microdata_resource
+        - import_microdata
+        - import_indicator_data
+        - publish_project
+        - hello_world
+
+    JobTypesCatalog:
+      type: array
+      description: Static reference of all registered job types and their payload/result schemas
+      items:
+        $ref: "#/components/schemas/JobTypeCatalogEntry"
+      example:
+        - job_type: generate_pdf
+          description: Generate project PDF
+          convenience_endpoint: POST /jobs/generate_pdf
+          payload_schema: GeneratePdfJobPayload
+          result_schema: GeneratePdfJobResult
+        - job_type: generate_microdata_resource
+          description: Export data files and create dat/micro external resource
+          convenience_endpoint: POST /jobs/generate_microdata_resource
+          payload_schema: GenerateMicrodataResourceJobPayload
+          result_schema: GenerateMicrodataResourceJobResult
+        - job_type: import_microdata
+          description: Process uploaded microdata file (dictionary, CSV export)
+          convenience_endpoint: POST /jobs/import_microdata/{project_id}
+          payload_schema: ImportMicrodataJobPayload
+          result_schema: ImportMicrodataJobResult
+        - job_type: import_indicator_data
+          description: Import timeseries CSV for one indicator value
+          convenience_endpoint: POST /jobs/import_indicator_data
+          payload_schema: ImportIndicatorDataJobPayload
+          result_schema: ImportIndicatorDataJobResult
+        - job_type: publish_project
+          description: Publish project metadata, resources, and optional DSD/data to NADA
+          convenience_endpoint: POST /jobs/publish_to_nada
+          payload_schema: PublishProjectJobPayload
+          result_schema: PublishProjectJobResult
+        - job_type: hello_world
+          description: Test/demo job handler
+          convenience_endpoint: null
+          payload_schema: HelloWorldJobPayload
+          result_schema: HelloWorldJobResult
+
+    JobTypeCatalogEntry:
+      type: object
+      properties:
+        job_type:
+          $ref: "#/components/schemas/RegisteredJobType"
+        description:
+          type: string
+        convenience_endpoint:
+          type: string
+          nullable: true
+          description: Dedicated POST path when available; otherwise use POST /jobs
+        payload_schema:
+          type: string
+          description: Component schema name for the job payload
+        result_schema:
+          type: string
+          description: Component schema name for the completed job result
+
+    Job:
+      type: object
+      description: Job object
+      properties:
+        uuid:
+          type: string
+        job_type:
+          $ref: "#/components/schemas/RegisteredJobType"
+        status:
+          type: string
+          enum:
+            - pending
+            - held
+            - processing
+            - completed
+            - failed
+          description: Current job status
+        priority:
+          type: integer
+          description: Job priority
+        user_id:
+          type: integer
+          description: User who initiated the job (NULL for system jobs)
+        payload:
+          description: Job-specific parameters; shape depends on job_type (see *JobPayload schemas)
+          oneOf:
+            - $ref: "#/components/schemas/GeneratePdfJobPayload"
+            - $ref: "#/components/schemas/GenerateMicrodataResourceJobPayload"
+            - $ref: "#/components/schemas/ImportMicrodataJobPayload"
+            - $ref: "#/components/schemas/ImportIndicatorDataJobPayload"
+            - $ref: "#/components/schemas/PublishProjectJobPayload"
+            - $ref: "#/components/schemas/HelloWorldJobPayload"
+        result:
+          description: Job result when completed; shape depends on job_type (see *JobResult schemas)
+          oneOf:
+            - $ref: "#/components/schemas/GeneratePdfJobResult"
+            - $ref: "#/components/schemas/GenerateMicrodataResourceJobResult"
+            - $ref: "#/components/schemas/ImportMicrodataJobResult"
+            - $ref: "#/components/schemas/ImportIndicatorDataJobResult"
+            - $ref: "#/components/schemas/PublishProjectJobResult"
+            - $ref: "#/components/schemas/HelloWorldJobResult"
+        error_message:
+          type: string
+          description: Error details if job failed
+        attempts:
+          type: integer
+          description: Number of processing attempts
+        max_attempts:
+          type: integer
+          description: Maximum retry attempts
+        created_at:
+          type: string
+          format: date-time
+          description: Job creation timestamp
+        started_at:
+          type: string
+          format: date-time
+          description: Job processing start timestamp (null if not started)
+        completed_at:
+          type: string
+          format: date-time
+          description: Job completion timestamp (null if not completed)
+        worker_id:
+          type: string
+          description: Worker identifier processing this job (null if not processing)
+
+    JobBasic:
+      type: object
+      description: Basic job information (without payload and result)
+      properties:
+        uuid:
+          type: string
+        job_type:
+          $ref: "#/components/schemas/RegisteredJobType"
+        status:
+          type: string
+          enum:
+            - pending
+            - held
+            - processing
+            - completed
+            - failed
+        priority:
+          type: integer
+        user_id:
+          type: integer
+        attempts:
+          type: integer
+        max_attempts:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        worker_id:
+          type: string
+        job_status_link:
+          type: string
+          format: uri
+          description: URL to get full job details
+
+    JobCreateRequest:
+      type: object
+      required:
+        - job_type
+        - payload
+      properties:
+        job_type:
+          $ref: "#/components/schemas/RegisteredJobType"
+        payload:
+          description: Job-specific parameters validated by the handler for job_type
+          oneOf:
+            - $ref: "#/components/schemas/GeneratePdfJobPayload"
+            - $ref: "#/components/schemas/GenerateMicrodataResourceJobPayload"
+            - $ref: "#/components/schemas/ImportMicrodataJobPayload"
+            - $ref: "#/components/schemas/ImportIndicatorDataJobPayload"
+            - $ref: "#/components/schemas/PublishProjectJobPayload"
+            - $ref: "#/components/schemas/HelloWorldJobPayload"
+          example:
+            project_id: 123
+            options: {}
+        priority:
+          type: integer
+          description: Job priority
+        max_attempts:
+          type: integer
+          description: Maximum retry attempts
+
+    JobCreateResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        message:
+          type: string
+          example: "Job created successfully"
+        uuid:
+          type: string
+        job:
+          $ref: "#/components/schemas/Job"
+
+    JobListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        total:
+          type: integer
+          description: Total number of jobs in the response
+        found:
+          type: integer
+          description: Number of jobs found
+        limit:
+          type: integer
+          description: Limit used for pagination
+        offset:
+          type: integer
+          description: Offset used for pagination
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobBasic"
+
+    JobDetailResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        job:
+          $ref: "#/components/schemas/Job"
+        worker_status:
+          $ref: "#/components/schemas/WorkerStatus"
+
+    QueueStatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        queue:
+          type: object
+          description: Overall queue statistics
+          properties:
+            pending:
+              type: integer
+              description: Number of pending jobs
+            held:
+              type: integer
+              description: Number of held jobs (paused, not processed by worker)
+            processing:
+              type: integer
+              description: Number of jobs currently processing
+            completed:
+              type: integer
+              description: Number of completed jobs
+            failed:
+              type: integer
+              description: Number of failed jobs
+            total:
+              type: integer
+              description: Total number of jobs
+        user_stats:
+          type: object
+          description: User-specific statistics (if user_id filter provided)
+          properties:
+            pending:
+              type: integer
+            held:
+              type: integer
+            processing:
+              type: integer
+            completed:
+              type: integer
+            failed:
+              type: integer
+            total:
+              type: integer
+
+    WorkerStatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        worker:
+          $ref: "#/components/schemas/WorkerStatus"
+
+    WorkerStatus:
+      type: object
+      properties:
+        is_running:
+          type: boolean
+          description: Whether the worker process is running
+        is_alive:
+          type: boolean
+          description: Whether the worker is alive (based on heartbeat)
+        pid_file_exists:
+          type: boolean
+          description: Whether PID file exists
+        heartbeat_file_exists:
+          type: boolean
+          description: Whether heartbeat file exists
+        heartbeat_age_seconds:
+          type: integer
+          description: Age of last heartbeat in seconds
+        pid_data:
+          type: object
+          description: PID file data
+          properties:
+            pid:
+              type: integer
+            worker_id:
+              type: string
+            started_at:
+              type: string
+            poll_interval:
+              type: integer
+        heartbeat_data:
+          type: object
+          description: Heartbeat file data
+          properties:
+            worker_id:
+              type: string
+            pid:
+              type: integer
+            timestamp:
+              type: integer
+            datetime:
+              type: string
+        active_worker_count:
+          type: integer
+          description: Number of active workers (jobs currently being processed)
+        active_worker_ids:
+          type: array
+          items:
+            type: string
+          description: List of active worker IDs
+
+    JobTypesResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        total:
+          type: integer
+          description: Total number of available job types
+        job_types:
+          type: array
+          description: List of available job types (live from JobRegistry)
+          items:
+            $ref: "#/components/schemas/JobTypeInfo"
+      example:
+        status: success
+        total: 6
+        job_types:
+          - job_type: generate_pdf
+            available: true
+            description: PDF Generation Job Handler
+          - job_type: generate_microdata_resource
+            available: true
+            description: Generate a dat/micro external resource from project data files (background job).
+          - job_type: import_microdata
+            available: true
+            description: Microdata Import Job Handler
+          - job_type: import_indicator_data
+            available: true
+            description: Import Indicator Data Job Handler
+          - job_type: publish_project
+            available: true
+            description: Publish Project Job Handler
+          - job_type: hello_world
+            available: true
+            description: Hello World Job Handler
+
+    JobTypeInfo:
+      type: object
+      properties:
+        job_type:
+          $ref: "#/components/schemas/RegisteredJobType"
+        available:
+          type: boolean
+          description: Whether this job type is available
+          default: true
+        description:
+          type: string
+          description: Description of what this job type does
+          example: "PDF Generation Job Handler"
+
+    ApiErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "failed"
+        message:
+          type: string
+          description: Error message
+
+    GenerateMicrodataResourceJobRequest:
+      type: object
+      required:
+        - project_id
+        - export_format
+      properties:
+        project_id:
+          type: integer
+          description: Project ID (sid)
+        export_format:
+          type: string
+          description: csv, dta, sav, xpt, or json
+        export_version:
+          type: string
+          description: Stata version when export_format is dta
+        file_ids:
+          type: array
+          items:
+            type: string
+          description: Data file IDs; all files when omitted
+        zip:
+          type: boolean
+          default: true
+        overwrite:
+          type: boolean
+          default: false
+        resource_id:
+          type: integer
+          description: Regenerate an existing generated resource
+        refresh_description:
+          type: boolean
+        max_wait_seconds:
+          type: integer
+          default: 900
+        priority:
+          type: integer
+          default: 0
+        max_attempts:
+          type: integer
+          default: 2
+
+    GeneratePdfJobRequest:
+      type: object
+      required:
+        - project_id
+      description: Request body for PDF generation job convenience endpoint
+      properties:
+        project_id:
+          type: integer
+          description: Project ID for which to generate the PDF
+          example: 123
+        options:
+          type: object
+          description: Optional PDF generation options
+          additionalProperties: true
+          properties:
+            template:
+              type: string
+              description: PDF template to use (optional)
+            format:
+              type: string
+              description: PDF format options (optional)
+          example: {}
+        priority:
+          type: integer
+          description: Job priority
+          default: 0
+        max_attempts:
+          type: integer
+          description: Maximum retry attempts
+          default: 3
+
+    GeneratePdfJobPayload:
+      type: object
+      required:
+        - project_id
+      description: Payload for PDF generation job (used in generic /jobs endpoint)
+      properties:
+        project_id:
+          type: integer
+          description: Project ID for which to generate the PDF
+          example: 123
+        options:
+          type: object
+          description: Optional PDF generation options
+          additionalProperties: true
+          properties:
+            template:
+              type: string
+              description: PDF template to use (optional)
+            format:
+              type: string
+              description: PDF format options (optional)
+          example: {}
+
+    GeneratePdfJobResult:
+      type: object
+      description: Result returned when PDF generation job completes successfully
+      properties:
+        pdf_path:
+          type: string
+          description: File path to the generated PDF
+          example: "/path/to/project_123.pdf"
+        project_id:
+          type: integer
+          description: Project ID for which the PDF was generated
+          example: 123
+        generated_at:
+          type: string
+          format: date-time
+          description: Timestamp when PDF was generated
+          example: "2025-01-11 16:30:45"
+
+    GenerateMicrodataResourceJobPayload:
+      type: object
+      required:
+        - project_id
+        - export_format
+      description: Payload for generate_microdata_resource job (used in generic /jobs endpoint)
+      properties:
+        project_id:
+          type: integer
+          description: Project ID (sid)
+        export_format:
+          type: string
+          description: csv, dta, sav, xpt, or json
+        export_version:
+          type: string
+          description: Stata version when export_format is dta
+        file_ids:
+          type: array
+          items:
+            type: string
+        zip:
+          type: boolean
+          default: true
+        overwrite:
+          type: boolean
+          default: false
+        resource_id:
+          type: integer
+          description: Regenerate an existing generated resource
+        refresh_description:
+          type: boolean
+        max_wait_seconds:
+          type: integer
+          default: 900
+
+    GenerateMicrodataResourceJobResult:
+      type: object
+      description: Result returned when microdata resource generation job completes
+      properties:
+        status:
+          type: string
+          enum: [success, skipped]
+        project_id:
+          type: integer
+        export_format:
+          type: string
+        resource_id:
+          type: integer
+        filename:
+          type: string
+        links_count:
+          type: integer
+        message:
+          type: string
+          description: Present when status is skipped (resource already exists)
+
+    ImportMicrodataJobPayload:
+      type: object
+      required:
+        - file_id
+        - project_id
+      description: Payload for microdata import job
+      properties:
+        file_id:
+          type: string
+          description: File ID of the uploaded data file to import
+          example: "F4"
+        project_id:
+          type: string
+          description: Project ID where the data will be imported
+          example: "743"
+
+    ImportMicrodataJobResult:
+      type: object
+      description: Result returned when microdata import job completes successfully
+      properties:
+        fastapi_job_id:
+          type: string
+          description: FastAPI processing job ID
+        file_id:
+          type: string
+          description: File ID that was imported
+        project_id:
+          oneOf:
+            - type: string
+            - type: integer
+          description: Project ID where data was imported
+        datafile_path:
+          type: string
+          description: Path to the processed data file
+        variables_imported:
+          type: integer
+          description: Number of variables imported from the data dictionary
+        case_count:
+          type: integer
+          nullable: true
+          description: Row count from the data dictionary
+        csv_file:
+          type: string
+          nullable: true
+          description: Basename of the CSV file after cleanup
+        fastapi_status:
+          type: string
+          example: done
+        message:
+          type: string
+          example: Microdata import completed successfully
+
+    ImportIndicatorDataJobRequest:
+      type: object
+      required:
+        - project_id
+        - upload_id
+        - indicator_value
+      description: Request body for import_indicator_data convenience endpoint
+      properties:
+        project_id:
+          oneOf:
+            - type: integer
+            - type: string
+          description: Project sid or idno (indicator/timeseries project)
+        upload_id:
+          type: string
+          description: Completed resumable upload ID from POST /api/uploads/*
+        indicator_value:
+          type: string
+          description: Import only rows whose indicator_id column matches this value
+          example: NY.GDP.PCAP.CD
+        delimiter:
+          type: string
+          description: CSV field delimiter (default comma)
+          default: ","
+          example: ","
+        keep_extra_csv_columns:
+          type: boolean
+          description: Keep CSV columns beyond the bound DSD when importing
+          default: false
+        priority:
+          type: integer
+          default: 0
+        max_attempts:
+          type: integer
+          description: Default 1 to avoid duplicate rows on retry
+          default: 1
+
+    ImportIndicatorDataJobPayload:
+      type: object
+      required:
+        - project_id
+        - upload_id
+        - indicator_value
+      description: Payload for import_indicator_data job (used in generic /jobs endpoint)
+      properties:
+        project_id:
+          type: integer
+          description: Project sid
+        upload_id:
+          type: string
+          description: Completed resumable upload ID
+        indicator_value:
+          type: string
+        delimiter:
+          type: string
+          default: ","
+        keep_extra_csv_columns:
+          type: boolean
+          default: false
+
+    ImportIndicatorDataJobResult:
+      type: object
+      description: Result returned when indicator data import job completes successfully
+      properties:
+        status:
+          type: string
+          example: success
+        indicator_value:
+          type: string
+        job_id:
+          type: string
+          description: FastAPI replace-from-csv job ID
+
+    HelloWorldJobPayload:
+      type: object
+      description: Payload for hello_world job (testing/demo; POST /jobs only)
+      properties:
+        message:
+          type: string
+          description: Optional greeting message
+          example: Hello, World!
+
+    HelloWorldJobResult:
+      type: object
+      description: Result returned when hello_world job completes
+      properties:
+        message:
+          type: string
+        processed_at:
+          type: string
+          format: date-time
+        job_id:
+          type: integer
+          description: Internal job queue ID
+
+    ImportMicrodataJobResponse:
+      type: object
+      description: Response from import_microdata endpoint (upload + job creation)
+      properties:
+        status:
+          type: string
+          example: "success"
+        message:
+          type: string
+          example: "File uploaded and import job created successfully"
+        file_id:
+          type: string
+          description: ID of the uploaded file
+          example: "F4"
+        uuid:
+          type: string
+          description: UUID of the created import job
+        job:
+          $ref: "#/components/schemas/Job"
+        upload_result:
+          type: object
+          description: File upload result details
+          properties:
+            uploaded:
+              type: object
+              properties:
+                uploaded_file_name:
+                  type: string
+                base64:
+                  type: string
+            file_id:
+              type: string
+
+    PublishProjectJobRequest:
+      type: object
+      required:
+        - project_id
+        - catalog_connection_id
+      description: Request body for publish_to_nada convenience endpoint
+      properties:
+        project_id:
+          oneOf:
+            - type: integer
+            - type: string
+          description: Project sid or idno to publish
+          example: "123"
+        catalog_connection_id:
+          type: integer
+          description: NADA catalog connection ID
+          example: 1
+        publish_metadata:
+          type: boolean
+          default: true
+        publish_thumbnail:
+          type: boolean
+          default: true
+        publish_resources:
+          type: boolean
+          description: >
+            Publish external resources metadata to NADA and upload attached local files to the study files API.
+          default: true
+        publish_dsd:
+          type: boolean
+          description: For indicator/timeseries projects, publish bound DSD to NADA
+          default: false
+        dsd_overwrite:
+          type: boolean
+          description: Replace existing DSD on NADA when publishing DSD
+          default: false
+        publish_indicator_data:
+          type: boolean
+          description: For indicator/timeseries projects, export and import observations to NADA
+          default: false
+        delete_nada_resources:
+          type: boolean
+          description: Remove existing NADA study resources before publishing (requires study_idno)
+          default: false
+        options:
+          type: object
+          description: Additional publish options (e.g. overwrite)
+          additionalProperties: true
+          example:
+            overwrite: "yes"
+        priority:
+          type: integer
+          default: 0
+        max_attempts:
+          type: integer
+          default: 3
+
+    PublishProjectJobPayload:
+      type: object
+      required:
+        - project_id
+        - catalog_connection_id
+        - user_id
+      description: Payload for publish_project job (used in generic /jobs endpoint)
+      properties:
+        project_id:
+          oneOf:
+            - type: integer
+            - type: string
+        catalog_connection_id:
+          type: integer
+        user_id:
+          type: integer
+          description: User performing the publish (set automatically by convenience endpoint)
+        publish_metadata:
+          type: boolean
+          default: true
+        publish_thumbnail:
+          type: boolean
+          default: true
+        publish_resources:
+          type: boolean
+          default: true
+        publish_dsd:
+          type: boolean
+          default: false
+        dsd_overwrite:
+          type: boolean
+          default: false
+        publish_indicator_data:
+          type: boolean
+          default: false
+        delete_nada_resources:
+          type: boolean
+          default: false
+        options:
+          type: object
+          additionalProperties: true
+
+    PublishProjectJobResult:
+      type: object
+      description: Result returned when publish_project job completes
+      properties:
+        results:
+          type: object
+          additionalProperties: true
+          description: Per-step publish outcomes (metadata, thumbnail, resources, dsd, etc.)
+        errors:
+          type: object
+          additionalProperties: true
+          description: Non-fatal step errors keyed by step name
+        project_id:
+          oneOf:
+            - type: integer
+            - type: string
+        catalog_connection_id:
+          type: integer
+        published_at:
+          type: string
+          format: date-time
+
+    PublishProjectJobResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        message:
+          type: string
+          example: "Publish job created successfully"
+        job_uuid:
+          type: string
+        job:
+          $ref: "#/components/schemas/Job"
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication

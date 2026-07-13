@@ -76,7 +76,10 @@ $lang['account_activation']="Account activation";
 $lang['callback_country_invalid']="The Country field is required.";
 $lang['log_in']="Log in";
 $lang['site_login_privacy_terms']="Information you provide by registering or logging in will be used in compliance with our Privacy Policy.";
-$lang['local_mode_login_message']="Click the button below to sign in. No password is required (local/desktop mode).";
+$lang['local_mode_login_message']="Local mode — click below to sign in as:";
+$lang['local_mode_no_password_required']="No password is required.";
+$lang['local_administrator']="Local Administrator";
+$lang['local_mode_login_failed']="Local sign-in failed. Please try again.";
 $lang['local_mode_no_forgot_password']="Password recovery is not available in local mode.";
 $lang['local_mode_no_registration']="User registration is not available in local mode.";
 $lang['impersonate_user']="Impersonate as another user";
@@ -153,6 +156,9 @@ $lang['roles_removal_failed']="Role removal failed";
 
 // User roles
 $lang['user_roles']="User Roles";
+$lang['editor_access_required_title']="Editor access required";
+$lang['editor_access_required_message']="Your account is active but does not have permission to use the metadata editor. Ask your site administrator to assign the Editor role to your account.";
+$lang['editor_access_required_admin_hint']="You have site administration access. Go to Admin → Users, open this account, and assign the Editor role (and any other roles needed).";
 
 // Pending activation
 $lang['pending_activation']="Pending Activation";

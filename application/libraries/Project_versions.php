@@ -228,34 +228,77 @@ class Project_versions
 		);
 		
 		try {
-			
-			//create project folder and update project table
-			$output['project_folder'] = $this->ci->Editor_model->create_project_folder($new_sid);
-
-			//copy data files
-			$output['data_files'] = $this->copy_project_data_files($source_sid, $new_sid);
-
-			//copy variables
-			$output['variables'] = $this->copy_project_variables($source_sid, $new_sid);
-
-			//copy variable groups
-			$output['variable_groups'] = $this->copy_project_variable_groups($source_sid, $new_sid);
-
-			//copy external resources (database records)
-			$output['external_resources'] = $this->copy_external_resources($source_sid, $new_sid);
-
-			//copy project files (thumbnails, data files, external resource files)
-			$output['files'] = $this->copy_project_files($source_sid, $new_sid);
+			$output = array_merge($output, $this->copy_project_content($source_sid, $new_sid));
 
 			//lock project
 			$this->ci->Editor_model->lock_project($new_sid);
 
 		} catch (Exception $e) {
-			$this->cleanup_failed_version($new_sid);
+			$this->cleanup_failed_copy($new_sid);
 			throw new Exception("FAILED_TO_COPY_PROJECT_DATA: " . $e->getMessage());
 		}
 
 		return $output;
+	}
+
+	/**
+	 * Copy project content from source to an existing target project row.
+	 *
+	 * @param int $source_sid
+	 * @param int $target_sid
+	 * @return array
+	 */
+	function copy_project_content($source_sid, $target_sid)
+	{
+		$output = array();
+
+		$output['project_folder'] = $this->ci->Editor_model->create_project_folder($target_sid);
+		$output['data_files'] = $this->copy_project_data_files($source_sid, $target_sid);
+		$output['variables'] = $this->copy_project_variables($source_sid, $target_sid);
+		$output['variable_groups'] = $this->copy_project_variable_groups($source_sid, $target_sid);
+		$output['external_resources'] = $this->copy_external_resources($source_sid, $target_sid);
+		$output['files'] = $this->copy_project_files($source_sid, $target_sid);
+
+		return $output;
+	}
+
+	/**
+	 * Copy indicator DSD binding without DuckDB publish state.
+	 *
+	 * @param int $source_sid
+	 * @param int $target_sid
+	 * @return array|null
+	 */
+	function copy_project_dsd_binding($source_sid, $target_sid)
+	{
+		if (!$this->ci->db->table_exists('editor_project_dsd')) {
+			return null;
+		}
+
+		$this->ci->load->model('Editor_project_dsd_model');
+		$binding = $this->ci->Editor_project_dsd_model->get_by_sid((int) $source_sid);
+		if (!$binding || empty($binding['data_structure_id'])) {
+			return null;
+		}
+
+		$indicator_id_value = isset($binding['indicator_id_value']) ? $binding['indicator_id_value'] : null;
+		$this->ci->Editor_project_dsd_model->bind(
+			(int) $target_sid,
+			(int) $binding['data_structure_id'],
+			$indicator_id_value
+		);
+
+		if (isset($binding['implied_freq_code']) && trim((string) $binding['implied_freq_code']) !== '') {
+			$this->ci->Editor_project_dsd_model->update_implied_freq_code(
+				(int) $target_sid,
+				(string) $binding['implied_freq_code']
+			);
+		}
+
+		return array(
+			'data_structure_id' => (int) $binding['data_structure_id'],
+			'has_published_data' => 0,
+		);
 	}
 
 	/**
@@ -267,31 +310,49 @@ class Project_versions
 	 */
 	function cleanup_failed_version($sid)
 	{
+		$this->cleanup_failed_copy($sid);
+	}
+
+	/**
+	 * Remove a partially created project copy from database and disk.
+	 *
+	 * @param int $sid
+	 */
+	function cleanup_failed_copy($sid)
+	{
 		try {
-			// Delete project folder if it exists
 			$project_folder = $this->ci->Editor_model->get_project_folder($sid);
 			if ($project_folder && file_exists($project_folder)) {
 				$this->recursive_delete_directory($project_folder);
 			}
-			
-			// Delete from database tables
+
+			if ($this->ci->db->table_exists('editor_resource_data_files')) {
+				$this->ci->db->where('sid', $sid);
+				$this->ci->db->delete('editor_resource_data_files');
+			}
+
+			if ($this->ci->db->table_exists('editor_project_dsd')) {
+				$this->ci->db->where('sid', $sid);
+				$this->ci->db->delete('editor_project_dsd');
+			}
+
 			$this->ci->db->where('sid', $sid);
 			$this->ci->db->delete('editor_data_files');
-			
+
 			$this->ci->db->where('sid', $sid);
 			$this->ci->db->delete('editor_variables');
-			
+
 			$this->ci->db->where('sid', $sid);
 			$this->ci->db->delete('editor_variable_groups');
-			
+
 			$this->ci->db->where('sid', $sid);
 			$this->ci->db->delete('editor_resources');
-			
+
 			$this->ci->db->where('id', $sid);
 			$this->ci->db->delete('editor_projects');
-			
+
 		} catch (Exception $e) {
-			log_message('error', 'Failed to cleanup failed version ' . $sid . ': ' . $e->getMessage());
+			log_message('error', 'Failed to cleanup failed project copy ' . $sid . ': ' . $e->getMessage());
 		}
 	}
 
@@ -439,22 +500,99 @@ class Project_versions
 	function copy_external_resources($source_sid, $target_sid)
 	{
 		$columns = $this->get_table_columns('editor_resources');
+		$columns = array_values(array_diff($columns, array('sid', 'id')));
 
-		//remove sid and pk columns
-		$columns = array_diff($columns, array('sid', 'id'));
+		$source_resources = $this->ci->db
+			->where('sid', (int) $source_sid)
+			->order_by('id', 'ASC')
+			->get('editor_resources')
+			->result_array();
 
-		//create sql
-		$sql = 'INSERT INTO editor_resources (sid,' . implode(",", $columns) 
-				. ') SELECT ' . $target_sid . ',' . implode(",", $columns) . ' FROM editor_resources WHERE sid=?';
-		
-		$result = $this->ci->db->query($sql, array($source_sid));
-		
-		if (!$result) {
-			$db_error = $this->ci->db->error();
-			throw new Exception("FAILED_TO_COPY_EXTERNAL_RESOURCES: " . $db_error['message']);
+		$resource_id_map = array();
+		foreach ($source_resources as $resource) {
+			$old_id = (int) $resource['id'];
+			$row = array('sid' => (int) $target_sid);
+			foreach ($columns as $col) {
+				if (array_key_exists($col, $resource)) {
+					$row[$col] = $resource[$col];
+				}
+			}
+
+			if (!$this->ci->db->insert('editor_resources', $row)) {
+				$db_error = $this->ci->db->error();
+				throw new Exception("FAILED_TO_COPY_EXTERNAL_RESOURCES: " . $db_error['message']);
+			}
+
+			$resource_id_map[$old_id] = (int) $this->ci->db->insert_id();
 		}
-		
-		return $result;
+
+		$links_copied = $this->copy_resource_datafile_links($source_sid, $target_sid, $resource_id_map);
+
+		return array(
+			'resources_copied' => count($resource_id_map),
+			'links_copied' => $links_copied,
+		);
+	}
+
+	/**
+	 * Copy optional dat/micro data-file link rows, remapping resource_id to the target project.
+	 *
+	 * @param int $source_sid
+	 * @param int $target_sid
+	 * @param array $resource_id_map old resource id => new resource id
+	 * @return int
+	 */
+	function copy_resource_datafile_links($source_sid, $target_sid, array $resource_id_map)
+	{
+		if (!$this->ci->db->table_exists('editor_resource_data_files') || empty($resource_id_map)) {
+			return 0;
+		}
+
+		$source_links = $this->ci->db
+			->where('sid', (int) $source_sid)
+			->order_by('id', 'ASC')
+			->get('editor_resource_data_files')
+			->result_array();
+
+		$link_columns = array(
+			'file_id',
+			'export_format',
+			'export_version',
+			'zip_entry_name',
+			'link_type',
+			'data_file_changed',
+			'source_csv_mtime',
+			'generated_at',
+			'created',
+			'created_by',
+		);
+
+		$count = 0;
+		foreach ($source_links as $link) {
+			$old_resource_id = (int) $link['resource_id'];
+			if (!isset($resource_id_map[$old_resource_id])) {
+				continue;
+			}
+
+			$row = array(
+				'sid' => (int) $target_sid,
+				'resource_id' => (int) $resource_id_map[$old_resource_id],
+			);
+			foreach ($link_columns as $col) {
+				if (array_key_exists($col, $link)) {
+					$row[$col] = $link[$col];
+				}
+			}
+
+			if (!$this->ci->db->insert('editor_resource_data_files', $row)) {
+				$db_error = $this->ci->db->error();
+				throw new Exception("FAILED_TO_COPY_RESOURCE_DATAFILE_LINKS: " . $db_error['message']);
+			}
+
+			$count++;
+		}
+
+		return $count;
 	}
 
 	/**
@@ -811,16 +949,12 @@ class Project_versions
 			throw new Exception("Project not found");
 		}
 
-		if ($this->is_main_project($project_id)) {
-			return $project_id;
+		$pid = isset($project['pid']) ? $project['pid'] : null;
+		if ($pid == 0 || ! $pid || $pid == $project_id) {
+			return (int) $project_id;
 		}
 
-		$main_project_id = $project['pid'];
-		if (!$main_project_id) {
-			throw new Exception("Invalid project structure: version has no parent");
-		}
-
-		return $main_project_id;
+		return (int) $pid;
 	}
 
 	/**
@@ -849,6 +983,54 @@ class Project_versions
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Load version rows for many main projects in one query.
+	 * Caller must pass main study ids (parent rows where pid IS NULL in normal listings).
+	 *
+	 * @param array $main_project_ids list of integer editor_projects.id
+	 * @return array map of main project id => list of version rows (same shape as get_versions), ordered by version_created DESC
+	 */
+	function get_versions_batch_for_main_projects(array $main_project_ids)
+	{
+		$main_project_ids = array_values(array_unique(array_map('intval', $main_project_ids)));
+		$main_project_ids = array_filter($main_project_ids);
+		if (count($main_project_ids) === 0) {
+			return array();
+		}
+
+		$this->ci->db->select('editor_projects.id, type, idno, version_number, pid, title, created, changed, created_by, changed_by, thumbnail, is_locked, version_notes, version_created, users.username as version_created_by_name, version_created_by');
+		$this->ci->db->from('editor_projects');
+		$this->ci->db->join('users', 'users.id=editor_projects.version_created_by');
+		$this->ci->db->where_in('pid', $main_project_ids);
+		$this->ci->db->order_by('pid', 'asc');
+		$this->ci->db->order_by('version_created', 'desc');
+		$query = $this->ci->db->get();
+
+		if ( ! $query) {
+			$error = $this->ci->db->error();
+			throw new Exception(implode(', ', $error));
+		}
+
+		$rows = $query->result_array();
+		$by_parent = array();
+		foreach ($main_project_ids as $id) {
+			$by_parent[$id] = array();
+		}
+		foreach ($rows as $row) {
+			$pid = (int) $row['pid'];
+			if ( ! isset($by_parent[$pid])) {
+				$by_parent[$pid] = array();
+			}
+			$by_parent[$pid][] = $row;
+		}
+		foreach ($by_parent as &$list) {
+			array_walk($list, 'unix_date_to_gmt', array('version_created'));
+		}
+		unset($list);
+
+		return $by_parent;
 	}
 
 	/**

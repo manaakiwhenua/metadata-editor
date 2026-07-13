@@ -26,6 +26,11 @@ $config['acl_permissions'] = [
             [
             'permission'=>'view',                
             'description'=>'View site administration dashboard'
+            ],
+            [
+            'permission'=>'edit',
+            'sub_permissions'=>['view'],
+            'description'=>'Run analytics aggregation and dashboard maintenance'
             ]
         ]
     ],
@@ -51,9 +56,7 @@ $config['acl_permissions'] = [
             ]
         ]
     ],
-    /*     
-    // TODO: implement project manager role
-    "project_manager"=>[ 
+    "project_manager"=>[
         "title" => "Project manager",
         "description"=> "Global access to all projects",
         "permissions"=>[
@@ -61,20 +64,23 @@ $config['acl_permissions'] = [
                 "permission" => "view"
             ],
             [
-                "permission" => "edit"
+                "permission" => "edit",
+                "sub_permissions"=>["view"]
             ],
             [
-                "permission" => "delete"
+                "permission" => "delete",
+                "sub_permissions"=>["view"]
             ],
             [
-                "permission" => "publish"
+                "permission" => "publish",
+                "sub_permissions"=>["view"]
             ],
             [
                 "permission" => "admin",
                 "sub_permissions"=>["view","edit","delete","publish"]
             ]
         ]
-    ],*/
+    ],
 
     "template_manager"=>[ 
         "title" => "Template manager",
@@ -179,6 +185,58 @@ $config['acl_permissions'] = [
             [
                 "permission" => "admin",
                 "sub_permissions"=>["view","edit","delete"]
+            ]
+        ]
+    ],
+
+    "codelist"=>[
+        "title" => "Codelists",
+        "description"=> "Manage the site-wide codelist registry",
+        "permissions"=>[
+            [
+                "permission" => "view"
+            ],
+            [
+                "permission" => "edit",
+                "sub_permissions"=>["view"]
+            ],
+            [
+                "permission" => "delete",
+                "sub_permissions"=>["view"]
+            ],
+            [
+                "permission" => "import",
+                "sub_permissions"=>["edit","view"]
+            ],
+            [
+                "permission" => "admin",
+                "sub_permissions"=>["view","edit","delete","import"]
+            ]
+        ]
+    ],
+
+    "data_structure"=>[
+        "title" => "Data structures",
+        "description"=> "Manage the site-wide DSD / data structure catalogue",
+        "permissions"=>[
+            [
+                "permission" => "view"
+            ],
+            [
+                "permission" => "edit",
+                "sub_permissions"=>["view"]
+            ],
+            [
+                "permission" => "delete",
+                "sub_permissions"=>["view"]
+            ],
+            [
+                "permission" => "import",
+                "sub_permissions"=>["edit","view"]
+            ],
+            [
+                "permission" => "admin",
+                "sub_permissions"=>["view","edit","delete","import"]
             ]
         ]
     ],
