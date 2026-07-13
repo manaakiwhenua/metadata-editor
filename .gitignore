@@ -1,7 +1,4 @@
 *.cache
-.env
-.env.*
-!.env.docker.example
 trash
 /trash
 .settings
@@ -25,3 +22,8 @@ files
 sample
 userdata
 docs
+metadata-backup-service
+# fork-only (local docker dev env)
+.env
+.env.*
+!.env.docker.example

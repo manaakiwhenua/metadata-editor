@@ -198,7 +198,7 @@ class Users extends MY_Controller {
 									 'active'     => $this->input->post('active'),
 									 'country'    => $this->input->post('country'),
         							 'active'     => $this->input->post('active'),
-									 'role_id'    => $this->input->post('role')
+									 'role_id'    => $this->acl_manager->sanitize_role_assignment($this->input->post('role'))
         							);
         	
         	//register the user
@@ -212,6 +212,11 @@ class Users extends MY_Controller {
 				
         		//get the user data by email
         		$user=$this->ion_auth->get_user_by_email($email);
+
+				if (empty($data['role_id'])) {
+					$this->ion_auth->set_user_default_roles($user->id);
+					unset($data['role_id']);
+				}
 
 				//update user group to ADMIN and ACTIVATE account
         		$this->ion_auth->update_user($user->id, $data);	        	
@@ -279,13 +284,20 @@ class Users extends MY_Controller {
                                                      );
             $this->data['active']=$this->form_validation->set_value('active',1);
 			
-			$this->data['roles']=array();
+			$this->data['roles']= $this->acl_manager->roles_for_assigner();
 
 			if($this->input->post('role')){
 				$this->data['user_role']=$this->input->post('role');
+			} else {
+				$this->data['user_role']=array();
+				foreach (default_user_role_names() as $role_name) {
+					$role = $this->acl_manager->get_role_by_name($role_name);
+					if (!empty($role['id'])) {
+						$this->data['user_role'][] = (int) $role['id'];
+					}
+				}
 			}
 			
-			$this->data['roles']= $this->acl_manager->get_roles();//full list of roles
 			$this->data['options_country']= $this->ion_auth_model->get_all_countries();
 			
             $content=$this->load->view('users/create', $this->data,TRUE);
@@ -327,7 +339,7 @@ class Users extends MY_Controller {
 				'company'    => $this->input->post('company'),
 				'phone'      => $this->input->post('phone1'),
 				'active'     => $this->input->post('active'),
-				'role_id'     => $this->input->post('role'),
+				'role_id'     => $this->acl_manager->sanitize_role_assignment($this->input->post('role'), $id),
 				'country'     => $this->input->post('country'),
 			);
 						
@@ -431,7 +443,7 @@ class Users extends MY_Controller {
 				$this->data['user_role']= $db_data->user_role;//roles assigned to user
 			}
 
-			$this->data['roles']= $this->acl_manager->get_roles();//full list of roles
+			$this->data['roles']= $this->acl_manager->roles_for_assigner();
 			$this->data['options_country']= $this->ion_auth_model->get_all_countries();
 
 			$content=$this->load->view('users/edit', $this->data,TRUE);						
@@ -844,7 +856,7 @@ class Users extends MY_Controller {
 		
 		// Get available roles
 		$this->load->library('Acl_manager');
-		$roles = $this->acl_manager->get_roles();
+		$roles = $this->acl_manager->roles_for_assigner();
 		
 		$data = [
 			'users' => $users,
@@ -875,7 +887,7 @@ class Users extends MY_Controller {
 		$this->acl_manager->has_access_or_die('user', 'edit');
 		
 		$user_ids = $this->input->post('user_ids');
-		$role_ids = $this->input->post('role_ids');
+		$role_ids = $this->acl_manager->filter_assignable_role_ids($this->input->post('role_ids'));
 		
 		if (empty($user_ids) || empty($role_ids)) {
 			$this->session->set_flashdata('error', 'No users or roles selected');
@@ -954,6 +966,15 @@ class Users extends MY_Controller {
 				}
 			}
 		}
+
+		if (!$this->acl_manager->user_is_admin()) {
+			$admin_role_ids = $this->acl_manager->get_admin_role_ids();
+			foreach ($user_roles as $uid => $roles) {
+				$user_roles[$uid] = array_values(array_filter($roles, function ($role) use ($admin_role_ids) {
+					return !in_array((int)$role['role_id'], $admin_role_ids, true);
+				}));
+			}
+		}
 		
 		$data = [
 			'users' => $users,
@@ -984,7 +1005,7 @@ class Users extends MY_Controller {
 		$this->acl_manager->has_access_or_die('user', 'edit');
 		
 		$user_ids = $this->input->post('user_ids');
-		$role_ids = $this->input->post('role_ids');
+		$role_ids = $this->acl_manager->filter_assignable_role_ids($this->input->post('role_ids'));
 		
 		if (empty($user_ids) || empty($role_ids)) {
 			$this->session->set_flashdata('error', 'No users or roles selected');
@@ -1295,6 +1316,7 @@ class Users extends MY_Controller {
 			if (is_numeric($user_id)) {
 				// Activate without code (admin override)
 				if ($this->ion_auth->activate($user_id)) {
+					$this->ion_auth->apply_default_roles_if_none($user_id);
 					$success_count++;
 				} else {
 					$error_count++;

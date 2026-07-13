@@ -19,6 +19,31 @@ class Editor_acl
 
 	}
 
+	/**
+	 * @return Acl_manager
+	 */
+	private function _acl_manager()
+	{
+		if (!isset($this->ci->acl_manager)) {
+			$this->ci->load->library('Acl_manager', null, 'acl_manager');
+		}
+		return $this->ci->acl_manager;
+	}
+
+	function registry_require($resource, $action, $user = null)
+	{
+		$this->_acl_manager()->registry_require($resource, $action, $user);
+	}
+
+	/**
+	 * @param object|null $user
+	 * @return array<string, bool>
+	 */
+	function registry_user_info_flags($user = null)
+	{
+		return $this->_acl_manager()->registry_user_info_flags($user);
+	}
+
 
 	function get_project_main_id($project_id)
 	{
@@ -34,6 +59,49 @@ class Editor_acl
 	}
 
 
+	/**
+	 * Global project access via the Project manager role (not site Admin).
+	 *
+	 * @param object|null $user
+	 * @param string|null $permission view|edit|delete|publish|admin
+	 */
+	function user_has_global_project_access($user=null, $permission='view')
+	{
+		if (!$user) {
+			$user = (object)$this->current_user();
+		}
+
+		if (!$user) {
+			return false;
+		}
+
+		if ($permission === null || $permission === '') {
+			$permission = 'view';
+		}
+
+		return $this->_acl_manager()->check_access('project_manager', $permission, $user);
+	}
+
+	/**
+	 * True when the user should see all projects in listings (site Admin or global project access).
+	 */
+	function user_sees_all_projects($user=null)
+	{
+		if (!$user) {
+			$user = (object)$this->current_user();
+		}
+
+		if (!$user) {
+			return false;
+		}
+
+		if ($this->user_is_admin($user)) {
+			return true;
+		}
+
+		return $this->user_has_global_project_access($user, 'view');
+	}
+
 	function user_has_project_access($project_id,$permission=null,$user=null)
 	{
 		if (!$user){
@@ -46,6 +114,10 @@ class Editor_acl
 		}
 
 		$project_id=$this->get_project_main_id($project_id);
+
+		if ($this->user_has_global_project_access($user, $permission !== null ? $permission : 'view')) {
+			return true;
+		}
 		
 		//check if user is project owner
 		if ($this->is_user_project_owner($project_id,$user)){
@@ -507,28 +579,7 @@ class Editor_acl
 
 	function has_site_admin_access($user=null)
 	{
-		if(empty($user)){
-			$user=$this->current_user();
-		}
-
-		if(!$user){
-			die("acl_manager::User not set");
-		}
-
-		//get user roles
-		$user_roles=$this->get_user_roles($user->id);
-
-		if(!$user_roles){
-			return false;
-		}
-
-		foreach($user_roles as $role){
-			if ($role['role_id']==2){ //user
-				return false;
-			}
-		}
-
-		return true;
+		return $this->ci->acl_manager->has_site_admin_access($user);
 	}
 
 	function has_access_or_die($resource,$privilege, $user=null)

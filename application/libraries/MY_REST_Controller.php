@@ -175,6 +175,52 @@ abstract class MY_REST_Controller extends REST_Controller {
 
     }
 
+    /**
+     * Non-fatal ACL check for branching (e.g. registry admin vs super-admin).
+     */
+    function user_has_access($resource, $privilege)
+    {
+        $user = $this->api_user();
+        try {
+            return $this->acl_manager->has_access($resource, $privilege, $user);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Registry ACL for API (codelist | data_structure).
+     *
+     * @param string $resource codelist|data_structure
+     * @param string $action browse|edit|import|delete|admin
+     */
+    function registry_require_or_die($resource, $action)
+    {
+        if ($this->acl_manager->registry_can($resource, $action, $this->api_user())) {
+            return true;
+        }
+        $this->_registry_access_denied_response();
+    }
+
+    /**
+     * Registry lifecycle admin (locked/archived) or Ion Auth super-admin.
+     */
+    function is_registry_admin($resource)
+    {
+        return $this->acl_manager->registry_can($resource, 'admin', $this->api_user());
+    }
+
+    private function _registry_access_denied_response()
+    {
+        $this->output
+            ->set_status_header(403)
+            ->set_content_type('application/json');
+        die(json_encode(array(
+            'status' => 'failed',
+            'error' => 'Access denied',
+        )));
+    }
+
     function has_access($resource,$privilege)
     {
         $user=$this->api_user();
@@ -246,7 +292,8 @@ abstract class MY_REST_Controller extends REST_Controller {
 	 */
 	protected function is_project_sharing_enabled_or_die()
 	{
-		if ($this->config->item('project_sharing')===false) {
+		$this->load->helper('user_access');
+		if (!project_sharing_enabled()) {
 			$error_output = array(
 				'status' => 'failed',
 				'message' => 'Project sharing is disabled'
@@ -258,6 +305,57 @@ abstract class MY_REST_Controller extends REST_Controller {
 			$this->output->_display();
 			die();
 		}
+	}
+
+	/**
+	 * Block metadata assessment when the feature is disabled site-wide.
+	 */
+	protected function is_metadata_assessment_enabled_or_die()
+	{
+		$this->load->helper('user_access');
+		if (!metadata_assessment_enabled()) {
+			$error_output = array(
+				'status' => 'failed',
+				'message' => 'Metadata assessment is disabled'
+			);
+
+			$this->output->set_status_header(403);
+			$this->output->set_content_type('application/json');
+			$this->output->set_output(json_encode($error_output));
+			$this->output->_display();
+			die();
+		}
+	}
+
+	/**
+	 * Parse limit/offset query params for paginated list endpoints.
+	 *
+	 * @param int $default_limit
+	 * @param int $max_limit
+	 * @return array{limit:int,offset:int}
+	 */
+	protected function get_pagination_params($default_limit = 15, $max_limit = 100)
+	{
+		$limit_param = $this->input->get('limit');
+		$limit = ($limit_param !== null && $limit_param !== '') ? (int) $limit_param : $default_limit;
+
+		$offset_param = $this->input->get('offset');
+		$offset = ($offset_param !== null && $offset_param !== '') ? (int) $offset_param : 0;
+
+		if ($limit > $max_limit) {
+			$limit = $max_limit;
+		}
+		if ($limit < 1) {
+			$limit = $default_limit;
+		}
+		if ($offset < 0) {
+			$offset = 0;
+		}
+
+		return array(
+			'limit' => $limit,
+			'offset' => $offset,
+		);
 	}
 
 }

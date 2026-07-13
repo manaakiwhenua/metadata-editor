@@ -101,6 +101,8 @@ class ImportPackage
             throw new Exception("Project folder not found: " . $project_folder_path);
         }
 
+        $this->validate_zip_entries($zip_path);
+
         // Extract ZIP using PhpZip
         $zipFile = new \PhpZip\ZipFile();
         try {
@@ -116,6 +118,39 @@ class ImportPackage
         }
 
         return $project_folder_path;
+    }
+
+
+    /**
+     * Reject unsafe ZIP entry paths before extraction.
+     *
+     * @param string $zip_path
+     */
+    private function validate_zip_entries($zip_path)
+    {
+        $zipFile = new \PhpZip\ZipFile();
+        try {
+            $zipFile->openFile($zip_path);
+            $entries = $zipFile->getListFiles();
+
+            foreach ($entries as $entry_name) {
+                $entry_name = str_replace('\\', '/', (string) $entry_name);
+
+                if ($entry_name === '' || $entry_name[0] === '/' || preg_match('/^[A-Za-z]:\\//', $entry_name)) {
+                    throw new Exception("Unsafe path in package archive: " . $entry_name);
+                }
+
+                if (strpos($entry_name, '../') !== false || substr($entry_name, -3) === '/..') {
+                    throw new Exception("Unsafe path in package archive: " . $entry_name);
+                }
+            }
+        }
+        catch (\PhpZip\Exception\ZipException $e) {
+            throw new Exception("Failed to read ZIP file: " . $e->getMessage());
+        }
+        finally {
+            $zipFile->close();
+        }
     }
 
 
@@ -162,7 +197,7 @@ class ImportPackage
     {
         // Check if IDNO is provided
         if (empty($project_info['idno'])){
-            log_message('warning', "Package info.json missing 'idno' field");
+            log_message('info', "Package info.json missing 'idno' field");
             return; // Allow import to continue without IDNO validation
         }
 
@@ -209,7 +244,7 @@ class ImportPackage
                 log_message('info', "Using JSON metadata file: " . $json_path);
             }
             else {
-                log_message('warning', "JSON file specified but not found: " . $json_path);
+                log_message('info', "JSON file specified but not found: " . $json_path);
             }
         }
 
@@ -222,7 +257,7 @@ class ImportPackage
                 log_message('info', "Falling back to XML metadata file: " . $xml_path);
             }
             else {
-                log_message('warning', "XML file specified but not found: " . $xml_path);
+                log_message('info', "XML file specified but not found: " . $xml_path);
             }
         }
 
@@ -267,7 +302,7 @@ class ImportPackage
                 log_message('info', "Using RDF JSON file: " . $rdf_json_path);
             }
             else {
-                log_message('warning', "RDF JSON file specified but not found: " . $rdf_json_path);
+                log_message('info', "RDF JSON file specified but not found: " . $rdf_json_path);
             }
         }
 
@@ -280,7 +315,7 @@ class ImportPackage
                 log_message('info', "Falling back to RDF XML file: " . $rdf_xml_path);
             }
             else {
-                log_message('warning', "RDF XML file specified but not found: " . $rdf_xml_path);
+                log_message('info', "RDF XML file specified but not found: " . $rdf_xml_path);
             }
         }
 
@@ -360,7 +395,7 @@ class ImportPackage
         // Get project type - only link for microdata/survey projects
         $project = $this->ci->Editor_model->get_basic_info($sid);
         if (!$project) {
-            log_message('warning', "Project not found for linking data files: " . $sid);
+            log_message('info', "Project not found for linking data files: " . $sid);
             return array('linked' => 0, 'skipped' => 0, 'errors' => array());
         }
 

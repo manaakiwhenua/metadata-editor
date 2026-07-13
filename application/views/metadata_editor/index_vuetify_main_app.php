@@ -153,8 +153,11 @@
             echo $this->load->view("metadata_editor/vue-nested-section-preview-component.js",null,true);
             
             echo $this->load->view("metadata_editor/vue-files-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-resource-dctype-utils.js",null,true);
             echo $this->load->view("metadata_editor/vue-external-resources-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-external-resources-edit-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-resumable-chunk-uploader.js",null,true);
+            echo $this->load->view("metadata_editor/vue-nada-publish-uploader.js",null,true);
             echo $this->load->view("metadata_editor/vue-resumable-file-upload-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-external-resources-create-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-datafiles-component.js",null,true);
@@ -162,8 +165,13 @@
             echo $this->load->view("metadata_editor/vue-datafile-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-datafile-import-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-datafile-data-explorer-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-indicator-timeseries-data-explorer-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-data-explorer-host-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-dialog-datafile-export-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-dialog-batch-export-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-microdata-resource-datafile-links-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-microdata-resource-details-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-external-resources-generate-microdata-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-dialog-batch-sum-stats-options-component.js",null,true);
 
             echo $this->load->view("metadata_editor/vue-variable-edit-documentation-component.js",null,true);
@@ -218,6 +226,17 @@
             echo $this->load->view("metadata_editor/vue-page-preview-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-geospatial-gallery-component.js",null,true);
 
+            //issues components
+            echo $this->load->view("metadata_editor/vue-issue-status-badge-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-create-issue-dialog-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-issue-detail-dialog-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-field-issues-indicator-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-field-issues-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-issue-list-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-issue-create-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-issue-edit-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-project-issues-component.js",null,true);
+
             echo $this->load->view("project/vue-project-share-component.js", null, true);
             echo $this->load->view("project/vue-collection-share-component.js", null, true);
             echo $this->load->view("metadata_editor/vue-summary-collections-component.js", null, true);
@@ -245,9 +264,12 @@
             echo $this->load->view("metadata_editor/vue-geospatial-feature-description-component.js",null,true);
 
             echo $this->load->view("metadata_editor/vue-indicator-dsd-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-indicator-dsd-global-codelist-preview-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-indicator-dsd-edit-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-indicator-dsd-import-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-indicator-dsd-chart-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-indicator-dsd-overview-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-indicator-data-page-component.js",null,true);
         ?>
 
         <?php if (empty($metadata)):?>
@@ -267,8 +289,12 @@
         let project_type='<?php echo isset($type) ? $type : '';?>';
         let user_has_edit_access=<?php echo $user_has_edit_access ? 'true' : 'false';?>;
 
+        function editorTemplateHasItems(ft) {
+            return !!(ft && ft.template && Array.isArray(ft.template.items));
+        }
+
         // DSD features
-        var dsd_temporary_features_enabled = false;
+        var dsd_temporary_features_enabled = true;
 
         //Define route components
         const main = {props:['element_id'],template: '<div><form-main/></div>' }
@@ -282,7 +308,7 @@
         const Datafiles ={template: '<div><datafiles/></div>'}
         const Datafile = {props: ['file_id'],template: '<div><datafile/></div>' }
         const DatafileEdit=VueDatafileEdit;
-        const DatafileExplorer = {props: ['file_id'],template: '<div><datafile-data-explorer/></div>' }
+        const DatafileExplorer = {props: ['file_id'],template: '<div><data-explorer-host :file_id="file_id" /></div>' }
         const DatafileImport = {template: '<div><datafile-import/></div>' }
         const Variables ={props: ['file_id'],template: '<div><variables/></div>'}
         const VariableGroups ={template: '<div><variable-groups /> </div>'}
@@ -293,6 +319,7 @@
         //const ResourcesEditComp ={props: ['index'],template: '<div><external-resources-edit /></div>'}
         const ResourcesEditComp =VueExternalResourcesEdit;
         const ResourcesCreateComp =VueExternalResourcesCreate;
+        const ResourcesGenerateMicrodataComp = VueExternalResourcesGenerateMicrodata;
         const GeoFeatures ={props: ['index'],template: '<div><geospatial-features/></div>'}
         const GeoFeaturesImport ={props: ['index'],template: '<div><geospatial-feature-import/></div>'}
         const GeoFeature ={props: ['id'],template: '<div><geospatial-feature-edit :feature_id="id"/></div>'}
@@ -301,9 +328,9 @@
         const GeoFeatureDescription ={template: '<div><geospatial-feature-description/></div>'}
         const PagePreview ={template: '<div><page-preview/></div>'}
         const GeoGallery ={template: '<div><geospatial-gallery/></div>'}
-        const IndicatorDsd ={template: '<div><indicator-dsd/></div>'}
         const IndicatorDsdImport ={template: '<div><indicator-dsd-import/></div>'}
         const IndicatorDsdChart ={template: '<div><indicator-dsd-chart/></div>'}
+        const IndicatorDsdOverview ={template: '<div><indicator-dsd-overview/></div>'}
         const ProjectHistory ={template: '<div><project-history/></div>'}
         const AdminMetadataHistory ={template: '<div><admin-metadata-history/></div>'}
         const SdmxCsvExport = {template: '<div><sdmx-csv-export-options/></div>'}
@@ -333,6 +360,8 @@
             { path: '/external-resources', component: ResourcesComp, props: true, name: 'external-resources'},
             { path: '/external-resources/create', component: ResourcesCreateComp, props: true, name: 'external-resources-create'},
             { path: '/external-resources/import', component: ResourcesImport},
+            { path: '/external-resources/generate-microdata', component: ResourcesGenerateMicrodataComp, name: 'external-resources-generate-microdata'},
+            { path: '/external-resources/regenerate/:resource_id', component: ResourcesGenerateMicrodataComp, props: true, name: 'external-resources-regenerate-microdata'},
             { path: '/external-resources/:index', component: ResourcesEditComp, props: true, name: 'external-resources-edit'},            
             { path: '/files', component: FileManager, props: true},
             { path: '/geospatial-features', component: GeoFeatures, props: true},
@@ -344,9 +373,13 @@
             // This route must come last to avoid matching /description or /import
             { path: '/geospatial-features/:id', component: GeoFeature, props: true },
             { path: '/geospatial-gallery', component: GeoGallery, props: true },
-            { path: '/indicator-dsd', component: IndicatorDsd, name: 'indicator-dsd', props: true },
-            { path: '/indicator-dsd-import', component: IndicatorDsdImport, name: 'indicator-dsd-import', props: true },
+            { path: '/indicator-dsd', redirect: '/indicator-dsd-overview' },
+            { path: '/indicator-dsd-import', redirect: { path: '/data-explorer/INDICATOR_DATA', query: { tab: 'import' } } },
             { path: '/indicator-dsd-chart', component: IndicatorDsdChart, name: 'indicator-dsd-chart', props: true },
+            { path: '/indicator-dsd-overview', component: IndicatorDsdOverview, name: 'indicator-dsd-overview', props: true },
+            { path: '/issues', component: { template: '<project-issues :project-id="$root.dataset_id" :can-edit="$root.UserHasEditAccess"/>' }, name: 'issues' },
+            { path: '/issues/create', component: VueIssueCreate, name: 'issue-create' },
+            { path: '/issues/:issueId', component: VueIssueEdit, props: true, name: 'issue-edit' },
             { path: '/change-log', component: ProjectHistory },
             { path: '/sdmx-csv-export', component: SdmxCsvExport },
             { path: '/validation-report', component: ValidationReport, name: 'validation-report', props: true },
@@ -366,6 +399,11 @@
             route_path=to.path.replace('/study/','');
 
             console.log("route path",route_path);
+
+            if (!store.state.template_structure_valid && to.path !== '/' && to.path !== '/page-preview') {
+                next({ path: '/', replace: true });
+                return;
+            }
             
             if (!store.state.treeActiveNode){
                 console.log("no active node");
@@ -405,6 +443,7 @@
                 project_isloading:false,
                 project_is_locked:false,
                 project_version_info:null,
+                template_structure_valid: (typeof template_structure_valid !== 'undefined' ? template_structure_valid : true),
                 variables_loaded:false,
                 variables_isloading:false,
                 variables_active_tab:"documentation",
@@ -452,7 +491,9 @@
                     filled:false,
                     outlined:true,                    
                     style:"xborder-top:1px solid gray;"
-                }
+                },
+                openIssuesSummary: [],
+                openFieldIssuesMenuFieldPath: null
             },
             getters: {
                 getUserHasEditAccess(state){
@@ -566,7 +607,9 @@
                         return item;
                     }
 
-                    //search nested formTemplate
+                    if (!editorTemplateHasItems(store.state.formTemplate)) {
+                        return null;
+                    }
                     let items=store.state.formTemplate.template.items;
                     let item=findTemplateByItemKey(items,route_path);
 
@@ -575,6 +618,18 @@
                 GetVariableDocumentationFields: function(state){                    
                     return state.variable_documentation_fields;
                 },
+                getOpenIssuesSummary: function(state) {
+                    return state.openIssuesSummary || [];
+                },
+                getOpenIssueCountByFieldPath: function(state) {
+                    return function(fieldPath) {
+                        if (!fieldPath || !state.openIssuesSummary || !state.openIssuesSummary.length) return 0;
+                        return state.openIssuesSummary.filter(function(i) { return i.field_path === fieldPath; }).length;
+                    };
+                },
+                getOpenFieldIssuesMenuFieldPath: function(state) {
+                    return state.openFieldIssuesMenuFieldPath;
+                }
             },
             actions: {               
                 async initData({commit},options) {
@@ -585,6 +640,7 @@
                     await store.dispatch('loadExternalResources',{dataset_id:options.dataset_id});
                     await store.dispatch('loadVariableGroups',{dataset_id:options.dataset_id});
                     await store.dispatch('loadMetadataTypesList',{});
+                    await store.dispatch('fetchOpenIssuesSummary', { projectId: store.state.project_id });
                     
                     // Load geospatial features for geospatial projects
                     if (store.state.project_type === 'geospatial') {
@@ -595,7 +651,11 @@
                     store.state.project_isloading=false;
                 },
                 async initTreeItems({commit},options) {               
-                    store.state.treeItems=store.state.formTemplate.template.items;    
+                    if (editorTemplateHasItems(store.state.formTemplate)) {
+                        store.state.treeItems=store.state.formTemplate.template.items;
+                    } else {
+                        store.state.treeItems=[];
+                    }
                 },
                 async loadTemplatesList({commit},options) {
                     let url=CI.base_url + '/api/templates/list/'+store.state.project_type;
@@ -615,6 +675,7 @@
                     .then(function (response) {                        
                         if (response.data.template){
                             store.state.formTemplate=response.data;
+                            store.state.template_structure_valid = editorTemplateHasItems(response.data);
                         }else{
                             console.log("error load template", response.data);
                             alert("error loading template");
@@ -623,6 +684,23 @@
                     .catch(function (error) {
                         console.log(error);
                     });
+                },
+                fetchOpenIssuesSummary: function({ commit, state }, options) {
+                    var projectId = (options && options.projectId) || state.project_id;
+                    if (!projectId) return Promise.resolve();
+                    var url = CI.base_url + '/api/issues/project/' + projectId + '/summary';
+                    return axios.get(url, { params: { limit: 500 } })
+                        .then(function(response) {
+                            if (response.data && response.data.status === 'success' && response.data.issues) {
+                                commit('setOpenIssuesSummary', response.data.issues);
+                            }
+                        })
+                        .catch(function(err) {
+                            console.warn('fetchOpenIssuesSummary failed', err);
+                        });
+                },
+                openFieldIssuesMenu: function({ commit }, fieldPath) {
+                    commit('setOpenFieldIssuesMenuFieldPath', fieldPath);
                 },
                 async loadProject({commit},options) {
                     let url=CI.base_url + '/api/editor/'+options.dataset_id;
@@ -636,9 +714,7 @@
                                     store.state.metadata_idno=response.data.project.study_idno;
                                 }
                                 
-                                if (response.data.project.is_locked){
-                                    store.state.project_is_locked=response.data.project.is_locked;
-                                }
+                                store.state.project_is_locked = parseInt(response.data.project.is_locked, 10) === 1;
 
                                 store.state.project_version_info={
                                     version_number:response.data.project.version_number,
@@ -869,6 +945,7 @@
                     let url=CI.base_url + '/api/datafiles/batch_export_zip/'+getters.getProjectID;
                     let body = { filenames: options.filenames || [] };
                     if (options.zip_filename) body.zip_filename = options.zip_filename;
+                    if (options.stata_version != null) body.stata_version = options.stata_version;
                     let resp = await axios.post(url, body);
                     return resp;
                 },
@@ -929,6 +1006,12 @@
                 },
                 variables_active_tab(state,data){
                     state.variables_active_tab=data;
+                },
+                setOpenIssuesSummary(state, issues) {
+                    state.openIssuesSummary = issues || [];
+                },
+                setOpenFieldIssuesMenuFieldPath(state, fieldPath) {
+                    state.openFieldIssuesMenuFieldPath = fieldPath;
                 }
             })            
         })

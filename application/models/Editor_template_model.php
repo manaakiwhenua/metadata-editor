@@ -61,6 +61,7 @@ class Editor_template_model extends ci_model {
 		$this->init_core_templates();
 		$this->ci->load->model('Template_acl_model');
 		$this->ci->load->model('Edit_history_model');
+		$this->ci->load->library('Metadata_change_log');
 		$this->Edit_history_model=$this->ci->Edit_history_model;
     }
 
@@ -598,30 +599,32 @@ class Editor_template_model extends ci_model {
 			throw new Exception("Update failed");
 		}
 
-		//generate diff
-		//$compare_fields=explode(",","author,description,data_type,instructions,lang,name,organization,uid,version,template");
-		$compare_fields=array('template');//only compare template field
-
+		//generate diff for template JSON only
+		$compare_fields=array('template');
 		$template_id=$template['id'];
 		$changed_by=isset($options['changed_by']) ? $options['changed_by'] : null;
 
-		//filter $template fields to only include fields that are in $compare_fields
-		$template=array_intersect_key($template,array_flip($compare_fields));
-		//remove empty db fields
-		$template=array_filter($template);
-		$template['template']=json_decode($template['template'],true);
+		$before_payload=array(
+			'template'=>json_decode($template['template'],true)
+		);
 
-		//filter $options
-		$options=array_intersect_key($options,array_flip($compare_fields));
-
-		//generate diff as json-patch
-		$diff=$this->get_metadata_diff($template,$options, $ignore_errors=true);
-		
-		if ($diff!=false && $diff!='[]'){
-			$this->Edit_history_model->log($obj_type='template',$obj_id=$template_id,$action='update', $metadata=$diff, $user_id=$changed_by);
+		$after_options=array_intersect_key($options,array_flip($compare_fields));
+		$after_template=isset($after_options['template']) ? $after_options['template'] : null;
+		if (is_string($after_template)){
+			$after_template=json_decode($after_template,true);
+		}
+		if ($after_template===null){
+			$after_template=$before_payload['template'];
 		}
 
-//		return $diff;
+		$this->ci->metadata_change_log->record_template_change(
+			$template_id,
+			$before_payload,
+			array('template'=>$after_template),
+			'update',
+			$changed_by
+		);
+
 		return $result;
 	}
 
@@ -823,22 +826,43 @@ class Editor_template_model extends ci_model {
 
 	function get_project_template($sid)
 	{
-		$this->db->select("template_uid");
+		$this->db->select("template_uid, type");
 		$this->db->where("id",$sid);
 		$result=$this->db->get("editor_projects")->row_array();
 
-		if (!isset($result['template_uid'])){
-			throw new Exception("Project does not have a template");
+		if (!$result){
+			throw new Exception("Project not found: " . $sid);
 		}
 
-		$template_uid = $result['template_uid'];
-		$template=$this->get_template_by_uid($template_uid);
+		$template_uid = isset($result['template_uid']) ? trim((string)$result['template_uid']) : '';
+		$project_type = isset($result['type']) ? $result['type'] : null;
 
-		if (!$template){
-			throw new Exception("Template not found: " . $template_uid);
+		if ($template_uid !== ''){
+			$template = $this->get_template_by_uid($template_uid);
+			if ($template){
+				return $template;
+			}
 		}
 
-		return $template;
+		// Fallback for empty or missing template_uid
+		if ($project_type){
+			$default = $this->get_default_template($project_type);
+			if (!empty($default['template_uid'])){
+				$template = $this->get_template_by_uid($default['template_uid']);
+				if ($template){
+					return $template;
+				}
+			}
+			$core_templates = $this->get_core_templates_by_type($project_type);
+			if (!empty($core_templates)){
+				$template = $this->get_template_by_uid($core_templates[0]['uid']);
+				if ($template){
+					return $template;
+				}
+			}
+		}
+
+		throw new Exception("Template not found: " . $template_uid);
 	}
 
 
@@ -945,20 +969,26 @@ class Editor_template_model extends ci_model {
 	 * Return patch for metadata diff
 	 * 
 	 */
+	/**
+	 * @deprecated Use Metadata_change_log::build_change_record_safe() instead.
+	 */
 	function get_metadata_diff($metadata_original, $metadata_updated, $ignore_errors=false)
 	{
-		try{
-			$diff = new JsonDiff($metadata_original, $metadata_updated, JsonDiff::TOLERATE_ASSOCIATIVE_ARRAYS);
+		$record = Metadata_change_log::build_change_record_safe(
+			$metadata_original,
+			$metadata_updated,
+			Metadata_change_log::SCOPE_TEMPLATE
+		);
 
-			$patch=$diff->getPatch();
-			return json_encode($patch);
-		} catch (Exception $e) {
-			if ($ignore_errors==true){
-				return false;
-			}
-			throw new Exception("Metadata diff failed: ".$e->getMessage());
+		if ($record === null) {
+			return false;
 		}
-		
+
+		if ($ignore_errors && isset($record['status']) && $record['status'] === 'diff_failed') {
+			return false;
+		}
+
+		return $record;
 	}
 
 
@@ -967,7 +997,7 @@ class Editor_template_model extends ci_model {
 	 * 
 	 * Get template revision history
 	 */
-	function get_template_revision_history($template_uid, $offset=0, $limit=10)
+	function get_template_revision_history($template_uid, $offset=0, $limit=15)
 	{
 		$template_id=$this->get_id_by_uid($template_uid);
 

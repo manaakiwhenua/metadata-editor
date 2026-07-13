@@ -208,6 +208,11 @@ class Project_json_writer
 			unset($metadata[$field]);
 		}
 
+		// Binding-only fields (stored in metadata for convenience; not part of timeseries schema export)
+		if (in_array($project['type'], array('indicator', 'timeseries'))) {
+			unset($metadata['indicator_id_value']);
+		}
+
 		if ($exclude_private_fields==1){
 			$this->json_remove_private_fields($sid,$metadata);
 		}
@@ -303,10 +308,13 @@ class Project_json_writer
 			}
 		}
 
-		// Indicator/timeseries: export data structure definition as data_structure
+		// Indicator/timeseries: export global DSD reference when bound
 		if (in_array($project['type'], array('indicator', 'timeseries'))) {
 			$this->ci->load->library('Indicator_util');
-			$output['data_structure'] = $this->ci->indicator_util->get_data_structure_for_project($sid);
+			$ds_fields = $this->ci->indicator_util->get_data_structure_export_fields($sid);
+			foreach ($ds_fields as $k => $v) {
+				$output[$k] = $v;
+			}
 		}
 		
 		$encoder = new \Violet\StreamingJsonEncoder\StreamJsonEncoder(
@@ -322,7 +330,26 @@ class Project_json_writer
 		return $output_file;
 	}
 
-	function transform_variable($variable)
+	/**
+	 * Count value categories stored on a variable (max of var_catgry and var_catgry_labels).
+	 */
+	public static function count_variable_categories($metadata)
+	{
+		if (!is_array($metadata)) {
+			return 0;
+		}
+		$n = 0;
+		if (isset($metadata['var_catgry']) && is_array($metadata['var_catgry'])) {
+			$n = max($n, count($metadata['var_catgry']));
+		}
+		if (isset($metadata['var_catgry_labels']) && is_array($metadata['var_catgry_labels'])) {
+			$n = max($n, count($metadata['var_catgry_labels']));
+		}
+		return $n;
+	}
+
+
+	function transform_variable($variable, $options=array())
 	{		
 		$sid=(int)$variable['sid'];
 		unset($variable['metadata']['uid']);
@@ -343,11 +370,7 @@ class Project_json_writer
 		// Ensure sequential array for iteration
 		$var_catgry_labels = array_values($var_catgry_labels);
 
-		// Replace var_catgry with list from var_catgry_labels ONLY
-		$missing_values = array();
-		if (isset($variable['metadata']['var_invalrng']['values']) && is_array($variable['metadata']['var_invalrng']['values'])) {
-			$missing_values = array_map('strval', $variable['metadata']['var_invalrng']['values']);
-		}
+		// Build lookup from full var_catgry (freq/stats rows may include e.g. Stata Sysmiss not in var_catgry_labels)
 		$catgry_by_value = array();
 		if (isset($variable['metadata']['var_catgry']) && is_array($variable['metadata']['var_catgry'])) {
 			foreach ($variable['metadata']['var_catgry'] as $cat) {
@@ -356,6 +379,25 @@ class Project_json_writer
 				}
 			}
 		}
+
+		$missing_values = array();
+		if (isset($variable['metadata']['var_invalrng']['values']) && is_array($variable['metadata']['var_invalrng']['values'])) {
+			$missing_values = array_map('strval', $variable['metadata']['var_invalrng']['values']);
+		}
+		// Categories may carry is_missing (e.g. DDI import) before var_invalrng was synced — include those codes for export
+		foreach ($catgry_by_value as $value_key => $cat) {
+			if (!isset($cat['is_missing'])) {
+				continue;
+			}
+			$im = $cat['is_missing'];
+			if ($im === '1' || $im === 1 || $im === 'Y' || $im === true) {
+				if (!in_array((string)$value_key, $missing_values, true)) {
+					$missing_values[] = (string)$value_key;
+				}
+			}
+		}
+
+		// Replace var_catgry using var_catgry_labels for value/label order, then append any extra rows from var_catgry
 		if (count($var_catgry_labels) > 0) {
 			$export_catgry = array();
 			foreach ($var_catgry_labels as $label_item) {
@@ -377,10 +419,50 @@ class Project_json_writer
 					'stats' => $stats
 				);
 			}
+			$exported_value_keys = array();
+			foreach ($export_catgry as $row) {
+				if (isset($row['value'])) {
+					$exported_value_keys[(string)$row['value']] = true;
+				}
+			}
+			foreach ($catgry_by_value as $value_key => $cat) {
+				if (isset($exported_value_keys[$value_key])) {
+					continue;
+				}
+				$label_extra = isset($cat['labl']) ? $cat['labl'] : '';
+				$is_missing_extra = in_array($value_key, $missing_values, true) ? '1' : '0';
+				$stats_extra = isset($cat['stats']) && is_array($cat['stats']) ? $cat['stats'] : array();
+				$export_catgry[] = array(
+					'value' => $value_key,
+					'labl' => $label_extra,
+					'is_missing' => $is_missing_extra,
+					'stats' => $stats_extra
+				);
+			}
+			$variable['metadata']['var_catgry'] = $export_catgry;
+		} elseif (count($catgry_by_value) > 0) {
+			$export_catgry = array();
+			foreach ($catgry_by_value as $value_key => $cat) {
+				$label_extra = isset($cat['labl']) ? $cat['labl'] : '';
+				$is_missing_extra = in_array($value_key, $missing_values, true) ? '1' : '0';
+				$stats_extra = isset($cat['stats']) && is_array($cat['stats']) ? $cat['stats'] : array();
+				$export_catgry[] = array(
+					'value' => $value_key,
+					'labl' => $label_extra,
+					'is_missing' => $is_missing_extra,
+					'stats' => $stats_extra
+				);
+			}
 			$variable['metadata']['var_catgry'] = $export_catgry;
 		} else {
 			unset($variable['metadata']['var_catgry']);
 		}
+
+		// Capture invd before sum_stats_options may remove it from the export
+		$invd_count_for_sysmiss = $this->extract_positive_invd(
+			isset($variable['metadata']['var_sumstat']) && is_array($variable['metadata']['var_sumstat'])
+				? $variable['metadata']['var_sumstat'] : array()
+		);
 
 		//process summary statistics
 		$sum_stats_options = isset($variable['metadata']['sum_stats_options']) ? $variable['metadata']['sum_stats_options'] : [];
@@ -391,31 +473,28 @@ class Project_json_writer
 			}
 		}
 
-		//handle summary statistics - remove all if no options set, or filter by enabled options
+		//handle summary statistics - filter by enabled options when set; otherwise keep all (e.g. for microdata with no sum_stats_options in DB)
 		if (isset($variable['metadata']['var_sumstat']) && is_array($variable['metadata']['var_sumstat']) ){
 			if (count($sum_stats_enabled_list) > 0){
-				//filter by enabled options
 				foreach($variable['metadata']['var_sumstat'] as $idx=>$sumstat){
 					if (!in_array($sumstat['type'], $sum_stats_enabled_list)){
 						unset($variable['metadata']['var_sumstat'][$idx]);
 					}
 				}
-			} else {
-				//remove all summary statistics if no options are set
-				unset($variable['metadata']['var_sumstat']);
 			}
-			//fix to get a JSON array instead of Object (only if var_sumstat still exists)
-			if (isset($variable['metadata']['var_sumstat'])){
-				$variable['metadata']['var_sumstat']=array_values((array)$variable['metadata']['var_sumstat']);
+			foreach ($variable['metadata']['var_sumstat'] as $idx => $sumstat) {
+				if (!isset($sumstat['value']) || $sumstat['value'] === '' || $sumstat['value'] === 'None') {
+					unset($variable['metadata']['var_sumstat'][$idx]);
+				}
 			}
+			// when no options are set (missing or all false): keep all summary statistics in export
+			$variable['metadata']['var_sumstat'] = array_values((array)$variable['metadata']['var_sumstat']);
 		}
 
-		//value ranges [counts, min, max] - remove min and max if not enabled
+		//value ranges [counts, min, max] - filter min/max only when options are set; otherwise keep all
 		if (isset($variable['metadata']['var_valrng']['range']) && is_array($variable['metadata']['var_valrng']['range']) ){
 			if (count($sum_stats_enabled_list) > 0){
-				//filter by enabled options
 				foreach($variable['metadata']['var_valrng']['range'] as $range_key=>$range){
-					//only check for min and max
 					if (!in_array($range_key, array("min", "max"))){
 						continue;
 					}
@@ -423,36 +502,44 @@ class Project_json_writer
 						unset($variable['metadata']['var_valrng']['range'][$range_key]);
 					}
 				}
-			} else {
-				//remove all range statistics if no options are set
-				unset($variable['metadata']['var_valrng']['range']);
 			}
 		}
 
-		//handle category frequency statistics
+		// When sumStat reports invalid cases but var_catgry has no explicit Sysmiss row (common after label-only edits)
+		if ($invd_count_for_sysmiss !== null
+			&& $this->var_intrvl_allows_sysmiss_category($variable['metadata'])) {
+			if (!isset($variable['metadata']['var_catgry']) || !is_array($variable['metadata']['var_catgry'])) {
+				$variable['metadata']['var_catgry'] = array();
+			}
+			if (!$this->var_catgry_has_sysmiss_value($variable['metadata']['var_catgry'])) {
+				$variable['metadata']['var_catgry'][] = array(
+					'value' => 'Sysmiss',
+					'labl' => '',
+					'stats' => array(array('type' => 'freq', 'value' => $invd_count_for_sysmiss, 'wgtd' => null))
+				);
+				if (!in_array('Sysmiss', $missing_values, true)) {
+					$missing_values[] = 'Sysmiss';
+				}
+			}
+		}
+
+		//handle category frequency statistics - filter by enabled options when set; otherwise keep all (e.g. frequencies)
 		if (isset($variable['metadata']['var_catgry']) && is_array($variable['metadata']['var_catgry']) ){
 			if (count($sum_stats_enabled_list) > 0){
-				//remove category freq if not enabled
 				if (!in_array('freq', $sum_stats_enabled_list)){
 					foreach($variable['metadata']['var_catgry'] as $idx=>$cat){
-						//remove freq if not enabled
 						if (isset($cat['stats']) && is_array($cat['stats']) ){
 							foreach($cat['stats'] as $stat_idx=>$stat){
 								if ($stat['type']=='freq'){
 									unset($variable['metadata']['var_catgry'][$idx]['stats'][$stat_idx]);
 								}
-							}						
+							}
+							$variable['metadata']['var_catgry'][$idx]['stats'] = array_values($variable['metadata']['var_catgry'][$idx]['stats']);
 						}
 					}
 				}
-			} else {
-				//remove all category statistics if no options are set
-				foreach($variable['metadata']['var_catgry'] as $idx=>$cat){
-					if (isset($cat['stats']) && is_array($cat['stats']) ){
-						unset($variable['metadata']['var_catgry'][$idx]['stats']);
-					}
-				}
 			}
+			// when no options are set: keep all category stats (e.g. frequencies) in export
 		}
 
 		//var_std_catgry field - array to object + use first row only
@@ -493,20 +580,18 @@ class Project_json_writer
 			unset($variable['metadata']['var_catgry_labels']);
 		}
 
-		// Set is_missing on categories for export based on var_invalrng.values
+		// Set is_missing on categories for export from var_invalrng + category flags (see $missing_values above)
 		// Note: This is for export only - is_missing is not stored on categories in the database
 		if (isset($variable['metadata']['var_catgry']) && is_array($variable['metadata']['var_catgry'])) {
-			$missing_values = array();
-			if (isset($variable['metadata']['var_invalrng']['values']) && 
-				is_array($variable['metadata']['var_invalrng']['values'])) {
-				$missing_values = array_map('strval', $variable['metadata']['var_invalrng']['values']);
-			}
-			
 			foreach($variable['metadata']['var_catgry'] as &$cat) {
 				if (isset($cat['value'])) {
 					$cat_value = (string)$cat['value'];
-					// Use var_invalrng.values
-					$cat['is_missing'] = in_array($cat_value, $missing_values, true) ? '1' : '0';
+					$is_missing = in_array($cat_value, $missing_values, true);
+					if ($is_missing) {
+						$cat['is_missing'] = '1';
+					} else {
+						unset($cat['is_missing']);
+					}
 				}
 			}
 			unset($cat); // Break reference
@@ -592,6 +677,47 @@ class Project_json_writer
 			return (float)$value;
 		}
 		return (int)$value;
+	}
+
+	/**
+	 * Positive invalid-case count from var_sumstat (DDI/Stata invd), or null if none.
+	 */
+	private function extract_positive_invd($var_sumstat)
+	{
+		foreach ($var_sumstat as $ss) {
+			if (!isset($ss['type']) || $ss['type'] !== 'invd' || !isset($ss['value'])) {
+				continue;
+			}
+			$v = $ss['value'];
+			if ($v === '' || $v === null) {
+				continue;
+			}
+			if (is_numeric($v) && (float)$v > 0) {
+				return (string)$v;
+			}
+		}
+		return null;
+	}
+
+	private function var_intrvl_allows_sysmiss_category($metadata)
+	{
+		if (!isset($metadata['var_intrvl'])) {
+			return false;
+		}
+		return strtolower((string)$metadata['var_intrvl']) === 'discrete';
+	}
+
+	private function var_catgry_has_sysmiss_value($var_catgry)
+	{
+		foreach ($var_catgry as $cat) {
+			if (!isset($cat['value'])) {
+				continue;
+			}
+			if (strcasecmp(trim((string)$cat['value']), 'Sysmiss') === 0) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 

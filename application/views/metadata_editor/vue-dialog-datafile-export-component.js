@@ -177,7 +177,13 @@ Vue.component('dialog-datafile-export', {
                 console.log("export status", result);
                 this.export_dialog.is_loading = true;
                 this.export_dialog.loading_message = this.$t('job_status') + ": " + result.data.job_status;
-                
+
+                if (result.data.job_status === 'failed' || result.data.job_status === 'error') {
+                    const msg = result.data.message || (typeof result.data.detail === 'string' ? result.data.detail : '') || 'Job failed';
+                    this.export_dialog.is_loading = false;
+                    this.export_dialog.message_error = this.$t("failed") + ": " + msg;
+                    return;
+                }
                 if (result.data.job_status !== 'done') {
                     this.exportFileStatusCheck(file_id, job_id, format, outputFilename);
                 } else if (result.data.job_status === 'done') {
@@ -218,11 +224,14 @@ Vue.component('dialog-datafile-export', {
             const base = this.filenamePart(this.file_physical_name);
             if (!base) return;
             const filename = outputFilename || (base + '.' + format);
-            const zip_filename = base + '.zip';
+            const payload = { filenames: [filename] };
+            if (format === 'dta' && this.selected_stata_version != null) {
+                payload.stata_version = this.selected_stata_version;
+            }
             this.zip_creating = true;
             this.zip_error = null;
             try {
-                const resp = await this.$store.dispatch('createBatchExportZip', { filenames: [filename], zip_filename: zip_filename });
+                const resp = await this.$store.dispatch('createBatchExportZip', payload);
                 const zip_path = resp.data && resp.data.zip_path ? resp.data.zip_path : null;
                 if (zip_path) {
                     this.zip_download_url = CI.base_url + '/api/files/download/' + this.ProjectID + '?file=' + encodeURIComponent(zip_path);
