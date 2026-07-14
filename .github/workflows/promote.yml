@@ -1,0 +1,59 @@
+# Promote a build to test (or prod) for the metadata-editor app.
+#
+# dev auto-deploys on every push to `downstream` (see ci.yml). test/prod are
+# PROMOTED deliberately: you pick which already-built image gets deployed.
+#
+# Multi-repo app: the web repo and this repo each build an image that feeds the
+# ONE k8s app `metadata-editor`. Each promotes only its own image, via
+# IMAGE_PROJECT (app_name = the k8s-apps-config folder; image_project = the image).
+# A full promotion = run this workflow in BOTH repos with each one's build_id.
+#
+# build_id comes from the CI run's build job (format: <run_number>-<sha>).
+name: Promote
+on:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        description: 'Build ID to promote (e.g. 2-fe0ff137...) - from the CI build job'
+        required: true
+        type: string
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - test
+          - prod
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: k8s-${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: manaakiwhenua/github-workflows
+          sparse-checkout: actions/k8s-deploy
+          path: .github-workflows
+      - name: Set cluster
+        id: cluster
+        run: |
+          if [[ "${{ inputs.environment }}" == "prod" ]]; then
+            echo "cluster=tak-k8s-prod" >> $GITHUB_OUTPUT
+          else
+            echo "cluster=tak-k8s-nonprod" >> $GITHUB_OUTPUT
+          fi
+      - name: Promote web image to ${{ inputs.environment }}
+        uses: ./.github-workflows/actions/k8s-deploy
+        with:
+          app_name: metadata-editor
+          image_project: metadata-editor
+          environment: ${{ inputs.environment }}
+          cluster: ${{ steps.cluster.outputs.cluster }}
+          build_key: ${{ inputs.build_id }}
+          bitbucket_token: ${{ secrets.K8S_APPS_CONFIG_TRIGGER_TOKEN }}
+      - name: Summary
+        run: |
+          echo "## Promoted ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "| image_project | \`metadata-editor\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| build | \`${{ inputs.build_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| cluster | \`${{ steps.cluster.outputs.cluster }}\` |" >> $GITHUB_STEP_SUMMARY
