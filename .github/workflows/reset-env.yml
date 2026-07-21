@@ -1,0 +1,97 @@
+# Wipe a dev/test environment's data and let it rebuild itself from scratch.
+#
+# What it does: triggers the `reset-app-data` pipeline in k8s-apps-config, which stamps a
+# new DB_RESET_TOKEN on this app's manifest. On the next ArgoCD sync the app's bootstrap
+# initContainer sees a token it hasn't seen before and:
+#
+#   1. drops every table
+#   2. clears the uploaded files (datafiles)
+#   3. reinstalls the schema
+#   4. re-seeds the admin accounts (ADMIN_EMAILS)
+#
+# The environment comes back clean in a couple of minutes - no installer to click, no
+# admin password to invent.
+#
+# Safe by construction: the token is COMPARED against the value stored in the database, so
+# a wipe only happens when it CHANGES. A rollout, a pod restart or an ArgoCD re-sync can
+# never re-wipe your environment.
+#
+# prod is not selectable here, and k8s-apps-config hard-refuses it anyway. Resetting prod
+# is a deliberate, manual, platform-eng act.
+name: Reset environment (destructive)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to WIPE'
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+      confirm:
+        description: 'Type the environment name again to confirm (dev or test)'
+        required: true
+        type: string
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    environment: k8s-${{ inputs.environment }}
+    steps:
+      - name: Confirm intent
+        run: |
+          if [[ "${{ inputs.confirm }}" != "${{ inputs.environment }}" ]]; then
+            echo "::error::Confirmation '${{ inputs.confirm }}' does not match environment '${{ inputs.environment }}'. Nothing was reset."
+            exit 1
+          fi
+          echo "Confirmed: wiping ${{ inputs.environment }}"
+
+      - name: Trigger reset in k8s-apps-config
+        env:
+          BITBUCKET_TOKEN: ${{ secrets.K8S_APPS_CONFIG_TRIGGER_TOKEN }}
+        run: |
+          set -euo pipefail
+          RESET_TOKEN="$(date -u +%Y%m%dT%H%M%SZ)-gh${{ github.run_id }}"
+          echo "reset token: $RESET_TOKEN"
+
+          HTTP_CODE=$(curl -s -o /tmp/resp.json -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${BITBUCKET_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "https://api.bitbucket.org/2.0/repositories/landcareresearch/k8s-apps-config/pipelines/" \
+            -d "{
+              \"target\": {
+                \"type\": \"pipeline_ref_target\",
+                \"ref_type\": \"branch\",
+                \"ref_name\": \"main\",
+                \"selector\": { \"type\": \"custom\", \"pattern\": \"reset-app-data\" }
+              },
+              \"variables\": [
+                { \"key\": \"APP_NAME\",    \"value\": \"metadata-editor\" },
+                { \"key\": \"ENVIRONMENT\", \"value\": \"${{ inputs.environment }}\" },
+                { \"key\": \"CLUSTER\",     \"value\": \"tak-k8s-nonprod\" },
+                { \"key\": \"RESET_TOKEN\", \"value\": \"${RESET_TOKEN}\" }
+              ]
+            }")
+
+          if [[ "$HTTP_CODE" != "201" ]]; then
+            echo "::error::Failed to trigger reset (HTTP $HTTP_CODE)"; cat /tmp/resp.json; exit 1
+          fi
+
+          UUID=$(jq -r '.uuid' /tmp/resp.json | tr -d '{}')
+          URL="https://bitbucket.org/landcareresearch/k8s-apps-config/pipelines/results/${UUID}"
+          echo "pipeline: $URL"
+
+          {
+            echo "## Reset ${{ inputs.environment }}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| environment | \`${{ inputs.environment }}\` |"
+            echo "| reset token | \`${RESET_TOKEN}\` |"
+            echo "| pipeline | [$UUID]($URL) |"
+            echo ""
+            echo "The database and uploaded files will be wiped, the schema reinstalled and the"
+            echo "admin accounts re-seeded on the next ArgoCD sync (usually a couple of minutes)."
+          } >> "$GITHUB_STEP_SUMMARY"
