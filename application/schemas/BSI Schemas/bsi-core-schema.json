@@ -1,0 +1,352 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://landcareresearch.co.nz/metadata/schema/core/v0.1",
+  "title": "MWLR Group Core Metadata Schema",
+  "description": "Core metadata schema for Manaaki Whenua - Landcare Research Group datasets, aligned to Dublin Core and Dublin Core Terms. Expressed in JSON Schema Draft-07.",
+  "type": "object",
+  "properties": {
+    "required_metadata": {
+      "required": [
+        "title",
+        "description",
+        "agents",
+        "dateCreated",
+        "identifier",
+        "keywords",
+        "resourceType"
+      ],
+      "type": "object",
+      "title": "Required metadata fields",
+      "description": "List of required metadata fields for this MWLR Core Metadata Schema.",
+      "properties": {
+        "title": {
+          "title": "Title",
+          "$comment": "dc:title",
+          "description": "A title giving an overview of the dataset.",
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "title": "Description",
+          "$comment": "dc:description",
+          "description": "A descriptive abstract outlining the dataset.",
+          "type": "string",
+          "minLength": 1
+        },
+        "agents": {
+          "title": "Agents",
+          "$comment": "dc:creator / dc:contributor",
+          "description": "People and organisations involved in the creation, maintenance, or management of the dataset. Each entry must specify a role.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "role"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "title": "Name",
+                "description": "Full name of the person or organisation.",
+                "type": "string",
+                "minLength": 1
+              },
+              "orcid": {
+                "title": "ORCID",
+                "description": "ORCID identifier URI for the person (e.g. https://orcid.org/0000-0000-0000-0000).",
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://orcid\\.org/\\d{4}-\\d{4}-\\d{4}-\\d{3}[0-9X]$"
+              },
+              "role": {
+                "title": "Role",
+                "description": "The role of this agent in relation to the dataset.",
+                "type": "string",
+                "enum": [
+                  "author",
+                  "maintainer",
+                  "pointOfContact",
+                  "contributor",
+                  "funder",
+                  "publisher"
+                ]
+              },
+              "organisation": {
+                "title": "Organisation",
+                "description": "The organisation the agent is affiliated with.",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "dateCreated": {
+          "title": "Date Created",
+          "$comment": "dcterms:created",
+          "description": "The date the dataset was created, in ISO 8601 format (YYYY-MM-DD).",
+          "type": "string",
+          "format": "date"
+        },
+        "identifier": {
+          "title": "Resource Identifier",
+          "$comment": "dc:identifier",
+          "description": "A unique identifier for the dataset, preferably a DOI or other persistent URI.",
+          "type": "string",
+          "minLength": 1
+        },
+        "keywords": {
+          "title": "Keywords",
+          "$comment": "dc:subject",
+          "description": "Keywords or phrases describing the dataset. Controlled vocabulary to be used should be GEMET.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minLength": 1,
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "resourceType": {
+          "title": "Resource Type",
+          "$comment": "dc:type",
+          "description": "The nature or genre of the resource, from the DCMI Type Vocabulary. Limited subset used",
+          "type": "string",
+          "enum": [
+            "Dataset",
+            "Collection",
+            "Service",
+            "Text"
+          ],
+          "default": "Dataset"
+        }
+      }
+    },
+    "general_metadata_information": {
+      "type": "object",
+      "title": "Detailed metadata information",
+      "description": "Additional metadata fields. These fields are not required but recommended for completeness.",
+      "properties": {
+        "alternativeTitle": {
+          "title": "Alternative Title",
+          "$comment": "dcterms:alternative",
+          "description": "Alternative titles for the dataset. Use this field for te reo Māori titles or other variant names.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "title": "Title",
+                "description": "Alternative title for the dataset.",
+                "type": "string"
+              }
+            },
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "bibliographicNote": {
+          "title": "Bibliographic Note",
+          "$comment": "dc:description",
+          "description": "Additional comments or bibliographic notes about the dataset.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dateModified": {
+          "title": "Date Modified",
+          "$comment": "dcterms:modified",
+          "description": "The date the dataset was last modified or a new version released, in ISO 8601 format (YYYY-MM-DD). Repeat for each version.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "publisher": {
+          "title": "Publisher",
+          "$comment": "dc:publisher",
+          "description": "The entity responsible for publishing the dataset. Defaults to Manaaki Whenua - Landcare Research Group.",
+          "type": "string",
+          "default": "Manaaki Whenua - Landcare Research Group of BSI"
+        },
+        "language": {
+          "title": "Language",
+          "$comment": "dc:language",
+          "description": "The language(s) of the resource. Use IETF BCP 47 language tags (e.g. 'en', 'mi' for te reo Māori).",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z]{2,3}(-[a-zA-Z0-9]+)*$"
+          },
+          "default": [
+            "en"
+          ],
+          "uniqueItems": true
+        },
+        "temporalCoverage": {
+          "title": "Temporal Coverage",
+          "$comment": "dcterms:temporal",
+          "description": "The time span the dataset covers.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "start": {
+              "title": "Start Date",
+              "description": "Start of the temporal coverage period, in ISO 8601 format (YYYY-MM-DD).",
+              "type": "string",
+              "format": "date"
+            },
+            "end": {
+              "title": "End Date",
+              "description": "End of the temporal coverage period, in ISO 8601 format (YYYY-MM-DD). Omit if ongoing.",
+              "type": "string",
+              "format": "date"
+            },
+            "description": {
+              "title": "Temporal Description",
+              "description": "Free-text description of the temporal coverage where precise dates are not available.",
+              "type": "string"
+            }
+          }
+        },
+        "spatialCoverage": {
+          "title": "Spatial Coverage",
+          "$comment": "dcterms:spatial",
+          "description": "The spatial extent the dataset covers. Provide coordinates, place names, or both. Mandatory for spatial datasets.",
+          "type": "object",
+          "properties": {
+            "placeName": {
+              "title": "Place Name",
+              "description": "A human-readable place name.",
+              "type": "string"
+            },
+            "geometry": {
+              "title": "Geometry",
+              "description": "A GeoJSON geometry object describing the spatial extent.",
+              "type": "object",
+              "required": [
+                "type",
+                "coordinates"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "Point",
+                    "LineString",
+                    "Polygon",
+                    "MultiPoint",
+                    "MultiLineString",
+                    "MultiPolygon"
+                  ]
+                },
+                "coordinates": {
+                  "description": "GeoJSON coordinates array. Structure depends on geometry type.",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "coordinate": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "provenance": {
+          "title": "Provenance / Project Description",
+          "$comment": "dcterms:provenance",
+          "description": "Information about the history or project context of the dataset, including project codes.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rightsHolder": {
+          "title": "Rights Holder",
+          "$comment": "dcterms:rightsHolder",
+          "description": "The entity that holds rights over the dataset. Specify if not Manaaki Whenua - Landcare Research Group of BSI.",
+          "type": "string"
+        },
+        "license": {
+          "title": "License",
+          "$comment": "dcterms:license",
+          "description": "The license under which the dataset is made available. Include any data sharing agreements.",
+          "type": "string"
+        },
+        "accessRights": {
+          "title": "Access Rights",
+          "$comment": "dcterms:accessRights",
+          "description": "Information about who can access the dataset, or its embargo status.",
+          "type": "string"
+        },
+        "format": {
+          "title": "Format",
+          "$comment": "dc:format",
+          "description": "The file format(s) of the dataset. If files use diffrent file types use dominant type",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "relation": {
+          "title": "Related Resources",
+          "$comment": "dc:relation",
+          "description": "Resources related to this dataset, such as journal papers, methodology descriptions. Prefer URIs (e.g. DOIs).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "isPartOf": {
+          "title": "Is Part Of",
+          "$comment": "dcterms:isPartOf",
+          "description": "The collection or larger dataset this dataset belongs to (e.g. NZLRI).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source": {
+          "title": "Derived From / Source",
+          "$comment": "dc:source",
+          "description": "A description of the resource or datasets from which this dataset was derived.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dataLocation": {
+          "title": "Location of Data",
+          "$comment": "dc:source",
+          "description": "Where the data is stored. Should be updated when storage location changes.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "audience": {
+          "title": "Audience",
+          "$comment": "dcterms:audience",
+          "description": "The intended audience or expected users of the dataset.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "version": {
+          "title": "Version",
+          "$comment": "dcterms:hasVersion",
+          "description": "The version of the dataset.",
+          "type": "string"
+        }
+      }
+    }
+  }
+}
