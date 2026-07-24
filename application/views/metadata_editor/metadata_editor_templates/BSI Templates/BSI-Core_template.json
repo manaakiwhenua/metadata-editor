@@ -1,6 +1,4 @@
 {
-    "id": "44",
-    "uid": "axbWOYKAUmMaOJO_KZ7rVstMQkOtrn4n",
     "data_type": "BSI-Core",
     "lang": "en",
     "template_type": "custom",
@@ -8,7 +6,6 @@
     "version": null,
     "organization": null,
     "author": null,
-    "description": null,
     "template": {
         "type": "template",
         "title": "BSI Core",
@@ -73,6 +70,7 @@
                                 "required": true,
                                 "help_text": "The role of this agent in relation to the dataset.",
                                 "display_type": "dropdown-custom",
+                                "enum_store_column": "code",
                                 "enum": [
                                     {
                                         "code": "author",
@@ -114,7 +112,7 @@
                     {
                         "key": "required_metadata.dateCreated",
                         "title": "Date Created",
-                        "type": "string",
+                        "type": "date",
                         "required": true,
                         "help_text": "The date the dataset was created, in ISO 8601 format (YYYY-MM-DD).",
                         "display_type": "date",
@@ -132,11 +130,20 @@
                     {
                         "key": "required_metadata.keywords",
                         "title": "Keywords",
-                        "type": "simple_array",
-                        "display_type": "text",
+                        "type": "array",
                         "required": true,
                         "help_text": "Keywords or phrases describing the dataset. Controlled vocabulary to be used should be GEMET.",
-                        "items": null,
+                        "props": [
+                            {
+                                "key": "keyword",
+                                "title": "Keyword",
+                                "type": "string",
+                                "prop_key": "required_metadata.keywords.keyword",
+                                "required": false,
+                                "help_text": "A keyword or phrase describing the dataset.",
+                                "display_type": "text"
+                            }
+                        ],
                         "is_required": true
                     },
                     {
@@ -147,6 +154,7 @@
                         "help_text": "The nature or genre of the resource, from the DCMI Type Vocabulary. Limited subset used",
                         "display_type": "dropdown-custom",
                         "is_required": true,
+                        "enum_store_column": "code",
                         "enum": [
                             {
                                 "code": "Dataset",
@@ -165,6 +173,23 @@
                                 "label": "Service"
                             }
                         ]
+                    },
+                    {
+                        "key": "general_metadata_information.publisher",
+                        "title": "Publisher",
+                        "type": "string",
+                        "required": true,
+                        "is_required": true,
+                        "help_text": "The entity responsible for publishing the dataset. Defaults to Bioeconomy Science Institute Maiangi Taiao.",
+                        "display_type": "dropdown-custom",
+                        "enum_store_column": "code",
+                        "default": "Bioeconomy Science Institute Maiangi Taiao",
+                        "enum": [
+                            {
+                                "code": "Bioeconomy Science Institute Maiangi Taiao",
+                                "label": "Bioeconomy Science Institute Maiangi Taiao"
+                            }
+                        ]
                     }
                 ]
             },
@@ -178,37 +203,65 @@
                     {
                         "key": "general_metadata_information.alternativeTitle",
                         "title": "Alternative Title",
+                        "type": "array",
                         "required": false,
                         "help_text": "Alternative titles for the dataset. Use this field for te reo Māori titles or other variant names.",
-                        "type": "simple_array",
-                        "display_type": "text",
-                        "items": null
+                        "props": [
+                            {
+                                "key": "title",
+                                "title": "Title",
+                                "type": "string",
+                                "prop_key": "general_metadata_information.alternativeTitle.title",
+                                "required": false,
+                                "help_text": "Alternative title for the dataset.",
+                                "display_type": "text"
+                            }
+                        ]
                     },
                     {
                         "key": "general_metadata_information.bibliographicNote",
                         "title": "Bibliographic Note",
+                        "type": "array",
                         "required": false,
                         "help_text": "Additional comments or bibliographic notes about the dataset.",
-                        "type": "simple_array",
-                        "display_type": "text",
-                        "items": null
+                        "props": [
+                            {
+                                "key": "note",
+                                "title": "Note",
+                                "type": "string",
+                                "prop_key": "general_metadata_information.bibliographicNote.note",
+                                "required": false,
+                                "help_text": "A bibliographic note or comment about the dataset.",
+                                "display_type": "text"
+                            }
+                        ]
                     },
                     {
                         "key": "general_metadata_information.dateModified",
                         "title": "Date Modified",
+                        "type": "array",
                         "required": false,
                         "help_text": "The date the dataset was last modified or a new version released, in ISO 8601 format (YYYY-MM-DD). Repeat for each version.",
-                        "type": "simple_array",
-                        "display_type": "text",
-                        "items": null
-                    },
-                    {
-                        "key": "general_metadata_information.publisher",
-                        "title": "Publisher",
-                        "type": "string",
-                        "required": false,
-                        "help_text": "The entity responsible for publishing the dataset. Defaults to Manaaki Whenua - Landcare Research Group.",
-                        "display_type": "text"
+                        "props": [
+                            {
+                                "key": "date",
+                                "title": "Date",
+                                "type": "string",
+                                "prop_key": "general_metadata_information.dateModified.date",
+                                "required": false,
+                                "help_text": "The date the dataset was modified or a new version released, in ISO 8601 format (YYYY-MM-DD).",
+                                "display_type": "text"
+                            },
+                            {
+                                "key": "version",
+                                "title": "Version",
+                                "type": "string",
+                                "prop_key": "general_metadata_information.dateModified.version",
+                                "required": false,
+                                "help_text": "The version of the dataset corresponding to this modification date.",
+                                "display_type": "text"
+                            }
+                        ]
                     },
                     {
                         "key": "general_metadata_information.language",
@@ -216,9 +269,17 @@
                         "type": "array",
                         "required": false,
                         "help_text": "The language(s) of the resource. Use IETF BCP 47 language tags (e.g. 'en', 'mi' for te reo Māori).",
-                        "type": "simple_array",
-                        "display_type": "text",
-                        "items": null
+                        "props": [
+                            {
+                                "key": "language",
+                                "title": "Language",
+                                "type": "string",
+                                "prop_key": "general_metadata_information.language.language",
+                                "required": false,
+                                "help_text": "IETF BCP 47 language tag (e.g. 'en', 'mi').",
+                                "display_type": "text"
+                            }
+                        ]
                     },
                     {
                         "type": "section",
@@ -281,7 +342,34 @@
                                         "type": "string",
                                         "required": true,
                                         "help_text": "",
-                                        "display_type": "select"
+                                        "display_type": "dropdown-custom",
+                                        "enum_store_column": "code",
+                                        "enum": [
+                                            {
+                                                "code": "Point",
+                                                "label": "Point"
+                                            },
+                                            {
+                                                "code": "LineString",
+                                                "label": "Line String"
+                                            },
+                                            {
+                                                "code": "Polygon",
+                                                "label": "Polygon"
+                                            },
+                                            {
+                                                "code": "MultiPoint",
+                                                "label": "Multi Point"
+                                            },
+                                            {
+                                                "code": "MultiLineString",
+                                                "label": "Multi Line String"
+                                            },
+                                            {
+                                                "code": "MultiPolygon",
+                                                "label": "Multi Polygon"
+                                            }
+                                        ]
                                     },
                                     {
                                         "key": "general_metadata_information.spatialCoverage.geometry.coordinates",
@@ -299,16 +387,6 @@
                                                 "help_text": "",
                                                 "display_type": "number"
                                             }
-                                        ],
-                                        "items": [
-                                            {
-                                                "key": "general_metadata_information.spatialCoverage.geometry.coordinates.coordinate",
-                                                "title": "Coordinate",
-                                                "type": "number",
-                                                "required": false,
-                                                "help_text": "",
-                                                "display_type": "number"
-                                            }
                                         ]
                                     }
                                 ]
@@ -318,18 +396,27 @@
                     {
                         "key": "general_metadata_information.provenance",
                         "title": "Provenance \/ Project Description",
-                        "type": "simple_array",
-                        "display_type": "text",
+                        "type": "array",
                         "required": false,
                         "help_text": "Information about the history or project context of the dataset, including project codes.",
-                        "items": null
+                        "props": [
+                            {
+                                "key": "description",
+                                "title": "Description",
+                                "type": "string",
+                                "prop_key": "general_metadata_information.provenance.description",
+                                "required": false,
+                                "help_text": "A description of the provenance or project context. Can include project codes or other relevant details.",
+                                "display_type": "text"
+                            }
+                        ]
                     },
                     {
                         "key": "general_metadata_information.rightsHolder",
                         "title": "Rights Holder",
                         "type": "string",
                         "required": false,
-                        "help_text": "The entity that holds rights over the dataset. Specify if not Manaaki Whenua - Landcare Research Group of BSI.",
+                        "help_text": "The entity that holds rights over the dataset. Specify if not Bioeconomy Science Institute Maiangi Taiao.",
                         "display_type": "text"
                     },
                     {
@@ -351,56 +438,146 @@
                     {
                         "key": "general_metadata_information.format",
                         "title": "Format",
+                        "type": "array",
                         "required": false,
-                        "help_text": "The file format(s) of the dataset. If files use diffrent file types use dominant type",
-                        "type": "simple_array",
-                        "display_type": "text",
-                        "items": null
+                        "help_text": "The file format(s) of the dataset. If files use different file types use dominant type",
+                        "props": [
+                            {
+                                "key": "format",
+                                "title": "Format",
+                                "type": "string",
+                                "prop_key": "general_metadata_information.format.format",
+                                "required": false,
+                                "help_text": "The file format of the dataset (e.g. 'CSV', 'GeoTIFF').",
+                                "display_type": "text"
+                            }
+                        ]
                     },
                     {
                         "key": "general_metadata_information.relation",
                         "title": "Related Resources",
+                        "type": "array",
                         "required": false,
                         "help_text": "Resources related to this dataset, such as journal papers, methodology descriptions. Prefer URIs (e.g. DOIs).",
-                        "type": "simple_array",
-                        "display_type": "text",
-                        "items": null
+                        "props": [
+                            {
+                                "key": "relation",
+                                "title": "Description of Relation",
+                                "type": "string",
+                                "prop_key": "general_metadata_information.relation.relation",
+                                "required": false,
+                                "help_text": "A description of the relationship to the related resource.",
+                                "display_type": "text"
+                            },
+                            {
+                                "key": "uri",
+                                "title": "URI",
+                                "type": "string",
+                                "prop_key": "general_metadata_information.relation.uri",
+                                "required": false,
+                                "help_text": "A URI identifying the related resource (e.g. DOI, URL).",
+                                "display_type": "text"
+                            }
+                        ]
                     },
                     {
                         "key": "general_metadata_information.isPartOf",
                         "title": "Is Part Of",
+                        "type": "array",
                         "required": false,
                         "help_text": "The collection or larger dataset this dataset belongs to (e.g. NZLRI).",
-                        "type": "simple_array",
-                        "display_type": "text",
-                        "items": null
+                        "props": [
+                            {
+                                "key": "collection",
+                                "title": "Collection Name",
+                                "type": "string",
+                                "prop_key": "general_metadata_information.isPartOf.collection",
+                                "required": false,
+                                "help_text": "The name of the collection or larger dataset this dataset is part of.",
+                                "display_type": "text"
+                            },
+                            {
+                                "key": "uri",
+                                "title": "Collection URI",
+                                "type": "string",
+                                "prop_key": "general_metadata_information.isPartOf.uri",
+                                "required": false,
+                                "help_text": "A URI identifying the collection or larger dataset (e.g. DOI, URL).",
+                                "display_type": "text"
+                            }
+                        ]
                     },
                     {
                         "key": "general_metadata_information.source",
                         "title": "Derived From \/ Source",
+                        "type": "array",
                         "required": false,
                         "help_text": "A description of the resource or datasets from which this dataset was derived.",
-                        "type": "simple_array",
-                        "display_type": "text",
-                        "items": null
+                        "props": [
+                            {
+                                "key": "source",
+                                "title": "Source Description",
+                                "type": "string",
+                                "prop_key": "general_metadata_information.source.source",
+                                "required": false,
+                                "help_text": "A description of the source resource or dataset.",
+                                "display_type": "text"
+                            },
+                            {
+                                "key": "uri",
+                                "title": "Source URI",
+                                "type": "string",
+                                "prop_key": "general_metadata_information.source.uri",
+                                "required": false,
+                                "help_text": "A URI identifying the source resource or dataset (e.g. DOI, URL).",
+                                "display_type": "text"
+                            }
+                        ]
                     },
                     {
                         "key": "general_metadata_information.dataLocation",
                         "title": "Location of Data",
+                        "type": "array",
                         "required": false,
                         "help_text": "Where the data is stored. Should be updated when storage location changes.",
-                        "type": "simple_array",
-                        "display_type": "text",
-                        "items": null
+                        "props": [
+                            {
+                                "key": "location",
+                                "title": "Data Location",
+                                "type": "string",
+                                "prop_key": "general_metadata_information.dataLocation.location",
+                                "required": false,
+                                "help_text": "A description of the location where the data is stored.",
+                                "display_type": "text"
+                            },
+                            {
+                                "key": "uri",
+                                "title": "Location URI",
+                                "type": "string",
+                                "prop_key": "general_metadata_information.dataLocation.uri",
+                                "required": false,
+                                "help_text": "A URI identifying the location where the data is stored (e.g. DOI, URL).",
+                                "display_type": "text"
+                            }
+                        ]
                     },
                     {
                         "key": "general_metadata_information.audience",
                         "title": "Audience",
+                        "type": "array",
                         "required": false,
                         "help_text": "The intended audience or expected users of the dataset.",
-                        "type": "simple_array",
-                        "display_type": "text",
-                        "items": null
+                        "props": [
+                            {
+                                "key": "audience",
+                                "title": "Audience Description",
+                                "type": "string",
+                                "prop_key": "general_metadata_information.audience.audience",
+                                "required": false,
+                                "help_text": "A description of the intended audience or expected users of the dataset.",
+                                "display_type": "text"
+                            }
+                        ]
                     },
                     {
                         "key": "general_metadata_information.version",
@@ -411,25 +588,19 @@
                         "display_type": "text"
                     }
                 ]
-            },
-            {
-                "key": "additional_container",
-                "title": "Additional Fields",
-                "type": "section_container",
-                "items": []
             }
         ]
     },
-    "created": "1784775400",
-    "changed": "1784775422",
+    "created": "1784856828",
+    "changed": "1784856828",
     "instructions": null,
-    "created_by": "1",
-    "changed_by": "1",
-    "owner_id": "1",
-    "is_private": null,
-    "is_published": null,
-    "is_deleted": null,
+    "created_by": null,
+    "changed_by": null,
+    "owner_id": null,
+    "is_private": "0",
+    "is_published": "1",
+    "is_deleted": "0",
     "deleted_by": null,
     "deleted_at": null,
-    "is_generated": false
+    "is_generated": true
 }
