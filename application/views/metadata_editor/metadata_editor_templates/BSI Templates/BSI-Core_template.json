@@ -1,5 +1,5 @@
 {
-    "data_type": "bsi-core",
+    "data_type": "BSI-core",
     "lang": "en",
     "template_type": "custom",
     "name": "BSI Core",
@@ -21,7 +21,9 @@
                 "items": [
                     {
                         "title": "Required metadata",
+                        "key": "required_metadata1785202598940",
                         "type": "section",
+                        "expanded": true,
                         "items": [
                             {
                                 "key": "required_metadata.title",
@@ -30,7 +32,10 @@
                                 "required": true,
                                 "help_text": "A title giving an overview of the dataset.",
                                 "display_type": "text",
-                                "is_required": true
+                                "is_required": true,
+                                "rules": {
+                                    "required": true
+                                }
                             },
                             {
                                 "key": "required_metadata.description",
@@ -39,6 +44,9 @@
                                 "required": true,
                                 "help_text": "A descriptive abstract outlining the dataset.",
                                 "display_type": "text",
+                                "rules": {
+                                    "required": true
+                                },
                                 "is_required": true
                             },
                             {
@@ -46,6 +54,9 @@
                                 "title": "Agents",
                                 "type": "array",
                                 "required": true,
+                                "rules": {
+                                    "required": true
+                                },
                                 "is_required": true,
                                 "help_text": "People and organisations involved in the creation, maintenance, or management of the dataset. Each entry must specify a role.",
                                 "props": [
@@ -119,6 +130,9 @@
                                 "title": "Date Created",
                                 "type": "date",
                                 "required": true,
+                                "rules": {
+                                    "required": true
+                                },
                                 "help_text": "The date the dataset was created, in ISO 8601 format (YYYY-MM-DD).",
                                 "display_type": "date",
                                 "is_required": true
@@ -127,6 +141,9 @@
                                 "key": "required_metadata.identifier",
                                 "title": "Resource Identifier",
                                 "type": "string",
+                                "rules": {
+                                    "required": true
+                                },
                                 "required": true,
                                 "help_text": "A unique identifier for the dataset, preferably a DOI or other persistent URI.",
                                 "display_type": "text",
@@ -136,6 +153,9 @@
                                 "key": "required_metadata.keywords",
                                 "title": "Keywords",
                                 "type": "simple_array",
+                                "rules": {
+                                    "required": true
+                                },
                                 "required": true,
                                 "help_text": "Keywords or phrases describing the dataset. Controlled vocabulary to be used should be GEMET.",
                                 "is_required": true,
@@ -145,6 +165,9 @@
                                 "key": "required_metadata.resourceType",
                                 "title": "Resource Type",
                                 "type": "string",
+                                "rules": {
+                                    "required": true
+                                },
                                 "required": true,
                                 "help_text": "The nature or genre of the resource, from the DCMI Type Vocabulary. Limited subset used",
                                 "display_type": "dropdown-custom",
@@ -173,6 +196,9 @@
                                 "key": "general_metadata_information.publisher",
                                 "title": "Publisher",
                                 "type": "string",
+                                "rules": {
+                                    "required": true
+                                },
                                 "required": true,
                                 "is_required": true,
                                 "help_text": "The entity responsible for publishing the dataset. Defaults to Bioeconomy Science Institute Maiangi Taiao.",
@@ -199,6 +225,7 @@
                     {
                         "title": "Detailed metadata",
                         "type": "section",
+                        "key": "general_metadata_information1785202603803",
                         "items": [
                             {
                                 "key": "general_metadata_information.alternativeTitle",
@@ -239,18 +266,18 @@
                             {
                                 "key": "general_metadata_information.dateModified",
                                 "title": "Date Modified",
-                                "type": "array",
+                                "type": "nested_array",
                                 "required": false,
                                 "help_text": "The date the dataset was last modified or a new version released, in ISO 8601 format (YYYY-MM-DD). Repeat for each version.",
                                 "props": [
                                     {
                                         "key": "date",
                                         "title": "Date",
-                                        "type": "string",
+                                        "type": "date",
                                         "prop_key": "general_metadata_information.dateModified.date",
                                         "required": false,
                                         "help_text": "The date the dataset was modified or a new version released, in ISO 8601 format (YYYY-MM-DD).",
-                                        "display_type": "text"
+                                        "display_type": "date"
                                     },
                                     {
                                         "key": "version",
@@ -483,11 +510,11 @@
                                     {
                                         "key": "general_metadata_information.extent.temporalElementExtent",
                                         "title": "Temporal element",
-                                        "type": "array",
+                                        "type": "nested_array",
                                         "props": [
                                             {
                                                 "key": "beginPosition",
-                                                "type": "string",
+                                                "type": "date",
                                                 "title": "beginPosition",
                                                 "prop_key": "general_metadata_information.extent.temporalElementExtent.beginPosition",
                                                 "help_text": "Begin time position. Requires an extended ISO 8601 formatted combined UTC date and time string (2009-11-17T10:00:00)",
@@ -495,7 +522,7 @@
                                             },
                                             {
                                                 "key": "endPosition",
-                                                "type": "string",
+                                                "type": "date",
                                                 "title": "endPosition",
                                                 "prop_key": "general_metadata_information.extent.temporalElementExtent.endPosition",
                                                 "help_text": "End time position. Requires an extended ISO 8601 formatted combined UTC date and time string (2009-11-17T10:00:00)",
