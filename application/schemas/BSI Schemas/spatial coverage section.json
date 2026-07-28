@@ -1,0 +1,48 @@
+        "spatialCoverage": {
+          "title": "Spatial Coverage",
+          "$comment": "dcterms:spatial",
+          "description": "The spatial extent the dataset covers. Provide coordinates, place names, or both. Mandatory for spatial datasets.",
+          "type": "object",
+          "properties": {
+            "placeName": {
+              "title": "Place Name",
+              "description": "A human-readable place name.",
+              "type": "string"
+            },
+            "geometry": {
+              "title": "Geometry",
+              "description": "A GeoJSON geometry object describing the spatial extent.",
+              "type": "object",
+              "required": [
+                "type",
+                "coordinates"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "Point",
+                    "LineString",
+                    "Polygon",
+                    "MultiPoint",
+                    "MultiLineString",
+                    "MultiPolygon"
+                  ]
+                },
+                "coordinates": {
+                  "description": "GeoJSON coordinates array. Structure depends on geometry type.",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "coordinate": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },

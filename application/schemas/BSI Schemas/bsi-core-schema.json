@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://landcareresearch.co.nz/metadata/schema/core/v0.1",
-  "title": "MWLR Group Core Metadata Schema",
+  "title": "BSI Core Metadata Schema",
   "description": "Core metadata schema for Bioeconomy Science Institute Maiangi Taiao datasets, aligned to Dublin Core and Dublin Core Terms. Expressed in JSON Schema Draft-07.",
   "type": "object",
   "properties": {
@@ -101,15 +101,7 @@
           "description": "Keywords or phrases describing the dataset. Controlled vocabulary to be used should be GEMET.",
           "type": "array",
           "items": {
-            "type": "object",
-            "properties": {
-              "keyword": {
-                "title": "Keyword",
-                "description": "A keyword or phrase describing the dataset.",
-                "type": "string",
-                "minLength": 1
-              }
-            }
+            "type": "string"
           },
           "minLength": 1,
           "minItems": 1,
@@ -127,7 +119,7 @@
             "Text"
           ],
           "default": "Dataset"
-        },        
+        },
         "publisher": {
           "title": "Publisher",
           "$comment": "dc:publisher",
@@ -248,48 +240,169 @@
             }
           }
         },
-        "spatialCoverage": {
-          "title": "Spatial Coverage",
-          "$comment": "dcterms:spatial",
-          "description": "The spatial extent the dataset covers. Provide coordinates, place names, or both. Mandatory for spatial datasets.",
+        "extent": {
+          "title": "Extent of the resource",
+          "description": "Defines the spatial (horizontal and vertical) and temporal region to which the content of the resource applies.",
           "type": "object",
+          "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent",
           "properties": {
-            "placeName": {
-              "title": "Place Name",
-              "description": "A human-readable place name.",
-              "type": "string"
-            },
-            "geometry": {
-              "title": "Geometry",
-              "description": "A GeoJSON geometry object describing the spatial extent.",
-              "type": "object",
-              "required": [
-                "type",
-                "coordinates"
-              ],
-              "additionalProperties": false,
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "Point",
-                    "LineString",
-                    "Polygon",
-                    "MultiPoint",
-                    "MultiLineString",
-                    "MultiPolygon"
-                  ]
-                },
-                "coordinates": {
-                  "description": "GeoJSON coordinates array. Structure depends on geometry type.",
-                  "type": "array",
-                  "items": {
+            "geographicElement": {
+              "type": "array",
+              "title": "Geographic extent(s)",
+              "description": "Geographic extent(s)",
+              "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "geographicBoundingBox": {
+                    "title": "Geographic Bounding Box",
+                    "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/gmd:EX_GeographicBoundingBox",
                     "type": "object",
                     "properties": {
-                      "coordinate": {
-                        "type": "number"
+                      "westBoundLongitude": {
+                        "title": "West",
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180,
+                        "_xpath": "gmd:westBoundLongitude/gco:Decimal"
+                      },
+                      "eastBoundLongitude": {
+                        "title": "East",
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180,
+                        "_xpath": "gmd:eastBoundLongitude/gco:Decimal"
+                      },
+                      "southBoundLatitude": {
+                        "title": "South",
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180,
+                        "_xpath": "gmd:southBoundLatitude/gco:Decimal"
+                      },
+                      "northBoundLatitude": {
+                        "title": "North",
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180,
+                        "_xpath": "gmd:northBoundLongitude/gco:Decimal"
                       }
                     }
+                  },
+                  "geohash": {
+                    "title": "Geohash",
+                    "type": "object",
+                    "properties": {
+                      "geohash": {
+                        "title": "Geohash",
+                        "type": "string"
+                      },
+                      "note": {
+                        "title": "Note",
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "geographicDescription": {
+                    "title": "Geographic description identifier",
+                    "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/EX_GeographicDescription/gmd:geographicIdentifier/gmd:MD_Identifier/gmd:code/gco:CharacterString",
+                    "type": "string"
+                  },
+                  "geographicBoundingPolygon": {
+                    "title": "Geographic Bounding Polygon",
+                    "description": "Geographic Bounding Polygon",
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "title": "Identifier",
+                        "type": "string"
+                      },
+                      "polygon": {
+                        "title": "Polygon",
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "ring": {
+                              "title": "Ring boundary",
+                              "type": "string",
+                              "enum": [
+                                "exterior",
+                                "interior"
+                              ]
+                            },
+                            "type": {
+                              "title": "Type",
+                              "type": "string",
+                              "enum": [
+                                "point",
+                                "lineString",
+                                "polygon"
+                              ]
+                            },
+                            "coordinates": {
+                              "title": "Coordinates",
+                              "type": "array",
+                              "items": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number"
+                                },
+                                "minItems": 2
+                              },
+                              "minItems": 2
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "temporalElementExtent": {
+              "type": "array",
+              "title": "Temporal extent(s)",
+              "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/gmd:EX_TemporalExtent",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "beginPosition": {
+                    "title": "Begin time position",
+                    "description": "Begin time position. Requires an extended ISO 8601 formatted combined UTC date and time string (2009-11-17T10:00:00)",
+                    "type": "string",
+                    "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/gmd:EX_TemporalExtent/gmd:extent/gml:TimePeriod/gml:beginPosition"
+                  },
+                  "endPosition": {
+                    "title": "End time position",
+                    "description": "End time position. Requires an extended ISO 8601 formatted combined UTC date and time string (2009-11-17T10:00:00)",
+                    "type": "string",
+                    "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/gmd:EX_TemporalExtent/gmd:extent/gml:TimePeriod/gml:endPosition"
+                  }
+                }
+              }
+            },
+            "verticalElement": {
+              "type": "array",
+              "title": "Vertical extent(s)",
+              "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/gmd:EX_VerticalExtent",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "minimumValue": {
+                    "title": "Minimum vertical value",
+                    "type": "number",
+                    "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/gmd:EX_VerticalExtent/gmd:minimumValue/gco:Real"
+                  },
+                  "maximumValue": {
+                    "title": "Maximum vertical value",
+                    "type": "number",
+                    "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/gmd:EX_VerticalExtent/gmd:maximumValue/gco:Real"
+                  },
+                  "verticalCRS": {
+                    "title": "Vertical CRS",
+                    "description": "Vertical coordinate reference system used (as defined in the ISO 19136 / GML standard",
+                    "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/gmd:EX_VerticalExtent/gmd:verticalCRS"
                   }
                 }
               }

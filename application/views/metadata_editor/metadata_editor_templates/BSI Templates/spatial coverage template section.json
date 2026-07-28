@@ -1,0 +1,79 @@
+                    {
+                        "type": "section",
+                        "key": "general_metadata_information.spatialCoverage",
+                        "title": "Spatial Coverage",
+                        "help_text": "The spatial extent the dataset covers. Provide coordinates, place names, or both. Mandatory for spatial datasets.",
+                        "expanded": true,
+                        "items": [
+                            {
+                                "key": "general_metadata_information.spatialCoverage.placeName",
+                                "title": "Place Name",
+                                "type": "string",
+                                "required": false,
+                                "help_text": "A human-readable place name.",
+                                "display_type": "text"
+                            },
+                            {
+                                "type": "section",
+                                "key": "general_metadata_information.spatialCoverage.geometry",
+                                "title": "Geometry",
+                                "help_text": "A GeoJSON geometry object describing the spatial extent.",
+                                "expanded": false,
+                                "items": [
+                                    {
+                                        "key": "general_metadata_information.spatialCoverage.geometry.type",
+                                        "title": "Type",
+                                        "type": "string",
+                                        "required": true,
+                                        "help_text": "",
+                                        "display_type": "dropdown-custom",
+                                        "enum_store_column": "code",
+                                        "enum": [
+                                            {
+                                                "code": "Point",
+                                                "label": "Point"
+                                            },
+                                            {
+                                                "code": "LineString",
+                                                "label": "Line String"
+                                            },
+                                            {
+                                                "code": "Polygon",
+                                                "label": "Polygon"
+                                            },
+                                            {
+                                                "code": "MultiPoint",
+                                                "label": "Multi Point"
+                                            },
+                                            {
+                                                "code": "MultiLineString",
+                                                "label": "Multi Line String"
+                                            },
+                                            {
+                                                "code": "MultiPolygon",
+                                                "label": "Multi Polygon"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "key": "general_metadata_information.spatialCoverage.geometry.coordinates",
+                                        "title": "Coordinates",
+                                        "type": "array",
+                                        "required": true,
+                                        "help_text": "GeoJSON coordinates array. Structure depends on geometry type.",
+                                        "props": [
+                                            {
+                                                "key": "coordinate",
+                                                "title": "Coordinate",
+                                                "type": "number",
+                                                "prop_key": "general_metadata_information.spatialCoverage.geometry.coordinates.coordinate",
+                                                "required": false,
+                                                "help_text": "",
+                                                "display_type": "number"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
