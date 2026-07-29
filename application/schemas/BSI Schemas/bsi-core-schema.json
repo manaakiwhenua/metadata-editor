@@ -13,7 +13,8 @@
         "dateCreated",
         "identifier",
         "keywords",
-        "resourceType"
+        "resourceType",
+        "publisher"
       ],
       "type": "object",
       "title": "Required metadata fields",
@@ -199,15 +200,7 @@
           "description": "The language(s) of the resource. Use IETF BCP 47 language tags (e.g. 'en', 'mi' for te reo Māori).",
           "type": "array",
           "items": {
-            "type": "object",
-            "properties": {
-              "language": {
-                "title": "Language",
-                "description": "IETF BCP 47 language tag (e.g. 'en', 'mi').",
-                "type": "string",
-                "pattern": "^[a-zA-Z]{2,3}(-[a-zA-Z0-9]+)*$"
-              }
-            }
+            "type": "string"
           },
           "default": [
             "en"
@@ -271,14 +264,14 @@
                       "southBoundLatitude": {
                         "title": "South",
                         "type": "number",
-                        "minimum": -180,
-                        "maximum": 180
+                        "minimum": -90,
+                        "maximum": 90
                       },
                       "northBoundLatitude": {
                         "title": "North",
                         "type": "number",
-                        "minimum": -180,
-                        "maximum": 180
+                        "minimum": -90,
+                        "maximum": 90
                       }
                     }
                   },
@@ -400,7 +393,8 @@
                   },
                   "verticalCRS": {
                     "title": "Vertical CRS",
-                    "description": "Vertical coordinate reference system used (as defined in the ISO 19136 / GML standard"
+                    "description": "Vertical coordinate reference system used (as defined in the ISO 19136 / GML standard",
+                    "type": "string"
                   }
                 }
               }
@@ -447,14 +441,7 @@
           "description": "The file format(s) of the dataset. If files use different file types use dominant type",
           "type": "array",
           "items": {
-            "type": "object",
-            "properties": {
-              "format": {
-                "title": "Format",
-                "description": "The file format of the dataset (e.g. 'CSV', 'GeoTIFF').",
-                "type": "string"
-              }
-            }
+            "type": "string"
           },
           "uniqueItems": true
         },
