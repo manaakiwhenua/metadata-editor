@@ -244,68 +244,63 @@
           "title": "Extent of the resource",
           "description": "Defines the spatial (horizontal and vertical) and temporal region to which the content of the resource applies.",
           "type": "object",
-          "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent",
           "properties": {
             "geographicElement": {
               "type": "array",
               "title": "Geographic extent(s)",
               "description": "Geographic extent(s)",
-              "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement",
               "items": {
                 "type": "object",
                 "properties": {
                   "geographicBoundingBox": {
                     "title": "Geographic Bounding Box",
-                    "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/gmd:EX_GeographicBoundingBox",
                     "type": "object",
                     "properties": {
                       "westBoundLongitude": {
                         "title": "West",
                         "type": "number",
                         "minimum": -180,
-                        "maximum": 180,
-                        "_xpath": "gmd:westBoundLongitude/gco:Decimal"
+                        "maximum": 180
                       },
                       "eastBoundLongitude": {
                         "title": "East",
                         "type": "number",
                         "minimum": -180,
-                        "maximum": 180,
-                        "_xpath": "gmd:eastBoundLongitude/gco:Decimal"
+                        "maximum": 180
                       },
                       "southBoundLatitude": {
                         "title": "South",
                         "type": "number",
                         "minimum": -180,
-                        "maximum": 180,
-                        "_xpath": "gmd:southBoundLatitude/gco:Decimal"
+                        "maximum": 180
                       },
                       "northBoundLatitude": {
                         "title": "North",
                         "type": "number",
                         "minimum": -180,
-                        "maximum": 180,
-                        "_xpath": "gmd:northBoundLongitude/gco:Decimal"
+                        "maximum": 180
                       }
                     }
                   },
                   "geohash": {
                     "title": "Geohash",
-                    "type": "object",
-                    "properties": {
-                      "geohash": {
-                        "title": "Geohash",
-                        "type": "string"
-                      },
-                      "note": {
-                        "title": "Note",
-                        "type": "string"
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "geohash": {
+                          "title": "Geohash",
+                          "type": "string"
+                        },
+                        "note": {
+                          "title": "Note",
+                          "type": "string"
+                        }
                       }
                     }
                   },
                   "geographicDescription": {
                     "title": "Geographic description identifier",
-                    "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/EX_GeographicDescription/gmd:geographicIdentifier/gmd:MD_Identifier/gmd:code/gco:CharacterString",
                     "type": "string"
                   },
                   "geographicBoundingPolygon": {
@@ -344,11 +339,21 @@
                               "title": "Coordinates",
                               "type": "array",
                               "items": {
-                                "type": "array",
-                                "items": {
-                                  "type": "number"
-                                },
-                                "minItems": 2
+                                "type": "object",
+                                "properties": {
+                                  "latitude": {
+                                    "title": "Latitude",
+                                    "type": "number",
+                                    "minimum": -90,
+                                    "maximum": 90
+                                  },
+                                  "longitude": {
+                                    "title": "Longitude",
+                                    "type": "number",
+                                    "minimum": -180,
+                                    "maximum": 180
+                                  }
+                                }
                               },
                               "minItems": 2
                             }
@@ -363,21 +368,18 @@
             "temporalElementExtent": {
               "type": "array",
               "title": "Temporal extent(s)",
-              "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/gmd:EX_TemporalExtent",
               "items": {
                 "type": "object",
                 "properties": {
                   "beginPosition": {
                     "title": "Begin time position",
                     "description": "Begin time position. Requires an extended ISO 8601 formatted combined UTC date and time string (2009-11-17T10:00:00)",
-                    "type": "string",
-                    "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/gmd:EX_TemporalExtent/gmd:extent/gml:TimePeriod/gml:beginPosition"
+                    "type": "string"
                   },
                   "endPosition": {
                     "title": "End time position",
                     "description": "End time position. Requires an extended ISO 8601 formatted combined UTC date and time string (2009-11-17T10:00:00)",
-                    "type": "string",
-                    "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/gmd:EX_TemporalExtent/gmd:extent/gml:TimePeriod/gml:endPosition"
+                    "type": "string"
                   }
                 }
               }
@@ -385,24 +387,20 @@
             "verticalElement": {
               "type": "array",
               "title": "Vertical extent(s)",
-              "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/gmd:EX_VerticalExtent",
               "items": {
                 "type": "object",
                 "properties": {
                   "minimumValue": {
                     "title": "Minimum vertical value",
-                    "type": "number",
-                    "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/gmd:EX_VerticalExtent/gmd:minimumValue/gco:Real"
+                    "type": "number"
                   },
                   "maximumValue": {
                     "title": "Maximum vertical value",
-                    "type": "number",
-                    "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/gmd:EX_VerticalExtent/gmd:maximumValue/gco:Real"
+                    "type": "number"
                   },
                   "verticalCRS": {
                     "title": "Vertical CRS",
-                    "description": "Vertical coordinate reference system used (as defined in the ISO 19136 / GML standard",
-                    "_xpath": "gmd:identificationInfo/gmd:MD_DataIdentification/gmd:extent/gmd:EX_Extent/gmd:geographicElement/gmd:EX_VerticalExtent/gmd:verticalCRS"
+                    "description": "Vertical coordinate reference system used (as defined in the ISO 19136 / GML standard"
                   }
                 }
               }

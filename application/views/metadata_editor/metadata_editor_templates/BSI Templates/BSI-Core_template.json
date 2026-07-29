@@ -352,46 +352,42 @@
                                         "type": "nested_array",
                                         "props": [
                                             {
-                                                "key": "geographicBoundingBox",
+                                                "key": "general_metadata_information.extent.geographicElement.geographicBoundingBox",
                                                 "title": "Geographic Bounding Box",
                                                 "type": "section",
                                                 "display_type": "bounding_box",
                                                 "bounding_box_options": {
-                                                    "west": "geographicBoundingBox.westBoundLongitude",
-                                                    "east": "geographicBoundingBox.eastBoundLongitude",
-                                                    "south": "geographicBoundingBox.southBoundLatitude",
-                                                    "north": "geographicBoundingBox.northBoundLatitude"
+                                                    "west": "general_metadata_information.extent.geographicElement.geographicBoundingBox.westBoundLongitude",
+                                                    "east": "general_metadata_information.extent.geographicElement.geographicBoundingBox.eastBoundLongitude",
+                                                    "south": "general_metadata_information.extent.geographicElement.geographicBoundingBox.southBoundLatitude",
+                                                    "north": "general_metadata_information.extent.geographicElement.geographicBoundingBox.northBoundLatitude"
                                                 },
                                                 "props": [
                                                     {
-                                                        "key": "geographicBoundingBox.westBoundLongitude",
+                                                        "key": "general_metadata_information.extent.geographicElement.geographicBoundingBox.westBoundLongitude",
                                                         "type": "number",
                                                         "title": "West bound longitude",
-                                                        "prop_key": "geographicBoundingBox.westBoundLongitude",
                                                         "display_type": "text",
                                                         "help_text": "Western-most coordinate of the limit of the dataset extent, expressed in longitude in decimal degrees."
                                                     },
                                                     {
-                                                        "key": "geographicBoundingBox.eastBoundLongitude",
+                                                        "key": "general_metadata_information.extent.geographicElement.geographicBoundingBox.eastBoundLongitude",
                                                         "type": "number",
                                                         "title": "East bound longitude",
-                                                        "prop_key": "geographicBoundingBox.eastBoundLongitude",
                                                         "display_type": "text",
                                                         "help_text": "Eastern-most coordinate of the limit of the dataset extent, expressed in longitude in decimal degrees."
                                                     },
                                                     {
-                                                        "key": "geographicBoundingBox.southBoundLatitude",
+                                                        "key": "general_metadata_information.extent.geographicElement.geographicBoundingBox.southBoundLatitude",
                                                         "type": "number",
                                                         "title": "South bound latitude",
-                                                        "prop_key": "geographicBoundingBox.southBoundLatitude",
                                                         "display_type": "text",
                                                         "help_text": "Southern-most coordinate of the limit of the dataset extent, expressed in latitude in decimal degrees."
                                                     },
                                                     {
-                                                        "key": "geographicBoundingBox.northBoundLatitude",
+                                                        "key": "general_metadata_information.extent.geographicElement.geographicBoundingBox.northBoundLatitude",
                                                         "type": "number",
                                                         "title": "North bound latitude",
-                                                        "prop_key": "geographicBoundingBox.northBoundLatitude",
                                                         "display_type": "text",
                                                         "help_text": "Northern-most coordinate of the limit of the dataset extent, expressed in latitude in decimal degrees."
                                                     }
@@ -399,7 +395,7 @@
                                                 "help_text": "This is the extent of the resource in the geographic space, given as a bounding box. Defining the coordinates of a rectangle representing the resource area on a map allows the discovery by geographical area. Click to draw a bounding box on the map or enter coordinates manually.\n\nProvide the coordinates bounding the limits of the dataset, by means of four properties:\n- West bound longitude: Western-most coordinate of the limit of the dataset extent, expressed in longitude in decimal degrees.\n- East bound longitude: Eastern-most coordinate of the limit of the dataset extent, expressed in longitude in decimal degrees.\n- South bound latitude: Southern-most coordinate of the limit of the dataset extent, expressed in latitude in decimal degrees.\n- North bound latitude: Northern-most coordinate of the limit of the dataset extent, expressed in latitude in decimal degrees.\n\nThe bounding box shall be as small as possible.\nThe bounding box shall be expressed in decimal degree with a precision of at least 2 decimals."
                                             },
                                             {
-                                                "key": "geohash",
+                                                "key": "general_metadata_information.extent.geographicElement.geohash",
                                                 "title": "Geohash",
                                                 "type": "array",
                                                 "props": [
@@ -423,7 +419,7 @@
                                                 "help_text": "A short alphanumeric string representing a spatial location or bounding box using the Geohash encoding. The purpose is to provide a compact, human-readable, and indexable way to encode geographic areas."
                                             },
                                             {
-                                                "key": "geographicDescription",
+                                                "key": "general_metadata_information.extent.geographicElement.geographicDescription",
                                                 "title": "Geographic description",
                                                 "type": "string",
                                                 "prop_key": "general_metadata_information.extent.geographicElement.geographicDescription",
@@ -431,7 +427,7 @@
                                                 "help_text": "A textual or coded description of the geographic area covered by the dataset or service. The purpose is to provide a named place or coded region (e.g., country, administrative unit) as a way to describe geographic extent, especially when precise coordinates or geometry are not available. This useful for indexing metadata by regions or matching data to known administrative areas."
                                             },
                                             {
-                                                "key": "geographicBoundingPolygon-section",
+                                                "key": "general_metadata_information.extent.geographicElement.geographicBoundingPolygon",
                                                 "title": "Bounding polygon",
                                                 "type": "section",
                                                 "props": [
@@ -444,7 +440,7 @@
                                                     },
                                                     {
                                                         "key": "geographicBoundingPolygon.polygon",
-                                                        "type": "array",
+                                                        "type": "nested_array",
                                                         "title": "Polygon",
                                                         "prop_key": "general_metadata_information.extent.geographicElement.geographicBoundingPolygon.polygon",
                                                         "props": [
@@ -479,7 +475,7 @@
                                                                         "label": "Point"
                                                                     },
                                                                     {
-                                                                        "code": "line",
+                                                                        "code": "lineString",
                                                                         "label": "Line"
                                                                     },
                                                                     {
@@ -492,10 +488,32 @@
                                                             },
                                                             {
                                                                 "key": "coordinates",
-                                                                "type": "textarea",
+                                                                "type": "array",
                                                                 "title": "Coordinates",
                                                                 "prop_key": "general_metadata_information.extent.geographicElement.geographicBoundingPolygon.polygon.coordinates",
-                                                                "help_text": "Coordinates of the polygon. These are the longitude-latitude pairs that define the polygon boundary. Each pair is ordered as <longitude> <latitude>, separated by spaces. The first and last coordinates must be the same to close the polygon."
+                                                                "props": [
+                                                                    {
+                                                                        "key":"longitude",
+                                                                        "type":"number",
+                                                                        "title":"Longitude",
+                                                                        "prop_key":"general_metadata_information.extent.geographicElement.geographicBoundingPolygon.polygon.coordinates.longitude",
+                                                                        "display_type":"text",
+                                                                        "rules": {
+                                                                            "numeric": true
+                                                                        } 
+                                                                    },
+                                                                    {
+                                                                        "key":"latitude",
+                                                                        "type":"number",
+                                                                        "title":"Latitude",
+                                                                        "prop_key":"general_metadata_information.extent.geographicElement.geographicBoundingPolygon.polygon.coordinates.latitude",
+                                                                        "display_type":"text",
+                                                                        "rules": {
+                                                                            "numeric": true
+                                                                        } 
+                                                                    }
+                                                                ],
+                                                                "help_text": "Coordinates of the polygon. These are the longitude-latitude pairs that define the polygon boundary. Each pair is ordered as <longitude> <latitude>. The first and last coordinates must be the same to close the polygon."
                                                             }
                                                         ],
                                                         "help_text": "A geometric object that defines the shape and extent of the area covered. This is defined in GML (Geography Markup Language), typically using EPSG:4326 (WGS 84) as the coordinate system."
@@ -539,17 +557,23 @@
                                         "props": [
                                             {
                                                 "key": "minimumValue",
-                                                "type": "string",
+                                                "type": "number",
                                                 "title": "Minimum value",
                                                 "prop_key": "general_metadata_information.extent.verticalElement.minimumValue",
-                                                "display_type": "text"
+                                                "display_type": "text",
+                                                "rules": {
+                                                    "numeric": true
+                                                }
                                             },
                                             {
                                                 "key": "maximumValue",
-                                                "type": "string",
+                                                "type": "number",
                                                 "title": "Maximum value",
                                                 "prop_key": "general_metadata_information.extent.verticalElement.maximumValue",
-                                                "display_type": "text"
+                                                "display_type": "text",
+                                                "rules": {
+                                                    "numeric": true
+                                                }
                                             },
                                             {
                                                 "key": "verticalCRS",
