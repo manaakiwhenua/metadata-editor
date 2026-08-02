@@ -26,6 +26,26 @@
                         "expanded": true,
                         "items": [
                             {
+                                "key": "required_metadata.resourceType",
+                                "title": "Resource Type",
+                                "type": "string",
+                                "rules": {
+                                    "required": true
+                                },
+                                "required": true,
+                                "help_text": "The nature or genre of the resource, from the DCMI Type Vocabulary. Limited subset used",
+                                "display_type": "dropdown",
+                                "is_required": true,
+                                "enum_store_column": "code",
+                                "default": "Dataset",
+                                "enum": [
+                                    {
+                                        "code": "Dataset",
+                                        "label": "Dataset"
+                                    }
+                                ]
+                            },
+                            {
                                 "key": "required_metadata.title",
                                 "title": "Title",
                                 "type": "string",
@@ -42,8 +62,9 @@
                                 "title": "Description",
                                 "type": "string",
                                 "required": true,
-                                "help_text": "A descriptive abstract outlining the dataset.",
-                                "display_type": "text",
+                                "help_text": "This is a brief narrative summary of the content of the dataset. The abstract should provide a clear and concise statement that enables the reader to understand the content of the data. Include the following: the main attributes, data sources, why it was created, what it can be used for if reused, any data quality issue. Do not use unexplained acronyms.",
+                                "display_type": "textarea",
+                                "content_format": "text",
                                 "rules": {
                                     "required": true
                                 },
@@ -58,16 +79,16 @@
                                     "required": true
                                 },
                                 "is_required": true,
-                                "help_text": "People and organisations involved in the creation, maintenance, or management of the dataset. Each entry must specify a role.",
+                                "help_text": "List people who have been involved with the creation and management of the dataset. It is important to state who the creator (Author) was. 'Author' is used for the person or organisation chiefly responsible for the intellectual content.",
                                 "props": [
                                     {
                                         "key": "name",
                                         "title": "Name",
                                         "type": "string",
                                         "prop_key": "required_metadata.agents.name",
-                                        "required": true,
                                         "help_text": "Full name of the person or organisation.",
-                                        "display_type": "text"
+                                        "display_type": "text",
+                                        "required": false
                                     },
                                     {
                                         "key": "orcid",
@@ -119,9 +140,10 @@
                                         "title": "Organisation",
                                         "type": "string",
                                         "prop_key": "required_metadata.agents.organisation",
-                                        "required": false,
+                                        "required": true,
                                         "help_text": "The organisation the agent is affiliated with.",
-                                        "display_type": "text"
+                                        "display_type": "text",
+                                        "default": "Bioeconomy Science Institute Maiangi Taiao"
                                     }
                                 ]
                             },
@@ -133,20 +155,8 @@
                                 "rules": {
                                     "required": true
                                 },
-                                "help_text": "The date the dataset was created, in ISO 8601 format (YYYY-MM-DD).",
+                                "help_text": "Date the dataset was created, in ISO 8601 format (YYYY-MM-DD). Date of creation differs from the temporal coverage. For example, a dataset might have been created in February 2009 (2009-02-15) but the data was collected during the year 2008 (temporal coverage from 2008-01-01 to 2008-12-31)",
                                 "display_type": "date",
-                                "is_required": true
-                            },
-                            {
-                                "key": "required_metadata.identifier",
-                                "title": "Resource Identifier",
-                                "type": "string",
-                                "rules": {
-                                    "required": true
-                                },
-                                "required": true,
-                                "help_text": "A unique identifier for the dataset, preferably a DOI or other persistent URI.",
-                                "display_type": "text",
                                 "is_required": true
                             },
                             {
@@ -157,40 +167,9 @@
                                     "required": true
                                 },
                                 "required": true,
-                                "help_text": "Keywords or phrases describing the dataset. Controlled vocabulary to be used should be GEMET.",
+                                "help_text": "Use the keywords feature to provide more specific terms that describe the dataset's content. These can be used to identify particular concepts, places, techniques, or any other relevant aspect that the dataset addresses. When possible, existing vocabularies should be used to source keywords. An example of global vocabulary is the Global Change Master Directory. Alternatively, GEMET, the GEneral Multilingual Environmental Thesaurus.",
                                 "is_required": true,
                                 "display_type": "dropdown-custom"
-                            },
-                            {
-                                "key": "required_metadata.resourceType",
-                                "title": "Resource Type",
-                                "type": "string",
-                                "rules": {
-                                    "required": true
-                                },
-                                "required": true,
-                                "help_text": "The nature or genre of the resource, from the DCMI Type Vocabulary. Limited subset used",
-                                "display_type": "dropdown-custom",
-                                "is_required": true,
-                                "enum_store_column": "code",
-                                "enum": [
-                                    {
-                                        "code": "Dataset",
-                                        "label": "Dataset"
-                                    },
-                                    {
-                                        "code": "Collection",
-                                        "label": "Collection"
-                                    },
-                                    {
-                                        "code": "Text",
-                                        "label": "Text"
-                                    },
-                                    {
-                                        "code": "Service",
-                                        "label": "Service"
-                                    }
-                                ]
                             },
                             {
                                 "key": "required_metadata.publisher",
@@ -218,17 +197,24 @@
             },
             {
                 "type": "section_container",
-                "key": "general_metadata_information",
-                "title": "Detailed metadata information",
+                "key": "optional_additional_metadata",
+                "title": "Optional additional metadata",
                 "help_text": "Additional metadata fields. These fields are not required but recommended for completeness.",
                 "items": [
                     {
-                        "title": "Detailed metadata",
+                        "title": "Optional additional metadata",
                         "type": "section",
-                        "key": "general_metadata_information1785202603803",
+                        "key": "optional_additional_metadata1785202603803",
                         "items": [
                             {
-                                "key": "general_metadata_information.alternativeTitle",
+                                "key": "optional_additional_metadata.identifier",
+                                "title": "Resource Identifier",
+                                "type": "string",
+                                "help_text": "A unique identifier for the dataset, preferably a DOI or other persistent URI.",
+                                "display_type": "text"
+                            },
+                            {
+                                "key": "optional_additional_metadata.alternativeTitle",
                                 "title": "Alternative Title",
                                 "type": "array",
                                 "required": false,
@@ -238,7 +224,7 @@
                                         "key": "title",
                                         "title": "Title",
                                         "type": "string",
-                                        "prop_key": "general_metadata_information.alternativeTitle.title",
+                                        "prop_key": "optional_additional_metadata.alternativeTitle.title",
                                         "required": false,
                                         "help_text": "Alternative title for the dataset.",
                                         "display_type": "text"
@@ -246,7 +232,7 @@
                                 ]
                             },
                             {
-                                "key": "general_metadata_information.bibliographicNote",
+                                "key": "optional_additional_metadata.bibliographicNote",
                                 "title": "Bibliographic Note",
                                 "type": "array",
                                 "required": false,
@@ -256,7 +242,7 @@
                                         "key": "note",
                                         "title": "Note",
                                         "type": "string",
-                                        "prop_key": "general_metadata_information.bibliographicNote.note",
+                                        "prop_key": "optional_additional_metadata.bibliographicNote.note",
                                         "required": false,
                                         "help_text": "A bibliographic note or comment about the dataset.",
                                         "display_type": "text"
@@ -264,7 +250,7 @@
                                 ]
                             },
                             {
-                                "key": "general_metadata_information.dateModified",
+                                "key": "optional_additional_metadata.dateModified",
                                 "title": "Date Modified",
                                 "type": "nested_array",
                                 "required": false,
@@ -274,7 +260,7 @@
                                         "key": "date",
                                         "title": "Date",
                                         "type": "date",
-                                        "prop_key": "general_metadata_information.dateModified.date",
+                                        "prop_key": "optional_additional_metadata.dateModified.date",
                                         "required": false,
                                         "help_text": "The date the dataset was modified or a new version released, in ISO 8601 format (YYYY-MM-DD).",
                                         "display_type": "date"
@@ -283,7 +269,7 @@
                                         "key": "version",
                                         "title": "Version",
                                         "type": "string",
-                                        "prop_key": "general_metadata_information.dateModified.version",
+                                        "prop_key": "optional_additional_metadata.dateModified.version",
                                         "required": false,
                                         "help_text": "The version of the dataset corresponding to this modification date.",
                                         "display_type": "text"
@@ -291,7 +277,7 @@
                                 ]
                             },
                             {
-                                "key": "general_metadata_information.language",
+                                "key": "optional_additional_metadata.language",
                                 "title": "Language",
                                 "type": "simple_array",
                                 "display_type": "dropdown-custom",
@@ -300,13 +286,13 @@
                             },
                             {
                                 "type": "section",
-                                "key": "general_metadata_information.temporalCoverage",
+                                "key": "optional_additional_metadata.temporalCoverage",
                                 "title": "Temporal Coverage",
                                 "help_text": "The time span the dataset covers.",
                                 "expanded": true,
                                 "items": [
                                     {
-                                        "key": "general_metadata_information.temporalCoverage.start",
+                                        "key": "optional_additional_metadata.temporalCoverage.start",
                                         "title": "Start Date",
                                         "type": "date",
                                         "required": false,
@@ -314,7 +300,7 @@
                                         "display_type": "date"
                                     },
                                     {
-                                        "key": "general_metadata_information.temporalCoverage.end",
+                                        "key": "optional_additional_metadata.temporalCoverage.end",
                                         "title": "End Date",
                                         "type": "date",
                                         "required": false,
@@ -322,7 +308,7 @@
                                         "display_type": "date"
                                     },
                                     {
-                                        "key": "general_metadata_information.temporalCoverage.description",
+                                        "key": "optional_additional_metadata.temporalCoverage.description",
                                         "title": "Temporal Description",
                                         "type": "string",
                                         "required": false,
@@ -332,12 +318,12 @@
                                 ]
                             },
                             {
-                                "key": "general_metadata_information.extent",
+                                "key": "optional_additional_metadata.extent",
                                 "title": "Extent (geographic, temporal, vertical)",
                                 "type": "section",
                                 "items": [
                                     {
-                                        "key": "general_metadata_information.extent.geographicElement",
+                                        "key": "optional_additional_metadata.extent.geographicElement",
                                         "title": "Geographic element",
                                         "type": "nested_array",
                                         "props": [
@@ -386,7 +372,7 @@
                                             },
                                             {
                                                 "key": "geohash",
-                                                "prop_key": "general_metadata_information.extent.geographicElement.geohash",
+                                                "prop_key": "optional_additional_metadata.extent.geographicElement.geohash",
                                                 "title": "Geohash",
                                                 "type": "array",
                                                 "props": [
@@ -394,7 +380,7 @@
                                                         "key": "geohash",
                                                         "type": "string",
                                                         "title": "Geohash",
-                                                        "prop_key": "general_metadata_information.extent.geographicElement.geohash.geohash",
+                                                        "prop_key": "optional_additional_metadata.extent.geographicElement.geohash.geohash",
                                                         "help_text": "The geohash is not explicitly defined in ISO 19139, but often used in profiles, extensions, or auxiliary metadata to support spatial search, indexing, or approximate location. For example, \"u4pruydqqvj\" represents a specific area near New York City. Geohashes can vary in length; more characters mean higher precision.",
                                                         "display_type": "textarea"
                                                     },
@@ -402,7 +388,7 @@
                                                         "key": "note",
                                                         "type": "string",
                                                         "title": "Note",
-                                                        "prop_key": "general_metadata_information.extent.geographicElement.geohash.note",
+                                                        "prop_key": "optional_additional_metadata.extent.geographicElement.geohash.note",
                                                         "help_text": "A descriptive or explanatory note about the Geohash value — e.g., resolution, use, limitations. For example, \"Geohash at 8-character precision (~19 meters accuracy).\"",
                                                         "display_type": "textarea"
                                                     }
@@ -413,7 +399,7 @@
                                                 "key": "geographicDescription",
                                                 "title": "Geographic description",
                                                 "type": "string",
-                                                "prop_key": "general_metadata_information.extent.geographicElement.geographicDescription",
+                                                "prop_key": "optional_additional_metadata.extent.geographicElement.geographicDescription",
                                                 "display_type": "textarea",
                                                 "help_text": "A textual or coded description of the geographic area covered by the dataset or service. The purpose is to provide a named place or coded region (e.g., country, administrative unit) as a way to describe geographic extent, especially when precise coordinates or geometry are not available. This useful for indexing metadata by regions or matching data to known administrative areas."
                                             },
@@ -427,20 +413,20 @@
                                                         "type": "string",
                                                         "display_type": "text",
                                                         "title": "Polygon identifier (ID)",
-                                                        "prop_key": "general_metadata_information.extent.geographicElement.geographicBoundingPolygon.id",
+                                                        "prop_key": "optional_additional_metadata.extent.geographicElement.geographicBoundingPolygon.id",
                                                         "help_text": "A unique identifier assigned to the polygon for referencing or validation. The purpose is to allow referencing this specific geometry within the metadata or from external systems."
                                                     },
                                                     {
                                                         "key": "geographicBoundingPolygon.polygon",
                                                         "type": "nested_array",
                                                         "title": "Polygon",
-                                                        "prop_key": "general_metadata_information.extent.geographicElement.geographicBoundingPolygon.polygon",
+                                                        "prop_key": "optional_additional_metadata.extent.geographicElement.geographicBoundingPolygon.polygon",
                                                         "props": [
                                                             {
                                                                 "key": "ring",
                                                                 "type": "string",
                                                                 "title": "Interior or exterior ring",
-                                                                "prop_key": "general_metadata_information.extent.geographicElement.geographicBoundingPolygon.polygon.ring",
+                                                                "prop_key": "optional_additional_metadata.extent.geographicElement.geographicBoundingPolygon.polygon.ring",
                                                                 "display_type": "dropdown-custom",
                                                                 "enum": [
                                                                     {
@@ -459,7 +445,7 @@
                                                                 "key": "type",
                                                                 "type": "string",
                                                                 "title": "Type",
-                                                                "prop_key": "general_metadata_information.extent.geographicElement.geographicBoundingPolygon.polygon.type",
+                                                                "prop_key": "optional_additional_metadata.extent.geographicElement.geographicBoundingPolygon.polygon.type",
                                                                 "display_type": "dropdown-custom",
                                                                 "enum": [
                                                                     {
@@ -482,13 +468,13 @@
                                                                 "key": "coordinates",
                                                                 "type": "array",
                                                                 "title": "Coordinates",
-                                                                "prop_key": "general_metadata_information.extent.geographicElement.geographicBoundingPolygon.polygon.coordinates",
+                                                                "prop_key": "optional_additional_metadata.extent.geographicElement.geographicBoundingPolygon.polygon.coordinates",
                                                                 "props": [
                                                                     {
                                                                         "key": "longitude",
                                                                         "type": "number",
                                                                         "title": "Longitude",
-                                                                        "prop_key": "general_metadata_information.extent.geographicElement.geographicBoundingPolygon.polygon.coordinates.longitude",
+                                                                        "prop_key": "optional_additional_metadata.extent.geographicElement.geographicBoundingPolygon.polygon.coordinates.longitude",
                                                                         "display_type": "text",
                                                                         "rules": {
                                                                             "numeric": true
@@ -498,7 +484,7 @@
                                                                         "key": "latitude",
                                                                         "type": "number",
                                                                         "title": "Latitude",
-                                                                        "prop_key": "general_metadata_information.extent.geographicElement.geographicBoundingPolygon.polygon.coordinates.latitude",
+                                                                        "prop_key": "optional_additional_metadata.extent.geographicElement.geographicBoundingPolygon.polygon.coordinates.latitude",
                                                                         "display_type": "text",
                                                                         "rules": {
                                                                             "numeric": true
@@ -514,11 +500,11 @@
                                                 "help_text": "A polygonal shape describing the precise spatial coverage of the dataset or service. The purpose is to provide more accurate spatial boundaries than a bounding box, especially for irregular or non-rectangular areas."
                                             }
                                         ],
-                                        "prop_key": "general_metadata_information.extent.geographicElement",
+                                        "prop_key": "optional_additional_metadata.extent.geographicElement",
                                         "help_text": "Spatial (horizontal) extent element. This can be defined either with a Bounding Box (recommended); or using Geographic Description - free text that defines the area covered. When the dataset covers one or more countries, it is recommended to enter the country names in this element, as it can then be used in data catalogs for filtering by geography.\n\nThe bounding box shall be as small as possible.\nThe bounding box shall be expressed in decimal degree with a precision of at least 2 decimals."
                                     },
                                     {
-                                        "key": "general_metadata_information.extent.temporalElementExtent",
+                                        "key": "optional_additional_metadata.extent.temporalElementExtent",
                                         "title": "Temporal element",
                                         "type": "nested_array",
                                         "props": [
@@ -526,7 +512,7 @@
                                                 "key": "beginPosition",
                                                 "type": "date",
                                                 "title": "beginPosition",
-                                                "prop_key": "general_metadata_information.extent.temporalElementExtent.beginPosition",
+                                                "prop_key": "optional_additional_metadata.extent.temporalElementExtent.beginPosition",
                                                 "help_text": "Begin time position. Requires an extended ISO 8601 formatted combined UTC date and time string (2009-11-17T10:00:00)",
                                                 "display_type": "date"
                                             },
@@ -534,16 +520,16 @@
                                                 "key": "endPosition",
                                                 "type": "date",
                                                 "title": "endPosition",
-                                                "prop_key": "general_metadata_information.extent.temporalElementExtent.endPosition",
+                                                "prop_key": "optional_additional_metadata.extent.temporalElementExtent.endPosition",
                                                 "help_text": "End time position. Requires an extended ISO 8601 formatted combined UTC date and time string (2009-11-17T10:00:00)",
                                                 "display_type": "date"
                                             }
                                         ],
-                                        "prop_key": "general_metadata_information.extent.temporalElementExtent",
+                                        "prop_key": "optional_additional_metadata.extent.temporalElementExtent",
                                         "help_text": "The temporal extent defines the time period covered by the content of the resource. Depending on the temporal characteristics of the dataset, this will consist in a Time period (made of a begin position and end position) or a time instant (made of a single time position) referencing date/time information according to ISO 8601.\n\nThis time period may be expressed as:\n- an individual date\n- an interval of dates (starting date and ending date)\n- a mix of individual dates and intervals of dates"
                                     },
                                     {
-                                        "key": "general_metadata_information.extent.verticalElement",
+                                        "key": "optional_additional_metadata.extent.verticalElement",
                                         "title": "Vertical element",
                                         "type": "array",
                                         "props": [
@@ -551,7 +537,7 @@
                                                 "key": "minimumValue",
                                                 "type": "number",
                                                 "title": "Minimum value",
-                                                "prop_key": "general_metadata_information.extent.verticalElement.minimumValue",
+                                                "prop_key": "optional_additional_metadata.extent.verticalElement.minimumValue",
                                                 "display_type": "text",
                                                 "rules": {
                                                     "numeric": true
@@ -561,7 +547,7 @@
                                                 "key": "maximumValue",
                                                 "type": "number",
                                                 "title": "Maximum value",
-                                                "prop_key": "general_metadata_information.extent.verticalElement.maximumValue",
+                                                "prop_key": "optional_additional_metadata.extent.verticalElement.maximumValue",
                                                 "display_type": "text",
                                                 "rules": {
                                                     "numeric": true
@@ -571,18 +557,18 @@
                                                 "key": "verticalCRS",
                                                 "type": "string",
                                                 "title": "Vertical CRS",
-                                                "prop_key": "general_metadata_information.extent.verticalElement.verticalCRS",
+                                                "prop_key": "optional_additional_metadata.extent.verticalElement.verticalCRS",
                                                 "display_type": "text"
                                             }
                                         ],
-                                        "prop_key": "general_metadata_information.extent.verticalElement",
+                                        "prop_key": "optional_additional_metadata.extent.verticalElement",
                                         "help_text": "Spatial (vertical) extent element, providing two properties: minimum value, maximum value and vertical CRS (reference to the vertical coordinate reference system)"
                                     }
                                 ],
                                 "help_text": ""
                             },
                             {
-                                "key": "general_metadata_information.provenance",
+                                "key": "optional_additional_metadata.provenance",
                                 "title": "Provenance \/ Project Description",
                                 "type": "array",
                                 "required": false,
@@ -592,7 +578,7 @@
                                         "key": "description",
                                         "title": "Description",
                                         "type": "string",
-                                        "prop_key": "general_metadata_information.provenance.description",
+                                        "prop_key": "optional_additional_metadata.provenance.description",
                                         "required": false,
                                         "help_text": "A description of the provenance or project context. Can include project codes or other relevant details.",
                                         "display_type": "text"
@@ -600,15 +586,16 @@
                                 ]
                             },
                             {
-                                "key": "general_metadata_information.rightsHolder",
+                                "key": "optional_additional_metadata.rightsHolder",
                                 "title": "Rights Holder",
                                 "type": "string",
                                 "required": false,
                                 "help_text": "The entity that holds rights over the dataset. Specify if not Bioeconomy Science Institute Maiangi Taiao.",
-                                "display_type": "text"
+                                "display_type": "text",
+                                "default": "Bioeconomy Science Institute Maiangi Taiao"
                             },
                             {
-                                "key": "general_metadata_information.license",
+                                "key": "optional_additional_metadata.license",
                                 "title": "License",
                                 "type": "string",
                                 "required": false,
@@ -616,7 +603,7 @@
                                 "display_type": "text"
                             },
                             {
-                                "key": "general_metadata_information.accessRights",
+                                "key": "optional_additional_metadata.accessRights",
                                 "title": "Access Rights",
                                 "type": "string",
                                 "required": false,
@@ -624,7 +611,7 @@
                                 "display_type": "text"
                             },
                             {
-                                "key": "general_metadata_information.format",
+                                "key": "optional_additional_metadata.format",
                                 "title": "Format",
                                 "type": "simple_array",
                                 "display_type": "dropdown-custom",
@@ -632,7 +619,7 @@
                                 "help_text": "The file format(s) of the dataset. If files use different file types use dominant type"
                             },
                             {
-                                "key": "general_metadata_information.relation",
+                                "key": "optional_additional_metadata.relation",
                                 "title": "Related Resources",
                                 "type": "array",
                                 "required": false,
@@ -642,7 +629,7 @@
                                         "key": "relation",
                                         "title": "Description of Relation",
                                         "type": "string",
-                                        "prop_key": "general_metadata_information.relation.relation",
+                                        "prop_key": "optional_additional_metadata.relation.relation",
                                         "required": false,
                                         "help_text": "A description of the relationship to the related resource.",
                                         "display_type": "text"
@@ -651,7 +638,7 @@
                                         "key": "uri",
                                         "title": "URI",
                                         "type": "string",
-                                        "prop_key": "general_metadata_information.relation.uri",
+                                        "prop_key": "optional_additional_metadata.relation.uri",
                                         "required": false,
                                         "help_text": "A URI identifying the related resource (e.g. DOI, URL).",
                                         "display_type": "text"
@@ -659,7 +646,7 @@
                                 ]
                             },
                             {
-                                "key": "general_metadata_information.isPartOf",
+                                "key": "optional_additional_metadata.isPartOf",
                                 "title": "Is Part Of",
                                 "type": "array",
                                 "required": false,
@@ -669,7 +656,7 @@
                                         "key": "collection",
                                         "title": "Collection Name",
                                         "type": "string",
-                                        "prop_key": "general_metadata_information.isPartOf.collection",
+                                        "prop_key": "optional_additional_metadata.isPartOf.collection",
                                         "required": false,
                                         "help_text": "The name of the collection or larger dataset this dataset is part of.",
                                         "display_type": "text"
@@ -678,7 +665,7 @@
                                         "key": "uri",
                                         "title": "Collection URI",
                                         "type": "string",
-                                        "prop_key": "general_metadata_information.isPartOf.uri",
+                                        "prop_key": "optional_additional_metadata.isPartOf.uri",
                                         "required": false,
                                         "help_text": "A URI identifying the collection or larger dataset (e.g. DOI, URL).",
                                         "display_type": "text"
@@ -686,7 +673,7 @@
                                 ]
                             },
                             {
-                                "key": "general_metadata_information.source",
+                                "key": "optional_additional_metadata.source",
                                 "title": "Derived From \/ Source",
                                 "type": "array",
                                 "required": false,
@@ -696,7 +683,7 @@
                                         "key": "source",
                                         "title": "Source Description",
                                         "type": "string",
-                                        "prop_key": "general_metadata_information.source.source",
+                                        "prop_key": "optional_additional_metadata.source.source",
                                         "required": false,
                                         "help_text": "A description of the source resource or dataset.",
                                         "display_type": "text"
@@ -705,7 +692,7 @@
                                         "key": "uri",
                                         "title": "Source URI",
                                         "type": "string",
-                                        "prop_key": "general_metadata_information.source.uri",
+                                        "prop_key": "optional_additional_metadata.source.uri",
                                         "required": false,
                                         "help_text": "A URI identifying the source resource or dataset (e.g. DOI, URL).",
                                         "display_type": "text"
@@ -713,7 +700,7 @@
                                 ]
                             },
                             {
-                                "key": "general_metadata_information.dataLocation",
+                                "key": "optional_additional_metadata.dataLocation",
                                 "title": "Location of Data",
                                 "type": "array",
                                 "required": false,
@@ -723,7 +710,7 @@
                                         "key": "location",
                                         "title": "Data Location",
                                         "type": "string",
-                                        "prop_key": "general_metadata_information.dataLocation.location",
+                                        "prop_key": "optional_additional_metadata.dataLocation.location",
                                         "required": false,
                                         "help_text": "A description of the location where the data is stored.",
                                         "display_type": "text"
@@ -732,7 +719,7 @@
                                         "key": "uri",
                                         "title": "Location URI",
                                         "type": "string",
-                                        "prop_key": "general_metadata_information.dataLocation.uri",
+                                        "prop_key": "optional_additional_metadata.dataLocation.uri",
                                         "required": false,
                                         "help_text": "A URI identifying the location where the data is stored (e.g. DOI, URL).",
                                         "display_type": "text"
@@ -740,7 +727,7 @@
                                 ]
                             },
                             {
-                                "key": "general_metadata_information.audience",
+                                "key": "optional_additional_metadata.audience",
                                 "title": "Audience",
                                 "type": "array",
                                 "required": false,
@@ -750,7 +737,7 @@
                                         "key": "audience",
                                         "title": "Audience Description",
                                         "type": "string",
-                                        "prop_key": "general_metadata_information.audience.audience",
+                                        "prop_key": "optional_additional_metadata.audience.audience",
                                         "required": false,
                                         "help_text": "A description of the intended audience or expected users of the dataset.",
                                         "display_type": "text"
@@ -758,7 +745,7 @@
                                 ]
                             },
                             {
-                                "key": "general_metadata_information.version",
+                                "key": "optional_additional_metadata.version",
                                 "title": "Version",
                                 "type": "string",
                                 "required": false,
@@ -770,17 +757,5 @@
                 ]
             }
         ]
-    },
-    "created": "1784856828",
-    "changed": "1784856828",
-    "instructions": null,
-    "created_by": null,
-    "changed_by": null,
-    "owner_id": null,
-    "is_private": "0",
-    "is_published": "1",
-    "is_deleted": "0",
-    "deleted_by": null,
-    "deleted_at": null,
-    "is_generated": true
+    }
 }

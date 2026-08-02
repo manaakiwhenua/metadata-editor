@@ -11,7 +11,6 @@
         "description",
         "agents",
         "dateCreated",
-        "identifier",
         "keywords",
         "resourceType",
         "publisher"
@@ -30,14 +29,14 @@
         "description": {
           "title": "Description",
           "$comment": "dc:description",
-          "description": "A descriptive abstract outlining the dataset.",
+          "description": "This is a brief narrative summary of the content of the dataset. The abstract should provide a clear and concise statement that enables the reader to understand the content of the data. Include the following: the main attributes, data sources, why it was created, what it can be used for if reused, any data quality issue. Do not use unexplained acronyms.",
           "type": "string",
           "minLength": 1
         },
         "agents": {
           "title": "Agents",
           "$comment": "dc:creator / dc:contributor",
-          "description": "People and organisations involved in the creation, maintenance, or management of the dataset. Each entry must specify a role.",
+          "description": "List people who have been involved with the creation and management of the dataset. It is important to state who the creator (Author) was. Author is used for the person or organisation chiefly responsible for the intellectual content.",
           "type": "array",
           "minItems": 1,
           "items": {
@@ -51,8 +50,7 @@
               "name": {
                 "title": "Name",
                 "description": "Full name of the person or organisation.",
-                "type": "string",
-                "minLength": 1
+                "type": "string"
               },
               "orcid": {
                 "title": "ORCID",
@@ -77,7 +75,8 @@
               "organisation": {
                 "title": "Organisation",
                 "description": "The organisation the agent is affiliated with.",
-                "type": "string"
+                "type": "string",
+                "default": "Bioeconomy Science Institute Maiangi Taiao"
               }
             }
           }
@@ -85,21 +84,14 @@
         "dateCreated": {
           "title": "Date Created",
           "$comment": "dcterms:created",
-          "description": "The date the dataset was created, in ISO 8601 format (YYYY-MM-DD).",
+          "description": "Date the dataset was created, in ISO 8601 format (YYYY-MM-DD). Date of creation differs from the temporal coverage. For example, a dataset might have been created in February 2009 (2009-02-15) but the data was collected during the year 2008 (temporal coverage from 2008-01-01 to 2008-12-31).",
           "type": "string",
           "format": "date-time"
-        },
-        "identifier": {
-          "title": "Resource Identifier",
-          "$comment": "dc:identifier",
-          "description": "A unique identifier for the dataset, preferably a DOI or other persistent URI.",
-          "type": "string",
-          "minLength": 1
         },
         "keywords": {
           "title": "Keywords",
           "$comment": "dc:subject",
-          "description": "Keywords or phrases describing the dataset. Controlled vocabulary to be used should be GEMET.",
+          "description": "Use the keywords feature to provide more specific terms that describe the dataset's content. These can be used to identify particular concepts, places, techniques, or any other relevant aspect that the dataset addresses. When possible, existing vocabularies should be used to source keywords. An example of global vocabulary is the Global Change Master Directory. Alternatively, GEMET, the GEneral Multilingual Environmental Thesaurus.",
           "type": "array",
           "items": {
             "type": "string"
@@ -114,10 +106,7 @@
           "description": "The nature or genre of the resource, from the DCMI Type Vocabulary. Limited subset used",
           "type": "string",
           "enum": [
-            "Dataset",
-            "Collection",
-            "Service",
-            "Text"
+            "Dataset"
           ],
           "default": "Dataset"
         },
@@ -134,9 +123,9 @@
         }
       }
     },
-    "general_metadata_information": {
+    "optional_additional_metadata": {
       "type": "object",
-      "title": "Detailed metadata information",
+      "title": "Optional additional metadata",
       "description": "Additional metadata fields. These fields are not required but recommended for completeness.",
       "properties": {
         "alternativeTitle": {
@@ -156,6 +145,12 @@
             "minLength": 1
           },
           "uniqueItems": true
+        },
+        "identifier": {
+          "title": "Resource Identifier",
+          "$comment": "dc:identifier",
+          "description": "A unique identifier for the dataset, preferably a DOI or other persistent URI.",
+          "type": "string"
         },
         "bibliographicNote": {
           "title": "Bibliographic Note",
@@ -420,6 +415,7 @@
         "rightsHolder": {
           "title": "Rights Holder",
           "$comment": "dcterms:rightsHolder",
+          "default": "Bioeconomy Science Institute Maiangi Taiao",
           "description": "The entity that holds rights over the dataset. Specify if not Bioeconomy Science Institute Maiangi Taiao.",
           "type": "string"
         },
