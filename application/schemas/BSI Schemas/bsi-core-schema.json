@@ -152,21 +152,11 @@
           "description": "A unique identifier for the dataset, preferably a DOI or other persistent URI.",
           "type": "string"
         },
-        "bibliographicNote": {
-          "title": "Bibliographic Note",
+        "commentsIncludingReferences": {
+          "title": "Comments including References",
           "$comment": "dc:description",
-          "description": "Additional comments or bibliographic notes about the dataset.",
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "note": {
-                "title": "Note",
-                "description": "A bibliographic note or comment about the dataset.",
-                "type": "string"
-              }
-            }
-          }
+          "description": "Provide additional information that helps users understand or use the dataset but is not captured elsewhere. This may include references to publications, explanatory comments, data citation information or other relevant notes.",
+          "type": "string"
         },
         "dateModified": {
           "title": "Date Modified",
@@ -192,7 +182,7 @@
         "language": {
           "title": "Language",
           "$comment": "dc:language",
-          "description": "The language(s) of the resource. Use IETF BCP 47 language tags (e.g. 'en', 'mi' for te reo Māori).",
+          "description": "Specify the language(s) used in the dataset or its documentation (e.g. English, Te Reo Māori).",
           "type": "array",
           "items": {
             "type": "string"
@@ -299,32 +289,22 @@
           }
         },
         "provenance": {
-          "title": "Provenance / Project Description",
+          "title": "Provenance / Project Context",
           "$comment": "dcterms:provenance",
-          "description": "Information about the history or project context of the dataset, including project codes.",
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "description": {
-                "title": "Description",
-                "description": "A description of the provenance or project context. Can include project codes or other relevant details.",
-                "type": "string"
-              }
-            }
-          }
+          "description": "Briefly describe how the dataset was created. Include the project name, data collection methods, processing, quality assurance, or other significant steps used to produce the dataset. Where relevant, include cultural provenance, such as whakapapa or other contextual information important for Māori data.",
+          "type": "string"
         },
         "rightsHolder": {
           "title": "Rights Holder",
           "$comment": "dcterms:rightsHolder",
           "default": "Bioeconomy Science Institute Maiangi Taiao",
-          "description": "The entity that holds rights over the dataset. Specify if not Bioeconomy Science Institute Maiangi Taiao.",
+          "description": "Identify the person or organisation that owns or controls the rights to this dataset if not Bioeconomy Science Institute Maiangi Taiao.",
           "type": "string"
         },
         "license": {
-          "title": "License",
+          "title": "License Details",
           "$comment": "dcterms:license",
-          "description": "The license under which the dataset is made available. Include any data sharing agreements.",
+          "description": "Specify the license and agreement that governs use and reuse of the dataset. Include any data sharing agreements. Examples include CC BY 4.0 or a commercial or BSI-specific licence. For Māori data, this may include iwi or hapū agreements, partnership agreements, or other Māori data governance arrangements that define how the data may be accessed and used.",
           "type": "string"
         },
         "accessRights": {
@@ -334,9 +314,9 @@
           "type": "string"
         },
         "format": {
-          "title": "Format",
+          "title": "Data Format",
           "$comment": "dc:format",
-          "description": "The file format(s) of the dataset. If files use different file types use dominant type",
+          "description": "The file format(s) of the dataset. If files use different file types, use dominant type (e.g. CSV, FASTA, GeoTIFF, Shape, NetCDF, instrument-specific formats).",
           "type": "array",
           "items": {
             "type": "string"
@@ -346,13 +326,13 @@
         "relation": {
           "title": "Related Resources",
           "$comment": "dc:relation",
-          "description": "Resources related to this dataset, such as journal papers, methodology descriptions. Prefer URIs (e.g. DOIs).",
+          "description": "Provide the named and links to publications, reports, protocols, software, websites, or other resources that help users understand or use this dataset. Persistent identifiers (URI) (e.g. DOI or URL) preferred. Use ADD ROW to add more items.",
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
               "relation": {
-                "title": "Description of Relation",
+                "title": "Description of Resource",
                 "description": "A description of the relationship to the related resource.",
                 "type": "string"
               },
@@ -388,9 +368,9 @@
           }
         },
         "source": {
-          "title": "Derived From / Source",
+          "title": "Derived From / Sources",
           "$comment": "dc:source",
-          "description": "A description of the resource or datasets from which this dataset was derived.",
+          "description": "Describe the original data or other resources from which this dataset was derived or compiled. Persistent identifiers (URI) (e.g. DOI or URL) preferred. List one dataset or resource per row. Use ADD ROW to add more items.",
           "type": "array",
           "items": {
             "type": "object",
@@ -402,7 +382,7 @@
               },
               "uri": {
                 "title": "Source URI",
-                "description": "A URI identifying the source resource or dataset (e.g. DOI, URL).",
+                "description": "Persistent identifiers (URI) (e.g. DOI or URL) preferred.",
                 "type": "string",
                 "format": "uri"
               }
@@ -412,7 +392,7 @@
         "dataLocation": {
           "title": "Location of Data",
           "$comment": "dc:source",
-          "description": "Where the data is stored. Should be updated when storage location changes.",
+          "description": "Specify where the dataset can be found. Record the storage location or access point that enables others to locate the data, such as a shared drive, SharePoint site, data repository, database, cloud storage, or a public location (e.g. repository, DOI, landing page or download URL).  If the metadata will be publicly available, do not include internal file paths or system details.",
           "type": "array",
           "items": {
             "type": "object",
@@ -424,7 +404,7 @@
               },
               "uri": {
                 "title": "Location URI",
-                "description": "A URI identifying the location where the data is stored (e.g. DOI, URL).",
+                "description": "Persistent identifiers (URI) (e.g. DOI or URL) preferred.",
                 "type": "string",
                 "format": "uri"
               }
@@ -432,25 +412,15 @@
           }
         },
         "audience": {
-          "title": "Audience",
+          "title": "Audience / Intended Users",
           "$comment": "dcterms:audience",
           "description": "The intended audience or expected users of the dataset.",
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "audience": {
-                "title": "Audience Description",
-                "description": "A description of the intended audience or expected users of the dataset.",
-                "type": "string"
-              }
-            }
-          }
+          "type": "string"          
         },
         "version": {
-          "title": "Version",
+          "title": "Dataset Version",
           "$comment": "dcterms:hasVersion",
-          "description": "The version of the dataset.",
+          "description": "Specify the dataset version if applicable. Examples include 1.0 (first release), 1.1 (minor update), 2.0 (major revision), or 2026-07 (date-based version).",
           "type": "string"
         }
       }
