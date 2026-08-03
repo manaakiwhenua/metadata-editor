@@ -241,6 +241,7 @@
                 "type": "object",
                 "properties": {
                   "geographicBoundingBox": {
+                    "$comment": "dcterms:spatial",
                     "title": "Geographic Bounding Box",
                     "type": "object",
                     "properties": {
@@ -289,106 +290,7 @@
                   },
                   "geographicDescription": {
                     "title": "Geographic description identifier",
-                    "type": "string"
-                  },
-                  "geographicBoundingPolygon": {
-                    "title": "Geographic Bounding Polygon",
-                    "description": "Geographic Bounding Polygon",
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "title": "Identifier",
-                        "type": "string"
-                      },
-                      "polygon": {
-                        "title": "Polygon",
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "ring": {
-                              "title": "Ring boundary",
-                              "type": "string",
-                              "enum": [
-                                "exterior",
-                                "interior"
-                              ]
-                            },
-                            "type": {
-                              "title": "Type",
-                              "type": "string",
-                              "enum": [
-                                "point",
-                                "lineString",
-                                "polygon"
-                              ]
-                            },
-                            "coordinates": {
-                              "title": "Coordinates",
-                              "type": "array",
-                              "items": {
-                                "type": "object",
-                                "properties": {
-                                  "latitude": {
-                                    "title": "Latitude",
-                                    "type": "number",
-                                    "minimum": -90,
-                                    "maximum": 90
-                                  },
-                                  "longitude": {
-                                    "title": "Longitude",
-                                    "type": "number",
-                                    "minimum": -180,
-                                    "maximum": 180
-                                  }
-                                }
-                              },
-                              "minItems": 2
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            "temporalElementExtent": {
-              "type": "array",
-              "title": "Temporal extent(s)",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "beginPosition": {
-                    "title": "Begin time position",
-                    "description": "Begin time position. Requires an extended ISO 8601 formatted combined UTC date and time string (2009-11-17T10:00:00)",
-                    "type": "string"
-                  },
-                  "endPosition": {
-                    "title": "End time position",
-                    "description": "End time position. Requires an extended ISO 8601 formatted combined UTC date and time string (2009-11-17T10:00:00)",
-                    "type": "string"
-                  }
-                }
-              }
-            },
-            "verticalElement": {
-              "type": "array",
-              "title": "Vertical extent(s)",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "minimumValue": {
-                    "title": "Minimum vertical value",
-                    "type": "number"
-                  },
-                  "maximumValue": {
-                    "title": "Maximum vertical value",
-                    "type": "number"
-                  },
-                  "verticalCRS": {
-                    "title": "Vertical CRS",
-                    "description": "Vertical coordinate reference system used (as defined in the ISO 19136 / GML standard",
+                    "$comment": "dcterms:spatial",
                     "type": "string"
                   }
                 }

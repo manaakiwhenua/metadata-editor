@@ -34,7 +34,7 @@
                                 },
                                 "required": true,
                                 "help_text": "The nature or genre of the resource, from the DCMI Type Vocabulary. Limited subset used",
-                                "display_type": "dropdown",
+                                "display_type": "dropdown-custom",
                                 "is_required": true,
                                 "enum_store_column": "code",
                                 "default": "Dataset",
@@ -319,13 +319,15 @@
                             },
                             {
                                 "key": "optional_additional_metadata.extent",
-                                "title": "Extent (geographic, temporal, vertical)",
+                                "title": "Geographic Coverage",
                                 "type": "section",
+                                "expanded": true,
                                 "items": [
                                     {
                                         "key": "optional_additional_metadata.extent.geographicElement",
                                         "title": "Geographic element",
                                         "type": "nested_array",
+                                        "expanded": true,
                                         "props": [
                                             {
                                                 "key": "geographicBoundingBox",
@@ -402,168 +404,11 @@
                                                 "prop_key": "optional_additional_metadata.extent.geographicElement.geographicDescription",
                                                 "display_type": "textarea",
                                                 "help_text": "A textual or coded description of the geographic area covered by the dataset or service. The purpose is to provide a named place or coded region (e.g., country, administrative unit) as a way to describe geographic extent, especially when precise coordinates or geometry are not available. This useful for indexing metadata by regions or matching data to known administrative areas."
-                                            },
-                                            {
-                                                "key": "geographicBoundingPolygon-section",
-                                                "title": "Bounding polygon",
-                                                "type": "section",
-                                                "props": [
-                                                    {
-                                                        "key": "geographicBoundingPolygon.id",
-                                                        "type": "string",
-                                                        "display_type": "text",
-                                                        "title": "Polygon identifier (ID)",
-                                                        "prop_key": "optional_additional_metadata.extent.geographicElement.geographicBoundingPolygon.id",
-                                                        "help_text": "A unique identifier assigned to the polygon for referencing or validation. The purpose is to allow referencing this specific geometry within the metadata or from external systems."
-                                                    },
-                                                    {
-                                                        "key": "geographicBoundingPolygon.polygon",
-                                                        "type": "nested_array",
-                                                        "title": "Polygon",
-                                                        "prop_key": "optional_additional_metadata.extent.geographicElement.geographicBoundingPolygon.polygon",
-                                                        "props": [
-                                                            {
-                                                                "key": "ring",
-                                                                "type": "string",
-                                                                "title": "Interior or exterior ring",
-                                                                "prop_key": "optional_additional_metadata.extent.geographicElement.geographicBoundingPolygon.polygon.ring",
-                                                                "display_type": "dropdown-custom",
-                                                                "enum": [
-                                                                    {
-                                                                        "code": "interior",
-                                                                        "label": "Interior"
-                                                                    },
-                                                                    {
-                                                                        "code": "exterior",
-                                                                        "label": "Exterior"
-                                                                    }
-                                                                ],
-                                                                "enum_store_column": "code",
-                                                                "help_text": "Rings that define the boundary of the polygon. Each ring is defined with a list of coordinates.\n       - Exterior ring: The outer boundary of the polygon.\n       - Interior ring: One or more holes within the polygon (optional)."
-                                                            },
-                                                            {
-                                                                "key": "type",
-                                                                "type": "string",
-                                                                "title": "Type",
-                                                                "prop_key": "optional_additional_metadata.extent.geographicElement.geographicBoundingPolygon.polygon.type",
-                                                                "display_type": "dropdown-custom",
-                                                                "enum": [
-                                                                    {
-                                                                        "code": "point",
-                                                                        "label": "Point"
-                                                                    },
-                                                                    {
-                                                                        "code": "lineString",
-                                                                        "label": "Line"
-                                                                    },
-                                                                    {
-                                                                        "code": "polygon",
-                                                                        "label": "Polygon"
-                                                                    }
-                                                                ],
-                                                                "enum_store_column": "code",
-                                                                "help_text": "The type of geometry used to represent the area. Common types are Polygon (a single closed area), MultiPolygon (a set of multiple polygons), and Envelope (a bounding rectangle)."
-                                                            },
-                                                            {
-                                                                "key": "coordinates",
-                                                                "type": "array",
-                                                                "title": "Coordinates",
-                                                                "prop_key": "optional_additional_metadata.extent.geographicElement.geographicBoundingPolygon.polygon.coordinates",
-                                                                "props": [
-                                                                    {
-                                                                        "key": "longitude",
-                                                                        "type": "number",
-                                                                        "title": "Longitude",
-                                                                        "prop_key": "optional_additional_metadata.extent.geographicElement.geographicBoundingPolygon.polygon.coordinates.longitude",
-                                                                        "display_type": "text",
-                                                                        "rules": {
-                                                                            "numeric": true
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "key": "latitude",
-                                                                        "type": "number",
-                                                                        "title": "Latitude",
-                                                                        "prop_key": "optional_additional_metadata.extent.geographicElement.geographicBoundingPolygon.polygon.coordinates.latitude",
-                                                                        "display_type": "text",
-                                                                        "rules": {
-                                                                            "numeric": true
-                                                                        }
-                                                                    }
-                                                                ],
-                                                                "help_text": "Coordinates of the polygon. These are the longitude-latitude pairs that define the polygon boundary. Each pair is ordered as <longitude> <latitude>. The first and last coordinates must be the same to close the polygon."
-                                                            }
-                                                        ],
-                                                        "help_text": "A geometric object that defines the shape and extent of the area covered. This is defined in GML (Geography Markup Language), typically using EPSG:4326 (WGS 84) as the coordinate system."
-                                                    }
-                                                ],
-                                                "help_text": "A polygonal shape describing the precise spatial coverage of the dataset or service. The purpose is to provide more accurate spatial boundaries than a bounding box, especially for irregular or non-rectangular areas."
                                             }
                                         ],
                                         "prop_key": "optional_additional_metadata.extent.geographicElement",
                                         "help_text": "Spatial (horizontal) extent element. This can be defined either with a Bounding Box (recommended); or using Geographic Description - free text that defines the area covered. When the dataset covers one or more countries, it is recommended to enter the country names in this element, as it can then be used in data catalogs for filtering by geography.\n\nThe bounding box shall be as small as possible.\nThe bounding box shall be expressed in decimal degree with a precision of at least 2 decimals."
-                                    },
-                                    {
-                                        "key": "optional_additional_metadata.extent.temporalElementExtent",
-                                        "title": "Temporal element",
-                                        "type": "nested_array",
-                                        "props": [
-                                            {
-                                                "key": "beginPosition",
-                                                "type": "date",
-                                                "title": "beginPosition",
-                                                "prop_key": "optional_additional_metadata.extent.temporalElementExtent.beginPosition",
-                                                "help_text": "Begin time position. Requires an extended ISO 8601 formatted combined UTC date and time string (2009-11-17T10:00:00)",
-                                                "display_type": "date"
-                                            },
-                                            {
-                                                "key": "endPosition",
-                                                "type": "date",
-                                                "title": "endPosition",
-                                                "prop_key": "optional_additional_metadata.extent.temporalElementExtent.endPosition",
-                                                "help_text": "End time position. Requires an extended ISO 8601 formatted combined UTC date and time string (2009-11-17T10:00:00)",
-                                                "display_type": "date"
-                                            }
-                                        ],
-                                        "prop_key": "optional_additional_metadata.extent.temporalElementExtent",
-                                        "help_text": "The temporal extent defines the time period covered by the content of the resource. Depending on the temporal characteristics of the dataset, this will consist in a Time period (made of a begin position and end position) or a time instant (made of a single time position) referencing date/time information according to ISO 8601.\n\nThis time period may be expressed as:\n- an individual date\n- an interval of dates (starting date and ending date)\n- a mix of individual dates and intervals of dates"
-                                    },
-                                    {
-                                        "key": "optional_additional_metadata.extent.verticalElement",
-                                        "title": "Vertical element",
-                                        "type": "array",
-                                        "props": [
-                                            {
-                                                "key": "minimumValue",
-                                                "type": "number",
-                                                "title": "Minimum value",
-                                                "prop_key": "optional_additional_metadata.extent.verticalElement.minimumValue",
-                                                "display_type": "text",
-                                                "rules": {
-                                                    "numeric": true
-                                                }
-                                            },
-                                            {
-                                                "key": "maximumValue",
-                                                "type": "number",
-                                                "title": "Maximum value",
-                                                "prop_key": "optional_additional_metadata.extent.verticalElement.maximumValue",
-                                                "display_type": "text",
-                                                "rules": {
-                                                    "numeric": true
-                                                }
-                                            },
-                                            {
-                                                "key": "verticalCRS",
-                                                "type": "string",
-                                                "title": "Vertical CRS",
-                                                "prop_key": "optional_additional_metadata.extent.verticalElement.verticalCRS",
-                                                "display_type": "text"
-                                            }
-                                        ],
-                                        "prop_key": "optional_additional_metadata.extent.verticalElement",
-                                        "help_text": "Spatial (vertical) extent element, providing two properties: minimum value, maximum value and vertical CRS (reference to the vertical coordinate reference system)"
-                                    }
+                                    }                                    
                                 ],
                                 "help_text": ""
                             },
