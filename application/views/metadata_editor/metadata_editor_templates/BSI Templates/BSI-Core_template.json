@@ -97,7 +97,10 @@
                                         "prop_key": "required_metadata.agents.orcid",
                                         "required": false,
                                         "help_text": "ORCID identifier URI for the person (e.g. https:\/\/orcid.org\/0000-0000-0000-0000).",
-                                        "display_type": "text"
+                                        "display_type": "text",
+                                        "rules": {
+                                            "is_uri": true
+                                        }
                                     },
                                     {
                                         "key": "role",
@@ -105,6 +108,9 @@
                                         "type": "string",
                                         "prop_key": "required_metadata.agents.role",
                                         "required": true,
+                                        "rules": {
+                                            "required": true
+                                        },
                                         "help_text": "The role of this agent in relation to the dataset.",
                                         "display_type": "dropdown-custom",
                                         "enum_store_column": "code",
@@ -143,6 +149,9 @@
                                         "required": true,
                                         "help_text": "The organisation the agent is affiliated with.",
                                         "display_type": "text",
+                                        "rules": {
+                                            "required": true
+                                        },
                                         "default": "Bioeconomy Science Institute Maiangi Taiao"
                                     }
                                 ]
@@ -209,38 +218,29 @@
                             {
                                 "key": "optional_additional_metadata.alternativeTitle",
                                 "title": "Alternative Title",
-                                "type": "array",
                                 "required": false,
                                 "help_text": "Alternative titles for the dataset. Use this field for te reo Māori titles or other variant names.",
-                                "props": [
-                                    {
-                                        "key": "title",
-                                        "title": "Title",
-                                        "type": "string",
-                                        "prop_key": "optional_additional_metadata.alternativeTitle.title",
-                                        "required": false,
-                                        "help_text": "Alternative title for the dataset.",
-                                        "display_type": "text"
-                                    }
-                                ]
+                                "type": "simple_array",
+                                "display_type": "dropdown-custom"
                             },
                             {
                                 "key": "optional_additional_metadata.language",
                                 "title": "Language",
                                 "type": "simple_array",
                                 "display_type": "dropdown-custom",
+                                "default": "en",
                                 "required": false,
                                 "help_text": "Specify the language(s) used in the dataset or its documentation (e.g. English, Te Reo Māori)."
                             },
                             {
-                                "key": "optional_additional_metadata.identifier",
+                                "key": "optional_additional_metadata.resourceIdentifier",
                                 "title": "Resource Identifier",
                                 "type": "string",
                                 "help_text": "A unique identifier for the dataset, preferably a DOI or other persistent URI.",
                                 "display_type": "text"
                             },
                             {
-                                "key": "optional_additional_metadata.version",
+                                "key": "optional_additional_metadata.datasetVersion",
                                 "title": "Dataset Version",
                                 "type": "string",
                                 "required": false,
@@ -284,7 +284,7 @@
                                 "content_format": "text"
                             },
                             {
-                                "key": "optional_additional_metadata.relation",
+                                "key": "optional_additional_metadata.relatedResources",
                                 "title": "Related Resources",
                                 "type": "array",
                                 "required": false,
@@ -294,7 +294,7 @@
                                         "key": "resource",
                                         "title": "Description of Resource",
                                         "type": "string",
-                                        "prop_key": "optional_additional_metadata.relation.resource",
+                                        "prop_key": "optional_additional_metadata.relatedResources.resource",
                                         "required": false,
                                         "help_text": "A description of the relationship to the related resource.",
                                         "display_type": "text"
@@ -303,7 +303,7 @@
                                         "key": "uri",
                                         "title": "URI",
                                         "type": "string",
-                                        "prop_key": "optional_additional_metadata.relation.uri",
+                                        "prop_key": "optional_additional_metadata.relatedResources.uri",
                                         "required": false,
                                         "help_text": "A URI identifying the related resource (e.g. DOI, URL).",
                                         "display_type": "text"
@@ -344,13 +344,13 @@
                                 ]
                             },
                             {
-                                "key": "optional_additional_metadata.extent",
+                                "key": "optional_additional_metadata.geographicCoverage",
                                 "title": "Geographic Coverage",
                                 "type": "section",
                                 "expanded": true,
                                 "items": [
                                     {
-                                        "key": "optional_additional_metadata.extent.geographicElement",
+                                        "key": "optional_additional_metadata.geographicCoverage.geographicElement",
                                         "title": "Geographic element",
                                         "type": "nested_array",
                                         "expanded": true,
@@ -400,7 +400,7 @@
                                             },
                                             {
                                                 "key": "geohash",
-                                                "prop_key": "optional_additional_metadata.extent.geographicElement.geohash",
+                                                "prop_key": "optional_additional_metadata.geographicCoverage.geographicElement.geohash",
                                                 "title": "Geohash",
                                                 "type": "array",
                                                 "props": [
@@ -408,7 +408,7 @@
                                                         "key": "geohash",
                                                         "type": "string",
                                                         "title": "Geohash",
-                                                        "prop_key": "optional_additional_metadata.extent.geographicElement.geohash.geohash",
+                                                        "prop_key": "optional_additional_metadata.geographicCoverage.geographicElement.geohash.geohash",
                                                         "help_text": "The geohash is not explicitly defined in ISO 19139, but often used in profiles, extensions, or auxiliary metadata to support spatial search, indexing, or approximate location. For example, \"u4pruydqqvj\" represents a specific area near New York City. Geohashes can vary in length; more characters mean higher precision.",
                                                         "display_type": "textarea"
                                                     },
@@ -416,7 +416,7 @@
                                                         "key": "note",
                                                         "type": "string",
                                                         "title": "Note",
-                                                        "prop_key": "optional_additional_metadata.extent.geographicElement.geohash.note",
+                                                        "prop_key": "optional_additional_metadata.geographicCoverage.geographicElement.geohash.note",
                                                         "help_text": "A descriptive or explanatory note about the Geohash value — e.g., resolution, use, limitations. For example, \"Geohash at 8-character precision (~19 meters accuracy).\"",
                                                         "display_type": "textarea"
                                                     }
@@ -427,12 +427,12 @@
                                                 "key": "geographicDescription",
                                                 "title": "Geographic description",
                                                 "type": "string",
-                                                "prop_key": "optional_additional_metadata.extent.geographicElement.geographicDescription",
+                                                "prop_key": "optional_additional_metadata.geographicCoverage.geographicElement.geographicDescription",
                                                 "display_type": "textarea",
                                                 "help_text": "A textual or coded description of the geographic area covered by the dataset or service. The purpose is to provide a named place or coded region (e.g., country, administrative unit) as a way to describe geographic extent, especially when precise coordinates or geometry are not available. This useful for indexing metadata by regions or matching data to known administrative areas."
                                             }
                                         ],
-                                        "prop_key": "optional_additional_metadata.extent.geographicElement",
+                                        "prop_key": "optional_additional_metadata.geographicCoverage.geographicElement",
                                         "help_text": "Spatial (horizontal) extent element. This can be defined either with a Bounding Box (recommended); or using Geographic Description - free text that defines the area covered. When the dataset covers one or more countries, it is recommended to enter the country names in this element, as it can then be used in data catalogs for filtering by geography.\n\nThe bounding box shall be as small as possible.\nThe bounding box shall be expressed in decimal degree with a precision of at least 2 decimals."
                                     }
                                 ],
@@ -448,7 +448,7 @@
                                 "content_format": "text"
                             },
                             {
-                                "key": "optional_additional_metadata.source",
+                                "key": "optional_additional_metadata.sources",
                                 "title": "Derived From \/ Sources",
                                 "type": "array",
                                 "required": false,
@@ -458,7 +458,7 @@
                                         "key": "source",
                                         "title": "Source Description",
                                         "type": "string",
-                                        "prop_key": "optional_additional_metadata.source.source",
+                                        "prop_key": "optional_additional_metadata.sources.source",
                                         "required": false,
                                         "help_text": "A description of the source resource or dataset.",
                                         "display_type": "text"
@@ -467,7 +467,7 @@
                                         "key": "uri",
                                         "title": "Source URI",
                                         "type": "string",
-                                        "prop_key": "optional_additional_metadata.source.uri",
+                                        "prop_key": "optional_additional_metadata.sources.uri",
                                         "required": false,
                                         "help_text": "Persistent identifiers (URI) (e.g. DOI or URL) preferred.",
                                         "display_type": "text"
@@ -530,16 +530,27 @@
                                 "content_format": "text"
                             },
                             {
-                                "key": "optional_additional_metadata.license",
+                                "key": "optional_additional_metadata.licenseURI",
+                                "title": "License URI",
+                                "type": "string",
+                                "required": false,
+                                "help_text": "Provide a URI to the license or agreement that governs use and reuse of the dataset. Persistent identifiers (URI) (e.g. DOI or URL) preferred.",
+                                "display_type": "text",
+                                "rules": {
+                                    "is_uri": true
+                                }
+                            },
+                            {
+                                "key": "optional_additional_metadata.licenseDetails",
                                 "title": "License Details",
                                 "type": "string",
                                 "required": false,
-                                "help_text": "Specify the license and agreement that governs use and reuse of the dataset. Include any data sharing agreements. Examples include CC BY 4.0 or a commercial or BSI-specific licence. For Māori data, this may include iwi or hapū agreements, partnership agreements, or other Māori data governance arrangements that define how the data may be accessed and used.",
+                                "help_text": "Specify the license and agreement that governs use and reuse of the dataset. Include any data sharing agreements. Examples include CC BY 4.0 or a commercial or BSI-specific license. For Māori data, this may include iwi or hapū agreements, partnership agreements, or other Māori data governance arrangements that define how the data may be accessed and used.",
                                 "display_type": "textarea",
                                 "content_format": "text"
                             },
                             {
-                                "key": "optional_additional_metadata.format",
+                                "key": "optional_additional_metadata.dataFormat",
                                 "title": "Data Format",
                                 "type": "simple_array",
                                 "display_type": "dropdown-custom",

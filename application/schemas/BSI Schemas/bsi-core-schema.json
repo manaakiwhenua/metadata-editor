@@ -18,7 +18,18 @@
       "type": "object",
       "title": "Required metadata fields",
       "description": "List of required metadata fields for this MWLR Core Metadata Schema.",
+      "additionalProperties": false,
       "properties": {
+        "resourceType": {
+          "title": "Resource Type",
+          "$comment": "dc:type",
+          "description": "The nature or genre of the resource, from the DCMI Type Vocabulary. Limited subset used",
+          "type": "string",
+          "enum": [
+            "Dataset"
+          ],
+          "default": "Dataset"
+        },
         "title": {
           "title": "Title",
           "$comment": "dc:title",
@@ -42,8 +53,8 @@
           "items": {
             "type": "object",
             "required": [
-              "name",
-              "role"
+              "role",
+              "organisation"
             ],
             "additionalProperties": false,
             "properties": {
@@ -94,21 +105,11 @@
           "description": "Use the keywords feature to provide more specific terms that describe the dataset's content. These can be used to identify particular concepts, places, techniques, or any other relevant aspect that the dataset addresses. When possible, existing vocabularies should be used to source keywords. An example of global vocabulary is the Global Change Master Directory. Alternatively, GEMET, the GEneral Multilingual Environmental Thesaurus.",
           "type": "array",
           "items": {
+            "minLength": 1,
             "type": "string"
           },
-          "minLength": 1,
           "minItems": 1,
           "uniqueItems": true
-        },
-        "resourceType": {
-          "title": "Resource Type",
-          "$comment": "dc:type",
-          "description": "The nature or genre of the resource, from the DCMI Type Vocabulary. Limited subset used",
-          "type": "string",
-          "enum": [
-            "Dataset"
-          ],
-          "default": "Dataset"
         },
         "publisher": {
           "title": "Publisher",
@@ -116,7 +117,6 @@
           "description": "The entity responsible for publishing the dataset. Defaults to Bioeconomy Science Institute Maiangi Taiao.",
           "type": "string",
           "default": "Bioeconomy Science Institute Maiangi Taiao",
-          "minLength": 1,
           "enum": [
             "Bioeconomy Science Institute Maiangi Taiao"
           ]
@@ -126,6 +126,7 @@
     "optional_additional_metadata": {
       "type": "object",
       "title": "Optional additional metadata",
+      "additionalProperties": false,
       "description": "Additional metadata fields. These fields are not required but recommended for completeness.",
       "properties": {
         "alternativeTitle": {
@@ -134,15 +135,8 @@
           "description": "Alternative titles for the dataset. Use this field for te reo Māori titles or other variant names.",
           "type": "array",
           "items": {
-            "type": "object",
-            "properties": {
-              "title": {
-                "title": "Title",
-                "description": "Alternative title for the dataset.",
-                "type": "string"
-              }
-            },
-            "minLength": 1
+            "minLength": 1,
+            "type": "string"
           },
           "uniqueItems": true
         },
@@ -152,6 +146,7 @@
           "description": "Specify the language(s) used in the dataset or its documentation (e.g. English, Te Reo Māori).",
           "type": "array",
           "items": {
+            "minLength": 1,
             "type": "string"
           },
           "default": [
@@ -159,13 +154,13 @@
           ],
           "uniqueItems": true
         },
-        "identifier": {
+        "resourceIdentifier": {
           "title": "Resource Identifier",
           "$comment": "dc:identifier",
           "description": "Persistent identifiers (URI) (e.g. DOI or URL) preferred",
           "type": "string"
         },
-        "version": {
+        "datasetVersion": {
           "title": "Dataset Version",
           "$comment": "dcterms:hasVersion",
           "description": "Specify the dataset version if applicable. Examples include 1.0 (first release), 1.1 (minor update), 2.0 (major revision), or 2026-07 (date-based version).",
@@ -182,7 +177,8 @@
               "date": {
                 "title": "Date",
                 "description": "The date the dataset was modified or a new version released, in ISO 8601 format (YYYY-MM-DD).",
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               "version": {
                 "title": "Version",
@@ -198,7 +194,7 @@
           "description": "The intended audience or expected users of the dataset.",
           "type": "string"
         },
-        "relation": {
+        "relatedResources": {
           "title": "Related Resources",
           "$comment": "dc:relation",
           "description": "Provide the named and links to publications, reports, protocols, software, websites, or other resources that help users understand or use this dataset. Persistent identifiers (URI) (e.g. DOI or URL) preferred. Use ADD ROW to add more items.",
@@ -206,7 +202,7 @@
           "items": {
             "type": "object",
             "properties": {
-              "relation": {
+              "resource": {
                 "title": "Description of Resource",
                 "description": "A description of the relationship to the related resource.",
                 "type": "string"
@@ -246,7 +242,7 @@
             }
           }
         },
-        "extent": {
+        "geographicCoverage": {
           "title": "Extent of the resource",
           "description": "Defines the spatial (horizontal and vertical) and temporal region to which the content of the resource applies.",
           "type": "object",
@@ -322,7 +318,7 @@
           "description": "Briefly describe how the dataset was created. Include the project name, data collection methods, processing, quality assurance, or other significant steps used to produce the dataset. Where relevant, include cultural provenance, such as whakapapa or other contextual information important for Māori data.",
           "type": "string"
         },
-        "source": {
+        "sources": {
           "title": "Derived From / Sources",
           "$comment": "dc:source",
           "description": "Describe the original data or other resources from which this dataset was derived or compiled. Persistent identifiers (URI) (e.g. DOI or URL) preferred. List one dataset or resource per row. Use ADD ROW to add more items.",
@@ -385,25 +381,32 @@
           "description": "Information about who can access the dataset, or its embargo status.",
           "type": "string"
         },
-        "license": {
+        "licenseURI": {
+          "title": "License URI",
+          "$comment": "dcterms:license",
+          "description": "Provide a URI to the license or agreement that governs use and reuse of the dataset. Persistent identifiers (URI) (e.g. DOI or URL) preferred.",
+          "type": "string",
+          "format": "uri"
+        },
+        "licenseDetails": {
           "title": "License Details",
           "$comment": "dcterms:license",
           "description": "Specify the license and agreement that governs use and reuse of the dataset. Include any data sharing agreements. Examples include CC BY 4.0 or a commercial or BSI-specific licence. For Māori data, this may include iwi or hapū agreements, partnership agreements, or other Māori data governance arrangements that define how the data may be accessed and used.",
           "type": "string"
         },
-        "format": {
+        "dataFormat": {
           "title": "Data Format",
           "$comment": "dc:format",
           "description": "The file format(s) of the dataset. If files use different file types, use dominant type (e.g. CSV, FASTA, GeoTIFF, Shape, NetCDF, instrument-specific formats).",
           "type": "array",
           "items": {
+            "minLength": 1,
             "type": "string"
           },
           "uniqueItems": true
         },
         "dataLocation": {
           "title": "Location of Data",
-          "$comment": "dc:source",
           "description": "Specify where the dataset can be found. Record the storage location or access point that enables others to locate the data, such as a shared drive, SharePoint site, data repository, database, cloud storage, or a public location (e.g. repository, DOI, landing page or download URL). If the metadata will be publicly available, do not include internal file paths or system details.",
           "type": "array",
           "items": {
