@@ -58,7 +58,7 @@ class Metadata_schemas_model extends CI_Model
     public function get_all($options = array())
     {
         // if (isset($options['include_core']) && $options['include_core'] === false) {
-            $this->db->where('is_core', 0);
+            $this->db->where('is_core', 0)->or_where('uid', 'geospatial');
         // }
 
         // if (!empty($options['status'])) {
