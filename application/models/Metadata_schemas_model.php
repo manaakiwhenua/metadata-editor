@@ -57,25 +57,25 @@ class Metadata_schemas_model extends CI_Model
      */
     public function get_all($options = array())
     {
-        if (isset($options['include_core']) && $options['include_core'] === false) {
+        // if (isset($options['include_core']) && $options['include_core'] === false) {
             $this->db->where('is_core', 0);
-        }
+        // }
 
-        if (!empty($options['status'])) {
-            $this->db->where('status', $options['status']);
-        }
+        // if (!empty($options['status'])) {
+        //     $this->db->where('status', $options['status']);
+        // }
 
-        if (!empty($options['search'])) {
-            $search = $options['search'];
-            $this->db->group_start()
-                ->like('uid', $search)
-                ->or_like('title', $search)
-                ->or_like('description', $search)
-            ->group_end();
-        }
+        // if (!empty($options['search'])) {
+        //     $search = $options['search'];
+        //     $this->db->group_start()
+        //         ->like('uid', $search)
+        //         ->or_like('title', $search)
+        //         ->or_like('description', $search)
+        //     ->group_end();
+        // }
 
-        $this->db->order_by('is_core', 'DESC');
-        //$this->db->order_by('uid', 'ASC');
+        // $this->db->order_by('is_core', 'DESC');
+        $this->db->order_by('uid', 'ASC');
 
         $rows = $this->db->get($this->table)->result_array();
         return $this->decode_rows($rows);
