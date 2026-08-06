@@ -40,6 +40,7 @@ $config['schemas']['icons'] = array(
     'admin_meta'      => 'admin_meta.svg',
     'custom'          => 'custom.svg',
     'resource'        => 'resource.svg',
+    'BSI-core'        => 'bsi_spiral.svg',
 );
 
 // Reserved schema UIDs (cannot be used by custom schemas)
