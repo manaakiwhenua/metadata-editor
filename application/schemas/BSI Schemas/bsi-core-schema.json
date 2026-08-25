@@ -9,7 +9,7 @@
       "required": [
         "title",
         "description",
-        "agents",
+        "roles",
         "dateCreated",
         "keywords",
         "resourceType",
@@ -44,8 +44,8 @@
           "type": "string",
           "minLength": 1
         },
-        "agents": {
-          "title": "Agents",
+        "roles": {
+          "title": "Roles",
           "$comment": "dc:creator / dc:contributor",
           "description": "List people who have been involved with the creation and management of the dataset. It is important to state who the creator (Author) was. Author is used for the person or organisation chiefly responsible for the intellectual content.",
           "type": "array",
@@ -79,8 +79,7 @@
                   "maintainer",
                   "pointOfContact",
                   "contributor",
-                  "funder",
-                  "publisher"
+                  "funder"
                 ]
               },
               "organisation": {

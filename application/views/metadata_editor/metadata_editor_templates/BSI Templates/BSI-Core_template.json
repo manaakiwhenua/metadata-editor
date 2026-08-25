@@ -71,8 +71,8 @@
                                 "is_required": true
                             },
                             {
-                                "key": "required_metadata.agents",
-                                "title": "Agents",
+                                "key": "required_metadata.roles",
+                                "title": "Roles",
                                 "type": "array",
                                 "required": true,
                                 "rules": {
@@ -85,7 +85,7 @@
                                         "key": "name",
                                         "title": "Name",
                                         "type": "string",
-                                        "prop_key": "required_metadata.agents.name",
+                                        "prop_key": "required_metadata.roles.name",
                                         "help_text": "Full name of the person or organisation.",
                                         "display_type": "text",
                                         "required": false
@@ -94,7 +94,7 @@
                                         "key": "orcid",
                                         "title": "ORCID",
                                         "type": "string",
-                                        "prop_key": "required_metadata.agents.orcid",
+                                        "prop_key": "required_metadata.roles.orcid",
                                         "required": false,
                                         "help_text": "ORCID identifier URI for the person (e.g. https:\/\/orcid.org\/0000-0000-0000-0000).",
                                         "display_type": "text",
@@ -106,12 +106,12 @@
                                         "key": "role",
                                         "title": "Role",
                                         "type": "string",
-                                        "prop_key": "required_metadata.agents.role",
+                                        "prop_key": "required_metadata.roles.role",
                                         "required": true,
                                         "rules": {
                                             "required": true
                                         },
-                                        "help_text": "The role of this agent in relation to the dataset.",
+                                        "help_text": "The role in relation to the dataset.",
                                         "display_type": "dropdown-custom",
                                         "enum_store_column": "code",
                                         "enum": [
@@ -134,10 +134,6 @@
                                             {
                                                 "code": "funder",
                                                 "label": "Funder"
-                                            },
-                                            {
-                                                "code": "publisher",
-                                                "label": "Publisher"
                                             }
                                         ]
                                     },
@@ -145,9 +141,9 @@
                                         "key": "organisation",
                                         "title": "Organisation",
                                         "type": "string",
-                                        "prop_key": "required_metadata.agents.organisation",
+                                        "prop_key": "required_metadata.roles.organisation",
                                         "required": true,
-                                        "help_text": "The organisation the agent is affiliated with.",
+                                        "help_text": "The organisation the role is affiliated with.",
                                         "display_type": "text",
                                         "rules": {
                                             "required": true
