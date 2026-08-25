@@ -31,10 +31,10 @@ class ISO19139Reader
         $result = array();
         $description=[
             "idno"=>(string) $this->xpath_query('//gmd:fileIdentifier/gco:CharacterString'),
-            "language"=> (string) $this->xpath_query('//gmd:language/gco:CharacterString'),
             "characterSet" =>[
                 "codeListValue"=>(string) $this->xpath_query('//gmd:characterSet/gmd:MD_CharacterSetCode/@codeListValue'),
                 "codeList"=>(string) $this->xpath_query('//gmd:characterSet/gmd:MD_CharacterSetCode/@codeList'),
+            "language" => (string) ($this->xpath_query('//gmd:language/gco:CharacterString') ?? $this->xpath_query('//gmd:language/gmd:LanguageCode')),
             ],
             "parentIdentifier"=> (string) $this->xpath_query('//gmd:parentIdentifier/gco:CharacterString'),
             "hierarchyLevel"=>(string) $this->xpath_query('//gmd:hierarchyLevel/gmd:MD_ScopeCode/@codeListValue'),
@@ -218,7 +218,7 @@ class ISO19139Reader
             'extent' => $this->getExtent($node->xpath('gmd:extent/gmd:EX_Extent')),
             'spatialRepresentationType' => (array) $this->xpath_query('gmd:spatialRepresentationType/gmd:MD_SpatialRepresentationTypeCode/@codeListValue', $node, true),
             'spatialResolution' => (array) $this->getSpatialResolution($node->xpath('gmd:spatialResolution')),
-            'language' => (array) $this->xpath_query('gmd:language/gco:CharacterString', $node),
+            'language' => (array) ($this->xpath_query('gmd:language/gco:CharacterString', $node) ?? $this->getLanguageCode($node->xpath('gmd:language'))),
             'characterSet' => (array) $this->getCharacterSetArray($node->xpath('gmd:characterSet')),
             'topicCategory' => (array) $this->getTopicCategory($node->xpath('gmd:topicCategory')),
             'supplementalInformation' => (string) $this->xpath_query('gmd:supplementalInformation/gco:CharacterString', $node),
@@ -343,9 +343,9 @@ class ISO19139Reader
         }
 
         foreach ($presentationForm as $form) {
-            $result[] = (string) $this->xpath_query('gmd:MD_PresentationFormCode/@codeListValue', $form);
+            $result[] = (string) $this->xpath_query('gmd:CI_PresentationFormCode/@codeListValue', $form); // MD_ to CI_?
         }
-        
+
         return $result;
     }
 
@@ -771,7 +771,24 @@ class ISO19139Reader
         foreach ($nodes as $node) {
             $result[] = (string) $this->xpath_query('gmd:MD_TopicCategoryCode', $node);
         }
-        
+
+        return $result;
+    }
+
+    function getLanguageCode($languageCode)
+    {
+        $result = array();
+
+        $nodes = $languageCode;
+
+        if (empty($nodes)) {
+            return null;
+        }
+
+        foreach ($nodes as $node) {
+            $result[] = (string) $this->xpath_query('gmd:LanguageCode', $node); // use codelistvalue instead?
+        }
+
         return $result;
     }
 
@@ -829,7 +846,7 @@ class ISO19139Reader
 
         foreach ($nodes as $node) {
             $result[] = [
-                "linkage" => (string) $this->xpath_query('gmd:linkage/gco:CharacterString', $node),
+                "linkage" => (string) $this->xpath_query('gmd:linkage/gco:CharacterString', $node), // different import; is this us?
                 "protocol" => (string) $this->xpath_query('gmd:protocol/gco:CharacterString', $node),
                 "name" => (string) $this->xpath_query('gmd:name/gco:CharacterString', $node),
                 "description" => (string) $this->xpath_query('gmd:description/gco:CharacterString', $node),
@@ -895,33 +912,34 @@ class ISO19139Reader
     }
 
 
-    public function parseContacts($contactNodes): array | null
+    public function parseContacts($contactNodes): array|null
     {
         $contacts = [];
         foreach ($contactNodes as $contactNode) {
-            $contacts[] =[
-                "individualName"=> (string) $this->xpath_query('gmd:individualName/gco:CharacterString', $contactNode),
-                "organisationName"=> (string) $this->xpath_query('gmd:organisationName/gco:CharacterString', $contactNode),
-                "positionName"=> ( string) $this->xpath_query('gmd:positionName/gco:CharacterString', $contactNode),
-                "role"=> (string) $this->xpath_query('gmd:role/gmd:CI_RoleCode/@codeListValue', $contactNode),
-                "contactInfo"=>[
-                    "phone"=>[
-                        "voice" => (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:phone/gmd:CI_Telephone/gmd:voice/gco:CharacterString',$contactNode),
-                        "facsimile"=> (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:phone/gmd:CI_Telephone/gmd:facsimile/gco:CharacterString' ,$contactNode),
+            $contacts[] = [
+                "individualName" => (string) $this->xpath_query('gmd:individualName/gco:CharacterString', $contactNode),
+                "organisationName" => (string) $this->xpath_query('gmd:organisationName/gco:CharacterString', $contactNode),
+                "positionName" => (string) $this->xpath_query('gmd:positionName/gco:CharacterString', $contactNode),
+                "role" => (string) $this->xpath_query('gmd:role/gmd:CI_RoleCode/@codeListValue', $contactNode),
+                "contactInfo" => [
+                    "phone" => [
+                        "voice" => (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:phone/gmd:CI_Telephone/gmd:voice/gco:CharacterString', $contactNode),
+                        "facsimile" => (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:phone/gmd:CI_Telephone/gmd:facsimile/gco:CharacterString', $contactNode),
                     ],
-                    "address"=>[
-                        "deliveryPoint"=> (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:address/gmd:CI_Address/gmd:deliveryPoint/gco:CharacterString' ,$contactNode),
-                        "city" => (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:address/gmd:CI_Address/gmd:city/gco:CharacterString' ,$contactNode),
-                        "postalCode" => (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:address/gmd:CI_Address/gmd:postalCode/gco:CharacterString' ,$contactNode),
-                        "country" => (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:address/gmd:CI_Address/gmd:country/gco:CharacterString' ,$contactNode),
-                        "electronicMailAddress" => (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact//gmd:CI_Address/gmd:electronicMailAddress/gco:CharacterString' ,$contactNode),
+                    "address" => [
+                        "deliveryPoint" => (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:address/gmd:CI_Address/gmd:deliveryPoint/gco:CharacterString', $contactNode),
+                        "city" => (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:address/gmd:CI_Address/gmd:city/gco:CharacterString', $contactNode),
+                        "postalCode" => (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:address/gmd:CI_Address/gmd:postalCode/gco:CharacterString', $contactNode),
+                        "country" => (string) ($this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:address/gmd:CI_Address/gmd:country/gco:CharacterString', $contactNode) ??
+                            ($this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:address/gmd:CI_Address/gmd:country/gmd:Country/@codeListValue', $contactNode))), # handle both?
+                        "electronicMailAddress" => (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact//gmd:CI_Address/gmd:electronicMailAddress/gco:CharacterString', $contactNode),
                     ],
-                    "onlineResource"=>[
-                        "linkage"=> (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:onlineResource/gmd:CI_OnlineResource/gmd:linkage/gco:CharacterString' ,$contactNode),
-                        "name"=> (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:onlineResource/gmd:CI_OnlineResource/gmd:name/gco:CharacterString' ,$contactNode),
-                        "description"=> (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:onlineResource/gmd:CI_OnlineResource/gmd:description/gco:CharacterString' ,$contactNode),
+                    "onlineResource" => [
+                        "linkage" => (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:onlineResource/gmd:CI_OnlineResource/gmd:linkage/gco:CharacterString', $contactNode),
+                        "name" => (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:onlineResource/gmd:CI_OnlineResource/gmd:name/gco:CharacterString', $contactNode),
+                        "description" => (string) $this->xpath_query('gmd:contactInfo/gmd:CI_Contact/gmd:onlineResource/gmd:CI_OnlineResource/gmd:description/gco:CharacterString', $contactNode),
                     ]
-                ]            
+                ]
             ];
         }
 
