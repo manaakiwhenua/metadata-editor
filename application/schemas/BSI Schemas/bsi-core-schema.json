@@ -187,6 +187,13 @@
             }
           }
         },
+        "datePublished": {
+          "title": "Date Published / Released",
+          "$comment": "dcterms:issued",
+          "description": "The date the dataset was first published or made publicly available, in ISO 8601 format (YYYY-MM-DD).",
+          "type": "string",
+          "format": "date-time"
+        },
         "audience": {
           "title": "Audience / Intended Users",
           "$comment": "dcterms:audience",
@@ -196,7 +203,7 @@
         "relatedResources": {
           "title": "Related Resources",
           "$comment": "dc:relation",
-          "description": "Provide the named and links to publications, reports, protocols, software, websites, or other resources that help users understand or use this dataset. Persistent identifiers (URI) (e.g. DOI or URL) preferred. Use ADD ROW to add more items.",
+          "description": "Provide the named and links to publications, reports, protocols, software, websites, or other resources that help users understand or use this dataset. Persistent identifiers (URI) (e.g. DOI or URL) preferred. Use ADD ROW to add more items.\n\nThe 'Relation Type' field has the following options:\n\nDerived from: Source dataset used to create this dataset\nPart of: Part of a collection or larger dataset\nHas part: Dataset/component belonging to this dataset\nDocumented by: Methodology, protocol, README, technical report\nDescribed by: Data paper describing the dataset\nReferences: Relevant publication/resource\nCites: Formally cited research/resource\nVersion of: Version relationship\nNew version of: Previous dataset release\nRequires: Software, model or other dependency\nOther: Anything not represented above\n",
           "type": "array",
           "items": {
             "type": "object",
@@ -205,6 +212,24 @@
                 "title": "Description of Resource",
                 "description": "A description of the relationship to the related resource.",
                 "type": "string"
+              },
+              "relationType": {
+                "title": "Relation Type",
+                "description": "The nature of the relationship between this dataset and the related resource.",
+                "type": "string",
+                "enum": [
+                  "IsDerivedFrom",
+                  "IsPartOf",
+                  "HasPart",
+                  "IsDocumentedBy",
+                  "IsDescribedBy",
+                  "References",
+                  "Cites",
+                  "IsVersionOf",
+                  "IsNewVersionOf",
+                  "Requires",
+                  "Other"
+                ]
               },
               "uri": {
                 "title": "URI",
@@ -317,50 +342,6 @@
           "description": "Briefly describe how the dataset was created. Include the project name, data collection methods, processing, quality assurance, or other significant steps used to produce the dataset. Where relevant, include cultural provenance, such as whakapapa or other contextual information important for Māori data.",
           "type": "string"
         },
-        "sources": {
-          "title": "Derived From / Sources",
-          "$comment": "dc:source",
-          "description": "Describe the original data or other resources from which this dataset was derived or compiled. Persistent identifiers (URI) (e.g. DOI or URL) preferred. List one dataset or resource per row. Use ADD ROW to add more items.",
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "source": {
-                "title": "Source Description",
-                "description": "A description of the source resource or dataset.",
-                "type": "string"
-              },
-              "uri": {
-                "title": "Source URI",
-                "description": "Persistent identifiers (URI) (e.g. DOI or URL) preferred.",
-                "type": "string",
-                "format": "uri"
-              }
-            }
-          }
-        },
-        "isPartOf": {
-          "title": "Is Part Of",
-          "$comment": "dcterms:isPartOf",
-          "description": "The collection or larger dataset this dataset belongs to (e.g. NZLRI).",
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "collection": {
-                "title": "Collection Name",
-                "description": "The name of the collection or larger dataset this dataset is part of.",
-                "type": "string"
-              },
-              "uri": {
-                "title": "Collection URI",
-                "description": "A URI identifying the collection or larger dataset (e.g. DOI, URL). Persistent identifiers (URI) (e.g. DOI or URL) preferred.",
-                "type": "string",
-                "format": "uri"
-              }
-            }
-          }
-        },
         "commentsIncludingReferences": {
           "title": "Comments including References",
           "$comment": "dc:description",
@@ -380,18 +361,18 @@
           "description": "Information about who can access the dataset, or its embargo status.",
           "type": "string"
         },
+        "licenseDetails": {
+          "title": "License Details",
+          "$comment": "dcterms:license",
+          "description": "Specify the license and agreement that governs use and reuse of the dataset. Include any data sharing agreements. Examples include CC BY 4.0 or a commercial or BSI-specific licence. For Māori data, this may include iwi or hapū agreements, partnership agreements, or other Māori data governance arrangements that define how the data may be accessed and used.",
+          "type": "string"
+        },
         "licenseURI": {
           "title": "License URI",
           "$comment": "dcterms:license",
           "description": "Provide a URI to the license or agreement that governs use and reuse of the dataset. Persistent identifiers (URI) (e.g. DOI or URL) preferred.",
           "type": "string",
           "format": "uri"
-        },
-        "licenseDetails": {
-          "title": "License Details",
-          "$comment": "dcterms:license",
-          "description": "Specify the license and agreement that governs use and reuse of the dataset. Include any data sharing agreements. Examples include CC BY 4.0 or a commercial or BSI-specific licence. For Māori data, this may include iwi or hapū agreements, partnership agreements, or other Māori data governance arrangements that define how the data may be accessed and used.",
-          "type": "string"
         },
         "dataFormat": {
           "title": "Data Format",

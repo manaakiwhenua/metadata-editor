@@ -280,11 +280,19 @@
                                 "content_format": "text"
                             },
                             {
+                                "key":"optional_additional_metadata.datePublished",
+                                "title":"Date Published \/ Released",
+                                "type":"date",
+                                "required":false,
+                                "help_text":"The date the dataset was first published or made publicly available, in ISO 8601 format (YYYY-MM-DD).",
+                                "display_type":"date"
+                            },
+                            {
                                 "key": "optional_additional_metadata.relatedResources",
                                 "title": "Related Resources",
                                 "type": "array",
                                 "required": false,
-                                "help_text": "Provide the named and links to publications, reports, protocols, software, websites, or other resources that help users understand or use this dataset. Persistent identifiers (URI) (e.g. DOI or URL) preferred. Use ADD ROW to add more items.",
+                                "help_text": "Provide the named and links to publications, reports, protocols, software, websites, or other resources that help users understand or use this dataset. Persistent identifiers (URI) (e.g. DOI or URL) preferred. Use ADD ROW to add more items.\n\nThe 'Relation Type' field has the following options:\n\nDerived from: Source dataset used to create this dataset\nPart of: Part of a collection or larger dataset\nHas part: Dataset/component belonging to this dataset\nDocumented by: Methodology, protocol, README, technical report\nDescribed by: Data paper describing the dataset\nReferences: Relevant publication/resource\nCites: Formally cited research/resource\nVersion of: Version relationship\nNew version of: Previous dataset release\nRequires: Software, model or other dependency\nOther: Anything not represented above\n",
                                 "props": [
                                     {
                                         "key": "resource",
@@ -294,6 +302,63 @@
                                         "required": false,
                                         "help_text": "A description of the relationship to the related resource.",
                                         "display_type": "text"
+                                    },
+                                    {
+                                        "key": "relationType",
+                                        "title": "Relation Type",
+                                        "type": "string",
+                                        "prop_key": "optional_additional_metadata.relatedResources.relationType",
+                                        "required": false,
+                                        "help_text": "The nature of the relationship between the dataset and the related resource.",
+                                        "display_type": "dropdown-custom",
+                                        "enum_store_column": "code",
+                                        "enum": [
+                                            {
+                                                "code": "IsDerivedFrom",
+                                                "label": "Derived from"
+                                            },
+                                            {
+                                                "code": "isPartOf",
+                                                "label": "Part of"
+                                            },
+                                            {
+                                                "code": "hasPart",
+                                                "label": "Has part"
+                                            },
+                                            {
+                                                "code": "IsDocumentedBy",
+                                                "label": "Documented by"
+                                            },
+                                            {
+                                                "code": "IsDescribedBy",
+                                                "label": "Described by"
+                                            },
+                                            {
+                                                "code": "References",
+                                                "label": "References"
+                                            },
+                                            {
+                                                "code": "Cites",
+                                                "label": "Cites"
+                                            },
+                                            {
+                                                "code": "isVersionOf",
+                                                "label": "Version of"
+                                            },
+                                            {
+                                                "code": "isNewVersionOf",
+                                                "label": "New version of"
+                                            },
+
+                                            {
+                                                "code": "Requires",
+                                                "label": "Requires"
+                                            },
+                                            {
+                                                "code": "Other",
+                                                "label": "Other"
+                                            }
+                                        ]
                                     },
                                     {
                                         "key": "uri",
@@ -442,61 +507,7 @@
                                 "help_text": "Briefly describe how the dataset was created. Include the project name, data collection methods, processing, quality assurance, or other significant steps used to produce the dataset. Where relevant, include cultural provenance, such as whakapapa or other contextual information important for Māori data.",
                                 "display_type": "textarea",
                                 "content_format": "text"
-                            },
-                            {
-                                "key": "optional_additional_metadata.sources",
-                                "title": "Derived From \/ Sources",
-                                "type": "array",
-                                "required": false,
-                                "help_text": "Describe the original data or other resources from which this dataset was derived or compiled. Persistent identifiers (URI) (e.g. DOI or URL) preferred. List one dataset or resource per row. Use ADD ROW to add more items.",
-                                "props": [
-                                    {
-                                        "key": "source",
-                                        "title": "Source Description",
-                                        "type": "string",
-                                        "prop_key": "optional_additional_metadata.sources.source",
-                                        "required": false,
-                                        "help_text": "A description of the source resource or dataset.",
-                                        "display_type": "text"
-                                    },
-                                    {
-                                        "key": "uri",
-                                        "title": "Source URI",
-                                        "type": "string",
-                                        "prop_key": "optional_additional_metadata.sources.uri",
-                                        "required": false,
-                                        "help_text": "Persistent identifiers (URI) (e.g. DOI or URL) preferred.",
-                                        "display_type": "text"
-                                    }
-                                ]
-                            },
-                            {
-                                "key": "optional_additional_metadata.isPartOf",
-                                "title": "Is Part Of",
-                                "type": "array",
-                                "required": false,
-                                "help_text": "The collection or larger dataset this dataset belongs to (e.g. NZLRI).",
-                                "props": [
-                                    {
-                                        "key": "collection",
-                                        "title": "Collection Name",
-                                        "type": "string",
-                                        "prop_key": "optional_additional_metadata.isPartOf.collection",
-                                        "required": false,
-                                        "help_text": "The name of the collection or larger dataset this dataset is part of.",
-                                        "display_type": "text"
-                                    },
-                                    {
-                                        "key": "uri",
-                                        "title": "Collection URI",
-                                        "type": "string",
-                                        "prop_key": "optional_additional_metadata.isPartOf.uri",
-                                        "required": false,
-                                        "help_text": "A URI identifying the collection or larger dataset (e.g. DOI, URL). Persistent identifiers (URI) (e.g. DOI or URL) preferred.",
-                                        "display_type": "text"
-                                    }
-                                ]
-                            },
+                            },                                   
                             {
                                 "key": "optional_additional_metadata.commentsIncludingReferences",
                                 "title": "Comments including References",
@@ -526,6 +537,15 @@
                                 "content_format": "text"
                             },
                             {
+                                "key": "optional_additional_metadata.licenseDetails",
+                                "title": "License Details",
+                                "type": "string",
+                                "required": false,
+                                "help_text": "Specify the license and agreement that governs use and reuse of the dataset. Include any data sharing agreements. Examples include CC BY 4.0 or a commercial or BSI-specific license. For Māori data, this may include iwi or hapū agreements, partnership agreements, or other Māori data governance arrangements that define how the data may be accessed and used.",
+                                "display_type": "textarea",
+                                "content_format": "text"
+                            },
+                            {
                                 "key": "optional_additional_metadata.licenseURI",
                                 "title": "License URI",
                                 "type": "string",
@@ -535,15 +555,6 @@
                                 "rules": {
                                     "is_uri": true
                                 }
-                            },
-                            {
-                                "key": "optional_additional_metadata.licenseDetails",
-                                "title": "License Details",
-                                "type": "string",
-                                "required": false,
-                                "help_text": "Specify the license and agreement that governs use and reuse of the dataset. Include any data sharing agreements. Examples include CC BY 4.0 or a commercial or BSI-specific license. For Māori data, this may include iwi or hapū agreements, partnership agreements, or other Māori data governance arrangements that define how the data may be accessed and used.",
-                                "display_type": "textarea",
-                                "content_format": "text"
                             },
                             {
                                 "key": "optional_additional_metadata.dataFormat",
