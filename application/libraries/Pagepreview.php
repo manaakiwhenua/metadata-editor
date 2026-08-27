@@ -59,6 +59,7 @@ class Pagepreview{
                 case 'string':
                 case 'boolean':
                 case 'integer':
+                case 'date':
                     $output[]= $this->render_text($item);
                     break;
 
