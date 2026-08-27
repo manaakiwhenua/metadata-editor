@@ -141,6 +141,7 @@ $lang['import_project_metadata']="Import project metadata";
 $lang['import_external_resources']="Import external resources";
 $lang['export_ddi']="Export DDI Codebook";
 $lang['export_json']="Export JSON";
+$lang['export_html']="Download HTML";
 $lang['export_external_resources']="Export external resources";
 $lang['publish_to_nada_note']="Publish project directly to a NADA catalog";
 $lang['catalog']="Catalog";
