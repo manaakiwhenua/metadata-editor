@@ -28,6 +28,7 @@ class ProjectPackage
 		$this->ci->load->model("Editor_resource_model");
 		$this->ci->load->model("Collection_model");
 		$this->ci->load->library("Project_json_writer");
+		$this->ci->load->library('Project_markdown_writer');
 	}
 
 
@@ -165,6 +166,10 @@ class ProjectPackage
 				$this->ci->Editor_resource_model->write_rdf($sid);
 				return $this->metadata_path($project, 'rdf');
 
+			case 'markdown':
+				$this->ci->project_markdown_writer->generate_project_markdown($sid);
+				return $this->metadata_path($project, 'md');
+
 			default:
 				throw new Exception("Unknown export stage: " . $stage);
 		}
@@ -229,6 +234,7 @@ class ProjectPackage
 			'thumbnail' => $this->ci->Editor_model->get_thumbnail($sid),
 			'json_file' => isset($file_set[$basename . '.json']) ? $basename . '.json' : null,
 			'xml_file' => isset($file_set[$basename . '.xml']) ? $basename . '.xml' : null,
+			'md_file' => isset($file_set[$basename . '.md']) ? $basename . '.md' : null,
 			'rdf_json_file' => isset($file_set[$basename . '.rdf.json']) ? $basename . '.rdf.json' : null,
 			'rdf_xml_file' => isset($file_set[$basename . '.rdf']) ? $basename . '.rdf' : null,
 			'collections' => $this->ci->Collection_model->get_collection_by_project($sid),
@@ -313,7 +319,7 @@ class ProjectPackage
 	 */
 	function get_export_stages($type)
 	{
-		$stages = array('json', 'resources_json', 'resources_rdf');
+		$stages = array('json', 'resources_json', 'resources_rdf', 'markdown');
 		if ($this->is_microdata_type($type)) {
 			array_splice($stages, 1, 0, array('ddi'));
 		}
@@ -345,13 +351,13 @@ class ProjectPackage
 		$candidates = array(
 			$basename . '.json',
 			$basename . '.rdf.json',
+			$basename . '.rdf',
+			$basename . '.md',
 		);
 
 		if ($this->is_microdata_type($project['type'])) {
 			$candidates[] = $basename . '.xml';
 		}
-
-		$candidates[] = $basename . '.rdf';
 
 		$paths = array();
 		foreach ($candidates as $relative_path) {

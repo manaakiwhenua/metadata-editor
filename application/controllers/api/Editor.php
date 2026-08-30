@@ -24,6 +24,7 @@ class Editor extends MY_REST_Controller
 		$this->load->library("Audit_log");
 		$this->load->library("Project_search");
 		$this->load->library('Project_json_writer');
+		$this->load->library('Project_markdown_writer');
 		$this->is_authenticated_or_die();
 		$this->api_user=$this->api_user();		
 	}
@@ -1072,7 +1073,76 @@ class Editor extends MY_REST_Controller
 		}
 	}
 
+	function markdown_get($sid=null)
+	{		
+		try{
+			$sid=$this->get_sid($sid);
+			$exists=$this->Editor_model->check_id_exists($sid);
+			
+			if(!$exists){
+				throw new Exception("Project not found");
+			}
+			
+			$this->editor_acl->user_has_project_access($sid,$permission='view');
 
+
+			$download=false;
+
+			if ($this->input->get("download")==1 || $this->input->get("download")=='true'){
+				$download=true;
+			}
+
+			$options=array(
+				'exclude_private_fields'=>0,
+				'include_external_resources'=>1,
+				'include_admin_metadata'=>1,
+				'user_id'=>$this->get_api_user_id() // used as part of admin metadata export
+			);
+
+			if ($download){
+				$this->project_markdown_writer->download_project_markdown($sid, $options);
+			}else{
+				$markdown_path=$this->project_markdown_writer->generate_project_markdown($sid, $options);
+
+				if (!file_exists($markdown_path)){
+					throw new Exception("Markdown file not found");
+				}
+
+				header("Content-type: text/markdown; charset=utf-8");
+				echo file_get_contents($markdown_path);
+			}
+
+			die();
+		}
+		catch(Exception $e){
+			$this->set_response($e->getMessage(), REST_Controller::HTTP_BAD_REQUEST);
+		}
+	}
+
+	function generate_markdown_get($sid=null)
+	{		
+		try{
+			$sid=$this->get_sid($sid);
+			$exists=$this->Editor_model->check_id_exists($sid);
+
+			if(!$exists){
+				throw new Exception("Project not found");
+			}
+
+			$this->editor_acl->user_has_project_access($sid,$permission='view');
+			$this->load->library('ProjectPackage');
+			$this->projectpackage->run_stage($sid, 'markdown');
+
+			$output=array(
+				'status'=>'success'
+			);
+
+			$this->set_response($output, REST_Controller::HTTP_OK);
+		}
+		catch(Exception $e){
+			$this->set_response($e->getMessage(), REST_Controller::HTTP_BAD_REQUEST);
+		}
+	}
 
 	/**
 	 * 

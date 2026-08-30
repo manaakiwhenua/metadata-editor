@@ -24,6 +24,7 @@ return array(
     'PhpZip\\' => array($vendorDir . '/nelexa/zip/src'),
     'PHPMailer\\PHPMailer\\' => array($vendorDir . '/phpmailer/phpmailer/src'),
     'MabeEnum\\' => array($vendorDir . '/marc-mabe/php-enum/src'),
+    'League\\HTMLToMarkdown\\' => array($vendorDir . '/league/html-to-markdown/src'),
     'League\\Event\\' => array($vendorDir . '/league/event/src'),
     'League\\Csv\\' => array($vendorDir . '/league/csv/src'),
     'Laminas\\Permissions\\Acl\\' => array($vendorDir . '/laminas/laminas-permissions-acl/src'),
