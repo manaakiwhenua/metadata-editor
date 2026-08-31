@@ -142,7 +142,7 @@
                                     <?php echo t("export_json"); ?>
                                 </v-list-item-title>
                             </v-list-item>
-                            <v-list-item @click="onLinkClick(base_url + '/api/editor/markdown/' + dataset_id +'?download=true')">
+                            <v-list-item @click="onLinkClick(base_url + '/api/editor/project_export/' + dataset_id + '/markdown')">
                                 <v-list-item-icon>
                                     <v-icon>mdi-language-markdown</v-icon>
                                 </v-list-item-icon>

@@ -28,7 +28,8 @@ class ProjectPackage
 		$this->ci->load->model("Editor_resource_model");
 		$this->ci->load->model("Collection_model");
 		$this->ci->load->library("Project_json_writer");
-		$this->ci->load->library('Project_markdown_writer');
+		$this->ci->load->library('Project_export_controller');
+		$this->ci->load->library('Project_export_writer_factory');
 	}
 
 
@@ -166,9 +167,11 @@ class ProjectPackage
 				$this->ci->Editor_resource_model->write_rdf($sid);
 				return $this->metadata_path($project, 'rdf');
 
-			case 'markdown':
-				$this->ci->project_markdown_writer->generate_project_markdown($sid);
-				return $this->metadata_path($project, 'md');
+			case 'markdown':				
+				$project_markdown_writer = $this->ci->project_export_writer_factory->create('markdown');
+				$this->ci->project_export_controller->generate_project_export($project_markdown_writer, $sid, $options);
+				$file_extension = $project_markdown_writer->file_extension();
+				return $this->metadata_path($project, $file_extension);
 
 			default:
 				throw new Exception("Unknown export stage: " . $stage);

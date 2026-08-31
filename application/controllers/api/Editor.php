@@ -24,7 +24,8 @@ class Editor extends MY_REST_Controller
 		$this->load->library("Audit_log");
 		$this->load->library("Project_search");
 		$this->load->library('Project_json_writer');
-		$this->load->library('Project_markdown_writer');
+		$this->load->library('Project_export_controller');
+		$this->load->library('Project_export_writer_factory'); 
 		$this->is_authenticated_or_die();
 		$this->api_user=$this->api_user();		
 	}
@@ -1073,45 +1074,25 @@ class Editor extends MY_REST_Controller
 		}
 	}
 
-	function markdown_get($sid=null)
-	{		
-		try{
-			$sid=$this->get_sid($sid);
-			$exists=$this->Editor_model->check_id_exists($sid);
+	/**
+	 * 
+	 * Export project metadata in various formats (Markdown, etc.)
+	 * @param string $sid - Project ID
+	 * @param string $format - Export format (default: 'markdown')
+	 */
+
+	function project_export_get($sid=null, $format='markdown')
+	{
+		try{			
 			
-			if(!$exists){
-				throw new Exception("Project not found");
-			}
-			
-			$this->editor_acl->user_has_project_access($sid,$permission='view');
+			$project_id=$this->get_sid($sid);
+			$this->check_project_exists($project_id);			
+			$this->editor_acl->user_has_project_access($project_id,$permission='view');
+	
+			$export_writer = $this->project_export_writer_factory->create_writer($format);
+			$options = $this->process_export_options();
 
-
-			$download=false;
-
-			if ($this->input->get("download")==1 || $this->input->get("download")=='true'){
-				$download=true;
-			}
-
-			$options=array(
-				'exclude_private_fields'=>0,
-				'include_external_resources'=>1,
-				'include_admin_metadata'=>1,
-				'user_id'=>$this->get_api_user_id() // used as part of admin metadata export
-			);
-
-			if ($download){
-				$this->project_markdown_writer->download_project_markdown($sid, $options);
-			}else{
-				$markdown_path=$this->project_markdown_writer->generate_project_markdown($sid, $options);
-
-				if (!file_exists($markdown_path)){
-					throw new Exception("Markdown file not found");
-				}
-
-				header("Content-type: text/markdown; charset=utf-8");
-				echo file_get_contents($markdown_path);
-			}
-
+			$this->project_export_controller->download_project_export($export_writer, $project_id, $options);
 			die();
 		}
 		catch(Exception $e){
@@ -1119,29 +1100,24 @@ class Editor extends MY_REST_Controller
 		}
 	}
 
-	function generate_markdown_get($sid=null)
-	{		
-		try{
-			$sid=$this->get_sid($sid);
-			$exists=$this->Editor_model->check_id_exists($sid);
-
-			if(!$exists){
-				throw new Exception("Project not found");
-			}
-
-			$this->editor_acl->user_has_project_access($sid,$permission='view');
-			$this->load->library('ProjectPackage');
-			$this->projectpackage->run_stage($sid, 'markdown');
-
-			$output=array(
-				'status'=>'success'
-			);
-
-			$this->set_response($output, REST_Controller::HTTP_OK);
+	private function check_project_exists($project_id)
+	{
+		$exists = $this->Editor_model->check_id_exists($project_id);
+		if (!$exists) {
+			throw new Exception("Project not found");
 		}
-		catch(Exception $e){
-			$this->set_response($e->getMessage(), REST_Controller::HTTP_BAD_REQUEST);
+	}
+		
+	private function process_export_options()
+	{
+		$options=array();
+		$exclude_private_fields = 1; // Default to excluding private fields
+		if ($this->input->get("exclude_private_fields") == 'false' || $this->input->get("exclude_private_fields") == '0') {
+			$exclude_private_fields = 0;
 		}
+		$options['exclude_private_fields'] = $exclude_private_fields;
+
+		return $options;
 	}
 
 	/**
