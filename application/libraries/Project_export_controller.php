@@ -27,7 +27,7 @@ class Project_export_controller
 		if(file_exists($file_path)){
 			$this->ci->load->helper('download');
 			$filename = 'project_metadata_' . $project_id . '.' . $export_writer->file_extension();
-			force_download($filename, file_get_contents($file_path));
+			force_download($filename, file_get_contents($file_path), $set_mime = TRUE); //set_mime detects mime type based on file extension
 		}
 		else{
 			throw new Exception("Download project '" . $export_writer->export_type() . "': File not found: " . $file_path);

@@ -23,10 +23,6 @@ class Project_markdown_writer implements IProject_export_writer
 		return "md";
 	}
 
-	public function mime_type() {
-		return "text/markdown";
-	}
-
 	/**
 	 * 
 	 * Generate project Markdown
