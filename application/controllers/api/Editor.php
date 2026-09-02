@@ -24,6 +24,8 @@ class Editor extends MY_REST_Controller
 		$this->load->library("Audit_log");
 		$this->load->library("Project_search");
 		$this->load->library('Project_json_writer');
+		$this->load->library('Project_export_controller');
+		$this->load->library('Project_export_writer_factory'); 
 		$this->is_authenticated_or_die();
 		$this->api_user=$this->api_user();		
 	}
@@ -1072,7 +1074,51 @@ class Editor extends MY_REST_Controller
 		}
 	}
 
+	/**
+	 * 
+	 * Export project metadata in various formats (Markdown, etc.)
+	 * @param string $sid - Project ID
+	 * @param string $format - Export format (default: 'markdown')
+	 */
 
+	function project_export_get($sid=null, $format='markdown')
+	{
+		try{			
+			
+			$project_id=$this->get_sid($sid);
+			$this->check_project_exists($project_id);			
+			$this->editor_acl->user_has_project_access($project_id,$permission='view');
+	
+			$export_writer = $this->project_export_writer_factory->create_writer($format);
+			$options = $this->process_export_options();
+
+			$this->project_export_controller->download_project_export($export_writer, $project_id, $options);
+			die();
+		}
+		catch(Exception $e){
+			$this->set_response($e->getMessage(), REST_Controller::HTTP_BAD_REQUEST);
+		}
+	}
+
+	private function check_project_exists($project_id)
+	{
+		$exists = $this->Editor_model->check_id_exists($project_id);
+		if (!$exists) {
+			throw new Exception("Project not found");
+		}
+	}
+		
+	private function process_export_options()
+	{
+		$options=array();
+		$exclude_private_fields = 1; // Default to excluding private fields
+		if ($this->input->get("exclude_private_fields") == 'false' || $this->input->get("exclude_private_fields") == '0') {
+			$exclude_private_fields = 0;
+		}
+		$options['exclude_private_fields'] = $exclude_private_fields;
+
+		return $options;
+	}
 
 	/**
 	 * 
