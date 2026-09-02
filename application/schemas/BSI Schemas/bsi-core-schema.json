@@ -2,6 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://landcareresearch.co.nz/metadata/schema/core/v0.1",
   "title": "BSI Core Metadata Schema",
+  "version": "1.0.0",
   "description": "Core metadata schema for Bioeconomy Science Institute Maiangi Taiao datasets, aligned to Dublin Core and Dublin Core Terms. Expressed in JSON Schema Draft-07.",
   "type": "object",
   "properties": {
@@ -76,8 +77,9 @@
                 "type": "string",
                 "enum": [
                   "author",
-                  "maintainer",
+                  "custodian",
                   "pointOfContact",
+                  "dataCollector",
                   "contributor",
                   "funder"
                 ]
@@ -148,9 +150,6 @@
             "minLength": 1,
             "type": "string"
           },
-          "default": [
-            "en"
-          ],
           "uniqueItems": true
         },
         "resourceIdentifier": {
@@ -172,6 +171,9 @@
           "type": "array",
           "items": {
             "type": "object",
+            "required": [
+              "date"
+            ],
             "properties": {
               "date": {
                 "title": "Date",
@@ -218,17 +220,17 @@
                 "description": "The nature of the relationship between this dataset and the related resource.",
                 "type": "string",
                 "enum": [
-                  "IsDerivedFrom",
-                  "IsPartOf",
-                  "HasPart",
-                  "IsDocumentedBy",
-                  "IsDescribedBy",
-                  "References",
-                  "Cites",
-                  "IsVersionOf",
-                  "IsNewVersionOf",
-                  "Requires",
-                  "Other"
+                  "isDerivedFrom",
+                  "isPartOf",
+                  "hasPart",
+                  "isDocumentedBy",
+                  "isDescribedBy",
+                  "references",
+                  "cites",
+                  "isVersionOf",
+                  "isNewVersionOf",
+                  "requires",
+                  "other"
                 ]
               },
               "uri": {
@@ -314,6 +316,9 @@
                     "type": "array",
                     "items": {
                       "type": "object",
+                      "required": [
+                        "geohash"
+                      ],
                       "properties": {
                         "geohash": {
                           "title": "Geohash",
@@ -342,10 +347,10 @@
           "description": "Briefly describe how the dataset was created. Include the project name, data collection methods, processing, quality assurance, or other significant steps used to produce the dataset. Where relevant, include cultural provenance, such as whakapapa or other contextual information important for Māori data.",
           "type": "string"
         },
-        "commentsIncludingReferences": {
-          "title": "Comments including References",
+        "comments": {
+          "title": "Comments",
           "$comment": "dc:description",
-          "description": "Provide additional information that helps users understand or use the dataset but is not captured elsewhere. This may include references to publications, explanatory comments, data citation information or other relevant notes.",
+          "description": "Provide additional information that helps users understand or use the dataset but is not captured elsewhere.",
           "type": "string"
         },
         "rightsHolder": {
@@ -359,7 +364,15 @@
           "title": "Access Rights",
           "$comment": "dcterms:accessRights",
           "description": "Information about who can access the dataset, or its embargo status.",
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "open",
+            "restricted",
+            "embargoed",
+            "internal",
+            "accessByAgreement",
+            "other"
+          ]
         },
         "licenseDetails": {
           "title": "License Details",

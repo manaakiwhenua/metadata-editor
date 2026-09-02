@@ -120,12 +120,16 @@
                                                 "label": "Author"
                                             },
                                             {
-                                                "code": "maintainer",
-                                                "label": "Maintainer"
+                                                "code": "custodian",
+                                                "label": "Custodian"
                                             },
                                             {
                                                 "code": "pointOfContact",
                                                 "label": "Point Of Contact"
+                                            },
+                                            {
+                                                "code": "dataCollector",
+                                                "label": "Data Collector"
                                             },
                                             {
                                                 "code": "contributor",
@@ -255,9 +259,13 @@
                                         "title": "Date",
                                         "type": "date",
                                         "prop_key": "optional_additional_metadata.dateModified.date",
-                                        "required": false,
                                         "help_text": "The date the dataset was modified or a new version released, in ISO 8601 format (YYYY-MM-DD).",
-                                        "display_type": "date"
+                                        "display_type": "date",
+                                        "required": true,
+                                        "rules": {
+                                            "required": true
+                                        },
+                                        "is_required": true
                                     },
                                     {
                                         "key": "version",
@@ -280,12 +288,12 @@
                                 "content_format": "text"
                             },
                             {
-                                "key":"optional_additional_metadata.datePublished",
-                                "title":"Date Published \/ Released",
-                                "type":"date",
-                                "required":false,
-                                "help_text":"The date the dataset was first published or made publicly available, in ISO 8601 format (YYYY-MM-DD).",
-                                "display_type":"date"
+                                "key": "optional_additional_metadata.datePublished",
+                                "title": "Date Published \/ Released",
+                                "type": "date",
+                                "required": false,
+                                "help_text": "The date the dataset was first published or made publicly available, in ISO 8601 format (YYYY-MM-DD).",
+                                "display_type": "date"
                             },
                             {
                                 "key": "optional_additional_metadata.relatedResources",
@@ -314,7 +322,7 @@
                                         "enum_store_column": "code",
                                         "enum": [
                                             {
-                                                "code": "IsDerivedFrom",
+                                                "code": "isDerivedFrom",
                                                 "label": "Derived from"
                                             },
                                             {
@@ -326,19 +334,19 @@
                                                 "label": "Has part"
                                             },
                                             {
-                                                "code": "IsDocumentedBy",
+                                                "code": "isDocumentedBy",
                                                 "label": "Documented by"
                                             },
                                             {
-                                                "code": "IsDescribedBy",
+                                                "code": "isDescribedBy",
                                                 "label": "Described by"
                                             },
                                             {
-                                                "code": "References",
+                                                "code": "references",
                                                 "label": "References"
                                             },
                                             {
-                                                "code": "Cites",
+                                                "code": "cites",
                                                 "label": "Cites"
                                             },
                                             {
@@ -349,13 +357,12 @@
                                                 "code": "isNewVersionOf",
                                                 "label": "New version of"
                                             },
-
                                             {
-                                                "code": "Requires",
+                                                "code": "requires",
                                                 "label": "Requires"
                                             },
                                             {
-                                                "code": "Other",
+                                                "code": "other",
                                                 "label": "Other"
                                             }
                                         ]
@@ -367,7 +374,10 @@
                                         "prop_key": "optional_additional_metadata.relatedResources.uri",
                                         "required": false,
                                         "help_text": "A URI identifying the related resource (e.g. DOI, URL).",
-                                        "display_type": "text"
+                                        "display_type": "text",
+                                        "rules": {
+                                            "is_uri": true
+                                        }
                                     }
                                 ]
                             },
@@ -469,6 +479,11 @@
                                                         "key": "geohash",
                                                         "type": "string",
                                                         "title": "Geohash",
+                                                        "rules": {
+                                                            "required": true
+                                                        },
+                                                        "required": true,
+                                                        "is_required": true,
                                                         "prop_key": "optional_additional_metadata.geographicCoverage.geographicElement.geohash.geohash",
                                                         "help_text": "The geohash is not explicitly defined in ISO 19139, but often used in profiles, extensions, or auxiliary metadata to support spatial search, indexing, or approximate location. For example, \"u4pruydqqvj\" represents a specific area near New York City. Geohashes can vary in length; more characters mean higher precision.",
                                                         "display_type": "textarea"
@@ -507,13 +522,13 @@
                                 "help_text": "Briefly describe how the dataset was created. Include the project name, data collection methods, processing, quality assurance, or other significant steps used to produce the dataset. Where relevant, include cultural provenance, such as whakapapa or other contextual information important for Māori data.",
                                 "display_type": "textarea",
                                 "content_format": "text"
-                            },                                   
+                            },
                             {
-                                "key": "optional_additional_metadata.commentsIncludingReferences",
-                                "title": "Comments including References",
+                                "key": "optional_additional_metadata.comments",
+                                "title": "Comments",
                                 "type": "string",
                                 "required": false,
-                                "help_text": "Provide additional information that helps users understand or use the dataset but is not captured elsewhere. This may include references to publications, explanatory comments, data citation information or other relevant notes.",
+                                "help_text": "Provide additional information that helps users understand or use the dataset but is not captured elsewhere.",
                                 "display_type": "textarea",
                                 "content_format": "text"
                             },
@@ -533,8 +548,34 @@
                                 "type": "string",
                                 "required": false,
                                 "help_text": "Specify who can access the dataset and any restrictions on access. Examples include Open, Restricted, Internal use only, Embargoed, or Access by agreement. For sensitive or Māori-governed data, describe any governance or approval requirements that determine access.",
-                                "display_type": "textarea",
-                                "content_format": "text"
+                                "display_type": "dropdown-custom",
+                                "enum_store_column": "code",
+                                "enum": [
+                                    {
+                                        "code":"open",
+                                        "label":"Open"
+                                    },
+                                    {
+                                        "code":"restricted",
+                                        "label":"Restricted"
+                                    },
+                                    {
+                                        "code":"embargoed",
+                                        "label":"Embargoed"
+                                    },
+                                    {
+                                        "code":"internal",
+                                        "label":"Internal use only"
+                                    },
+                                    {
+                                        "code":"accessByAgreement",
+                                        "label":"Access by agreement"
+                                    },
+                                    {
+                                        "code":"other",
+                                        "label":"Other"
+                                    }
+                                ]
                             },
                             {
                                 "key": "optional_additional_metadata.licenseDetails",
@@ -587,7 +628,10 @@
                                         "prop_key": "optional_additional_metadata.dataLocation.uri",
                                         "required": false,
                                         "help_text": "Persistent identifiers (URI) (e.g. DOI or URL) preferred.",
-                                        "display_type": "text"
+                                        "display_type": "text",
+                                        "rules": {
+                                            "is_uri": true
+                                        }
                                     }
                                 ]
                             }
