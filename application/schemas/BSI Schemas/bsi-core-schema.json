@@ -364,15 +364,27 @@
           "title": "Access Rights",
           "$comment": "dcterms:accessRights",
           "description": "Information about who can access the dataset, or its embargo status.",
-          "type": "string",
-          "enum": [
-            "open",
-            "restricted",
-            "embargoed",
-            "internal",
-            "accessByAgreement",
-            "other"
-          ]
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "accessRightsType": {
+              "title": "Access Rights",
+              "type":"string",
+              "enum": [
+                "open",
+                "restricted",
+                "embargoed",
+                "internal",
+                "accessByAgreement",
+                "other"
+              ]
+            },
+            "accessRightsDescription": {
+              "title": "Description of Access Rights",
+              "description": "Free-text description of the access rights.",
+              "type": "string"
+            }
+          }
         },
         "licenseDetails": {
           "title": "License Details",

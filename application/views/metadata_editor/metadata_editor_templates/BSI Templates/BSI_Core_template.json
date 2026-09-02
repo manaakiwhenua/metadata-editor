@@ -545,35 +545,50 @@
                             {
                                 "key": "optional_additional_metadata.accessRights",
                                 "title": "Access Rights",
-                                "type": "string",
+                                "type": "section",
                                 "required": false,
-                                "help_text": "Specify who can access the dataset and any restrictions on access. Examples include Open, Restricted, Internal use only, Embargoed, or Access by agreement. For sensitive or Māori-governed data, describe any governance or approval requirements that determine access.",
-                                "display_type": "dropdown-custom",
-                                "enum_store_column": "code",
-                                "enum": [
+                                "expanded": true,
+                                "items": [
                                     {
-                                        "code":"open",
-                                        "label":"Open"
+                                        "key":"optional_additional_metadata.accessRights.accessRightsType",
+                                        "title": "Access Rights",
+                                        "type": "string",
+                                        "display_type": "dropdown-custom",
+                                        "help_text": "Specify who can access the dataset and any restrictions on access. Examples include Open, Restricted, Internal use only, Embargoed, or Access by agreement.",
+                                        "enum_store_column": "code",
+                                        "enum": [
+                                            {
+                                                "code": "open",
+                                                "label": "Open"
+                                            },
+                                            {
+                                                "code": "restricted",
+                                                "label": "Restricted"
+                                            },
+                                            {
+                                                "code": "embargoed",
+                                                "label": "Embargoed"
+                                            },
+                                            {
+                                                "code": "internal",
+                                                "label": "Internal use only"
+                                            },
+                                            {
+                                                "code": "accessByAgreement",
+                                                "label": "Access by agreement"
+                                            },
+                                            {
+                                                "code": "other",
+                                                "label": "Other"
+                                            }
+                                        ]
                                     },
                                     {
-                                        "code":"restricted",
-                                        "label":"Restricted"
-                                    },
-                                    {
-                                        "code":"embargoed",
-                                        "label":"Embargoed"
-                                    },
-                                    {
-                                        "code":"internal",
-                                        "label":"Internal use only"
-                                    },
-                                    {
-                                        "code":"accessByAgreement",
-                                        "label":"Access by agreement"
-                                    },
-                                    {
-                                        "code":"other",
-                                        "label":"Other"
+                                        "key":"optional_additional_metadata.accessRights.accessRightsDescription",
+                                        "title": "Access Rights Description",
+                                        "type":"string",
+                                        "display_type":"textarea",
+                                        "help_text": "A description of the access rights. For sensitive or Māori-governed data, describe any governance or approval requirements that determine access."
                                     }
                                 ]
                             },
