@@ -115,12 +115,9 @@
         "publisher": {
           "title": "Publisher",
           "$comment": "dc:publisher",
-          "description": "The entity responsible for publishing the dataset. Defaults to Bioeconomy Science Institute Maiangi Taiao.",
+          "description": "The entity responsible for publishing the dataset. Default to Bioeconomy Science Institute Maiangi Taiao.",
           "type": "string",
-          "default": "Bioeconomy Science Institute Maiangi Taiao",
-          "enum": [
-            "Bioeconomy Science Institute Maiangi Taiao"
-          ]
+          "default": "Bioeconomy Science Institute Maiangi Taiao"
         }
       }
     },

@@ -190,15 +190,8 @@
                                 "required": true,
                                 "is_required": true,
                                 "help_text": "The entity responsible for publishing the dataset. Defaults to Bioeconomy Science Institute Maiangi Taiao.",
-                                "display_type": "dropdown-custom",
-                                "enum_store_column": "code",
-                                "default": "Bioeconomy Science Institute Maiangi Taiao",
-                                "enum": [
-                                    {
-                                        "code": "Bioeconomy Science Institute Maiangi Taiao",
-                                        "label": "Bioeconomy Science Institute Maiangi Taiao"
-                                    }
-                                ]
+                                "display_type": "text",
+                                "default": "Bioeconomy Science Institute Maiangi Taiao"
                             }
                         ]
                     }
@@ -228,7 +221,6 @@
                                 "title": "Language",
                                 "type": "simple_array",
                                 "display_type": "dropdown-custom",
-                                "default": "en",
                                 "required": false,
                                 "help_text": "Specify the language(s) used in the dataset or its documentation (e.g. English, Te Reo Māori)."
                             },
