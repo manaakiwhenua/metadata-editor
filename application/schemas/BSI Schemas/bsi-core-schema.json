@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://landcareresearch.co.nz/metadata/schema/core/v0.1",
   "title": "BSI Core Metadata Schema",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Core metadata schema for Bioeconomy Science Institute Maiangi Taiao datasets, aligned to Dublin Core and Dublin Core Terms. Expressed in JSON Schema Draft-07.",
   "type": "object",
   "properties": {
@@ -10,7 +10,7 @@
       "required": [
         "title",
         "description",
-        "roles",
+        "agents",
         "dateCreated",
         "keywords",
         "resourceType",
@@ -45,8 +45,8 @@
           "type": "string",
           "minLength": 1
         },
-        "roles": {
-          "title": "Roles",
+        "agents": {
+          "title": "Agents",
           "$comment": "dc:creator / dc:contributor",
           "description": "List people who have been involved with the creation and management of the dataset. It is important to state who the creator (Author) was. Author is used for the person or organisation chiefly responsible for the intellectual content.",
           "type": "array",
@@ -55,10 +55,20 @@
             "type": "object",
             "required": [
               "role",
-              "organisation"
+              "name",
+              "agentType",
+              "affiliation"
             ],
             "additionalProperties": false,
             "properties": {
+              "agentType": {
+                "title": "Agent type",
+                "type": "string",
+                "enum": [
+                  "person",
+                  "organisation"
+                ]
+              },
               "name": {
                 "title": "Name",
                 "description": "Full name of the person or organisation.",
@@ -84,8 +94,8 @@
                   "funder"
                 ]
               },
-              "organisation": {
-                "title": "Organisation",
+              "affiliation": {
+                "title": "Affiliation",
                 "description": "The organisation the agent is affiliated with.",
                 "type": "string",
                 "default": "Bioeconomy Science Institute Maiangi Taiao"
@@ -98,7 +108,7 @@
           "$comment": "dcterms:created",
           "description": "Date the dataset was created, in ISO 8601 format (YYYY-MM-DD). Date of creation differs from the temporal coverage. For example, a dataset might have been created in February 2009 (2009-02-15) but the data was collected during the year 2008 (temporal coverage from 2008-01-01 to 2008-12-31).",
           "type": "string",
-          "format": "date-time"
+          "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
         },
         "keywords": {
           "title": "Keywords",
@@ -176,7 +186,7 @@
                 "title": "Date",
                 "description": "The date the dataset was modified or a new version released, in ISO 8601 format (YYYY-MM-DD).",
                 "type": "string",
-                "format": "date-time"
+                "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
               },
               "version": {
                 "title": "Version",
@@ -191,7 +201,7 @@
           "$comment": "dcterms:issued",
           "description": "The date the dataset was first published or made publicly available, in ISO 8601 format (YYYY-MM-DD).",
           "type": "string",
-          "format": "date-time"
+          "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
         },
         "audience": {
           "title": "Audience / Intended Users",
@@ -230,6 +240,11 @@
                   "other"
                 ]
               },
+              "relationTypeInformation": {
+                "title": "Relation Type Information",
+                "description": "A description of the relation type.",
+                "type": "string"
+              },
               "uri": {
                 "title": "URI",
                 "description": "Persistent identifiers (URI) (e.g. DOI or URL) preferred.",
@@ -250,13 +265,13 @@
               "title": "Start Date",
               "description": "Start of the temporal coverage period, in ISO 8601 format (YYYY-MM-DD).",
               "type": "string",
-              "format": "date-time"
+              "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
             },
             "end": {
               "title": "End Date",
               "description": "End of the temporal coverage period, in ISO 8601 format (YYYY-MM-DD). Omit if ongoing.",
               "type": "string",
-              "format": "date-time"
+              "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
             },
             "description": {
               "title": "Temporal Description",
@@ -276,6 +291,10 @@
               "description": "Geographic extent(s)",
               "items": {
                 "type": "object",
+                "required": [
+                  "geographicDescription"
+                ],
+                "additionalProperties": false,
                 "properties": {
                   "geographicBoundingBox": {
                     "$comment": "dcterms:spatial",
@@ -366,7 +385,7 @@
           "properties": {
             "accessRightsType": {
               "title": "Access Rights",
-              "type":"string",
+              "type": "string",
               "enum": [
                 "open",
                 "restricted",

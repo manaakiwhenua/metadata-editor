@@ -3,7 +3,7 @@
     "lang": "en",
     "template_type": "custom",
     "name": "BSI Core",
-    "version": "1.0.0",
+    "version": "0.0.1",
     "organization": "Bioeconomy Science Institute Maiangi Taiao",
     "author": "Bioeconomy Science Institute Maiangi Taiao",
     "template": {
@@ -71,8 +71,8 @@
                                 "is_required": true
                             },
                             {
-                                "key": "required_metadata.roles",
-                                "title": "Roles",
+                                "key": "required_metadata.agents",
+                                "title": "Agents",
                                 "type": "array",
                                 "required": true,
                                 "rules": {
@@ -82,31 +82,52 @@
                                 "help_text": "List people who have been involved with the creation and management of the dataset. It is important to state who the creator (Author) was. 'Author' is used for the person or organisation chiefly responsible for the intellectual content.",
                                 "props": [
                                     {
+                                        "key": "agentType",
+                                        "title": "Agent Type",
+                                        "display_type": "dropdown-custom",
+                                        "type": "string",
+                                        "enum": [
+                                            {
+                                                "code": "person",
+                                                "label": "Person"
+                                            },
+                                            {
+                                                "code": "organisation",
+                                                "label": "Organisation"
+                                            }
+                                        ],
+                                        "enum_store_column": "code"
+                                    },
+                                    {
                                         "key": "name",
                                         "title": "Name",
                                         "type": "string",
-                                        "prop_key": "required_metadata.roles.name",
+                                        "prop_key": "required_metadata.agents.name",
                                         "help_text": "Full name of the person or organisation.",
                                         "display_type": "text",
-                                        "required": false
+                                        "required": true,
+                                        "rules": {
+                                            "required": true
+                                        }
                                     },
                                     {
                                         "key": "orcid",
                                         "title": "ORCID",
                                         "type": "string",
-                                        "prop_key": "required_metadata.roles.orcid",
+                                        "prop_key": "required_metadata.agents.orcid",
                                         "required": false,
                                         "help_text": "ORCID identifier URI for the person (e.g. https:\/\/orcid.org\/0000-0000-0000-0000).",
                                         "display_type": "text",
                                         "rules": {
-                                            "is_uri": true
+                                            "is_uri": true,
+                                            "regex": "^https://orcid\\.org/\\d{4}-\\d{4}-\\d{4}-\\d{3}[0-9X]$"
                                         }
                                     },
                                     {
                                         "key": "role",
                                         "title": "Role",
                                         "type": "string",
-                                        "prop_key": "required_metadata.roles.role",
+                                        "prop_key": "required_metadata.agents.role",
                                         "required": true,
                                         "rules": {
                                             "required": true
@@ -142,10 +163,10 @@
                                         ]
                                     },
                                     {
-                                        "key": "organisation",
-                                        "title": "Organisation",
+                                        "key": "affiliation",
+                                        "title": "Affiliation",
                                         "type": "string",
-                                        "prop_key": "required_metadata.roles.organisation",
+                                        "prop_key": "required_metadata.agents.affiliation",
                                         "required": true,
                                         "help_text": "The organisation the role is affiliated with.",
                                         "display_type": "text",
@@ -159,13 +180,14 @@
                             {
                                 "key": "required_metadata.dateCreated",
                                 "title": "Date Created",
-                                "type": "date",
+                                "type": "string",
                                 "required": true,
                                 "rules": {
-                                    "required": true
+                                    "required": true,
+                                    "regex": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
                                 },
                                 "help_text": "Date the dataset was created, in ISO 8601 format (YYYY-MM-DD). Date of creation differs from the temporal coverage. For example, a dataset might have been created in February 2009 (2009-02-15) but the data was collected during the year 2008 (temporal coverage from 2008-01-01 to 2008-12-31)",
-                                "display_type": "date",
+                                "display_type": "text",
                                 "is_required": true
                             },
                             {
@@ -249,13 +271,14 @@
                                     {
                                         "key": "date",
                                         "title": "Date",
-                                        "type": "date",
+                                        "type": "string",
                                         "prop_key": "optional_additional_metadata.dateModified.date",
                                         "help_text": "The date the dataset was modified or a new version released, in ISO 8601 format (YYYY-MM-DD).",
-                                        "display_type": "date",
+                                        "display_type": "text",
                                         "required": true,
                                         "rules": {
-                                            "required": true
+                                            "required": true,
+                                            "regex": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
                                         },
                                         "is_required": true
                                     },
@@ -282,10 +305,13 @@
                             {
                                 "key": "optional_additional_metadata.datePublished",
                                 "title": "Date Published \/ Released",
-                                "type": "date",
+                                "type": "string",
                                 "required": false,
                                 "help_text": "The date the dataset was first published or made publicly available, in ISO 8601 format (YYYY-MM-DD).",
-                                "display_type": "date"
+                                "display_type": "text",
+                                "rules": {
+                                    "regex": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
+                                }
                             },
                             {
                                 "key": "optional_additional_metadata.relatedResources",
@@ -360,6 +386,14 @@
                                         ]
                                     },
                                     {
+                                        "key": "optional_additional_metadata.relatedResources.relationTypeInformation",
+                                        "title": "Relation Type Information",
+                                        "type": "string",
+                                        "required": false,
+                                        "display_type": "text",
+                                        "help_text": "A description of the relation type."
+                                    },
+                                    {
                                         "key": "uri",
                                         "title": "URI",
                                         "type": "string",
@@ -383,18 +417,24 @@
                                     {
                                         "key": "optional_additional_metadata.temporalCoverage.start",
                                         "title": "Start Date",
-                                        "type": "date",
+                                        "type": "string",
                                         "required": false,
                                         "help_text": "Start of the temporal coverage period, in ISO 8601 format (YYYY-MM-DD).",
-                                        "display_type": "date"
+                                        "display_type": "text",
+                                        "rules": {
+                                            "regex": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
+                                        }
                                     },
                                     {
                                         "key": "optional_additional_metadata.temporalCoverage.end",
                                         "title": "End Date",
-                                        "type": "date",
+                                        "type": "string",
                                         "required": false,
                                         "help_text": "End of the temporal coverage period, in ISO 8601 format (YYYY-MM-DD). Omit if ongoing.",
-                                        "display_type": "date"
+                                        "display_type": "text",
+                                        "rules": {
+                                            "regex": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
+                                        }
                                     },
                                     {
                                         "key": "optional_additional_metadata.temporalCoverage.description",
@@ -496,6 +536,10 @@
                                                 "title": "Geographic description",
                                                 "type": "string",
                                                 "prop_key": "optional_additional_metadata.geographicCoverage.geographicElement.geographicDescription",
+                                                "rules": {
+                                                    "required": true
+                                                },
+                                                "required": true,
                                                 "display_type": "textarea",
                                                 "help_text": "A textual or coded description of the geographic area covered by the dataset or service. The purpose is to provide a named place or coded region (e.g., country, administrative unit) as a way to describe geographic extent, especially when precise coordinates or geometry are not available. This useful for indexing metadata by regions or matching data to known administrative areas."
                                             }
@@ -542,11 +586,11 @@
                                 "expanded": true,
                                 "items": [
                                     {
-                                        "key":"optional_additional_metadata.accessRights.accessRightsType",
+                                        "key": "optional_additional_metadata.accessRights.accessRightsType",
                                         "title": "Access Rights",
                                         "type": "string",
                                         "display_type": "dropdown-custom",
-                                        "help_text": "Specify who can access the dataset and any restrictions on access. Examples include Open, Restricted, Internal use only, Embargoed, or Access by agreement.",
+                                        "help_text": "Specify who can access the dataset and any restrictions on access. Select from Open, Restricted, Internal use only, Embargoed, or Access by Agreement. Provide a description if necessary.",
                                         "enum_store_column": "code",
                                         "enum": [
                                             {
@@ -576,10 +620,10 @@
                                         ]
                                     },
                                     {
-                                        "key":"optional_additional_metadata.accessRights.accessRightsDescription",
+                                        "key": "optional_additional_metadata.accessRights.accessRightsDescription",
                                         "title": "Access Rights Description",
-                                        "type":"string",
-                                        "display_type":"textarea",
+                                        "type": "string",
+                                        "display_type": "textarea",
                                         "help_text": "A description of the access rights. For sensitive or Māori-governed data, describe any governance or approval requirements that determine access."
                                     }
                                 ]
