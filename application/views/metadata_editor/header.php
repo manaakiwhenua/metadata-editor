@@ -142,7 +142,22 @@
                                     <?php echo t("export_json"); ?>
                                 </v-list-item-title>
                             </v-list-item>
-
+                            <v-list-item @click="onLinkClick(base_url + '/api/editor/project_export/' + dataset_id + '/markdown')">
+                                <v-list-item-icon>
+                                    <v-icon>mdi-language-markdown</v-icon>
+                                </v-list-item-icon>
+                                <v-list-item-title>
+                                    <?php echo t("download_markdown"); ?>
+                                </v-list-item-title>
+                            </v-list-item>
+                            <v-list-item @click="onLinkClick(base_url + '/api/editor/html/' + dataset_id +'?download=true')">
+                                <v-list-item-icon>
+                                    <v-icon>mdi-monitor-arrow-down-variant</v-icon>
+                                </v-list-item-icon>
+                                <v-list-item-title>
+                                    <?php echo t("download_html"); ?>
+                                </v-list-item-title>
+                            </v-list-item>
                             <v-list-item v-if="dataset_type=='indicator'" @click="onLinkClick(base_url + '/api/sdmx/msd/?template_uid=' + projectTemplateUID)">
                                 <v-list-item-icon>
                                     <v-icon>mdi-file</v-icon>

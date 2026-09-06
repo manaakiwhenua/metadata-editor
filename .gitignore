@@ -23,6 +23,7 @@ sample
 userdata
 docs
 metadata-backup-service
+vendor/league/html-to-markdown/.github
 # fork-only (local docker dev env)
 .env
 .env.*
