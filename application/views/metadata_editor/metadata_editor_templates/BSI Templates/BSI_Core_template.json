@@ -79,7 +79,7 @@
                                     "required": true
                                 },
                                 "is_required": true,
-                                "help_text": "List people who have been involved with the creation and management of the dataset. It is important to state who the creator (Author) was. 'Author' is used for the person or organisation chiefly responsible for the intellectual content.",
+                                "help_text": "List people or organisations who have been involved with the creation and management of the dataset. It is important to state who the creator (Author) was. Author is used for the person or organisation chiefly responsible for the intellectual content./n/n For a person, enter the organisation they are affiliated with in relation to this dataset. Normally leave blank when the agent is an organisation.",
                                 "props": [
                                     {
                                         "key": "agentType",
@@ -168,7 +168,7 @@
                                         "type": "string",
                                         "prop_key": "required_metadata.agents.affiliation",
                                         "required": true,
-                                        "help_text": "The organisation the role is affiliated with.",
+                                        "help_text": "For a person, enter the organisation they are affiliated with in relation to this dataset. Normally leave blank when the agent is an organisation.",
                                         "display_type": "text",
                                         "rules": {
                                             "required": true
@@ -211,7 +211,7 @@
                                 },
                                 "required": true,
                                 "is_required": true,
-                                "help_text": "The entity responsible for publishing the dataset. Defaults to Bioeconomy Science Institute Maiangi Taiao.",
+                                "help_text": "The organisation responsible for stewardship, release, or making the dataset available as a data asset. This will normally be Bioeconomy Science Institute Maiangi Taiao, but another organisation may be entered where appropriate. This does not necessarily mean the dataset has been publicly published.",
                                 "display_type": "text",
                                 "default": "Bioeconomy Science Institute Maiangi Taiao"
                             }
@@ -325,7 +325,10 @@
                                         "title": "Description of Resource",
                                         "type": "string",
                                         "prop_key": "optional_additional_metadata.relatedResources.resource",
-                                        "required": false,
+                                        "required": true,
+                                        "rules":{
+                                            "required":true
+                                        },
                                         "help_text": "A description of the relationship to the related resource.",
                                         "display_type": "text"
                                     },
@@ -334,7 +337,10 @@
                                         "title": "Relation Type",
                                         "type": "string",
                                         "prop_key": "optional_additional_metadata.relatedResources.relationType",
-                                        "required": false,
+                                        "required": true,
+                                        "rules":{
+                                            "required":true
+                                        },
                                         "help_text": "The nature of the relationship between the dataset and the related resource.",
                                         "display_type": "dropdown-custom",
                                         "enum_store_column": "code",
@@ -545,7 +551,7 @@
                                             }
                                         ],
                                         "prop_key": "optional_additional_metadata.geographicCoverage.geographicElement",
-                                        "help_text": "Spatial (horizontal) extent element. This can be defined either with a Bounding Box (recommended); or using Geographic Description - free text that defines the area covered. When the dataset covers one or more countries, it is recommended to enter the country names in this element, as it can then be used in data catalogs for filtering by geography.\n\nThe bounding box shall be as small as possible.\nThe bounding box shall be expressed in decimal degree with a precision of at least 2 decimals."
+                                        "help_text": "Provide at least a human-readable description of the geographic area covered by the dataset. This can be defined using a Geographic Description - free text that defines the area covered (for example 'Canterbury Plains, New Zealand'), supported by a Bounding Box (recommended) or Geohash.\n\nThe bounding box shall be as small as possible.\nThe bounding box shall be expressed in decimal degree with a precision of at least 2 decimals."
                                     }
                                 ],
                                 "help_text": ""
@@ -564,7 +570,7 @@
                                 "title": "Comments",
                                 "type": "string",
                                 "required": false,
-                                "help_text": "Provide additional information that helps users understand or use the dataset but is not captured elsewhere.",
+                                "help_text": "Provide additional information that helps users understand or use the dataset but is not captured elsewhere. References should be recorded under Related Resources.",
                                 "display_type": "textarea",
                                 "content_format": "text"
                             },
@@ -573,7 +579,7 @@
                                 "title": "Rights Holder",
                                 "type": "string",
                                 "required": false,
-                                "help_text": "Identify the person or organisation that owns or controls the rights to this dataset if not Bioeconomy Science Institute Maiangi Taiao.",
+                                "help_text": "Identify the person or organisation that owns or controls rights to the dataset if not the Bioeconomy Science Institute Maiangi Taiao. More than one rights holder may be named in this field where necessary. Leave blank where rights-holder information is not recorded.",
                                 "display_type": "textarea",
                                 "default": "Bioeconomy Science Institute Maiangi Taiao",
                                 "content_format": "text"
@@ -624,7 +630,7 @@
                                         "title": "Access Rights Description",
                                         "type": "string",
                                         "display_type": "textarea",
-                                        "help_text": "A description of the access rights. For sensitive or Māori-governed data, describe any governance or approval requirements that determine access."
+                                        "help_text": "A free-text description of the access rights. For sensitive or Māori-governed data, describe any governance or approval requirements that determine access. A description must be provided when Access Rights is 'Other'"
                                     }
                                 ]
                             },

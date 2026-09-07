@@ -7,15 +7,6 @@
   "type": "object",
   "properties": {
     "required_metadata": {
-      "required": [
-        "title",
-        "description",
-        "agents",
-        "dateCreated",
-        "keywords",
-        "resourceType",
-        "publisher"
-      ],
       "type": "object",
       "title": "Required metadata fields",
       "description": "List of required metadata fields for this MWLR Core Metadata Schema.",
@@ -48,17 +39,11 @@
         "agents": {
           "title": "Agents",
           "$comment": "dc:creator / dc:contributor",
-          "description": "List people who have been involved with the creation and management of the dataset. It is important to state who the creator (Author) was. Author is used for the person or organisation chiefly responsible for the intellectual content.",
+          "description": "List people or organisations who have been involved with the creation and management of the dataset. It is important to state who the creator (Author) was. Author is used for the person or organisation chiefly responsible for the intellectual content./n/n For a person, enter the organisation they are affiliated with in relation to this dataset. Normally leave blank when the agent is an organisation.",
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": [
-              "role",
-              "name",
-              "agentType",
-              "affiliation"
-            ],
             "additionalProperties": false,
             "properties": {
               "agentType": {
@@ -96,7 +81,7 @@
               },
               "affiliation": {
                 "title": "Affiliation",
-                "description": "The organisation the agent is affiliated with.",
+                "description": "For a person, enter the organisation they are affiliated with in relation to this dataset. Normally leave blank when the agent is an organisation.",
                 "type": "string",
                 "default": "Bioeconomy Science Institute Maiangi Taiao"
               }
@@ -125,7 +110,7 @@
         "publisher": {
           "title": "Publisher",
           "$comment": "dc:publisher",
-          "description": "The entity responsible for publishing the dataset. Default to Bioeconomy Science Institute Maiangi Taiao.",
+          "description": "The organisation responsible for stewardship, release, or making the dataset available as a data asset. This will normally be Bioeconomy Science Institute Maiangi Taiao, but another organisation may be entered where appropriate. This does not necessarily mean the dataset has been publicly published.",
           "type": "string",
           "default": "Bioeconomy Science Institute Maiangi Taiao"
         }
@@ -178,9 +163,6 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "date"
-            ],
             "properties": {
               "date": {
                 "title": "Date",
@@ -287,13 +269,10 @@
           "properties": {
             "geographicElement": {
               "type": "array",
-              "title": "Geographic extent(s)",
-              "description": "Geographic extent(s)",
+              "title": "Geographic element",
+              "description": "Provide at least a human-readable description of the geographic area covered by the dataset. This can be defined using a Geographic Description - free text that defines the area covered (for example 'Canterbury Plains, New Zealand'), supported by a Bounding Box (recommended) or Geohash.\n\nThe bounding box shall be as small as possible.\nThe bounding box shall be expressed in decimal degree with a precision of at least 2 decimals.",
               "items": {
                 "type": "object",
-                "required": [
-                  "geographicDescription"
-                ],
                 "additionalProperties": false,
                 "properties": {
                   "geographicBoundingBox": {
@@ -332,9 +311,6 @@
                     "type": "array",
                     "items": {
                       "type": "object",
-                      "required": [
-                        "geohash"
-                      ],
                       "properties": {
                         "geohash": {
                           "title": "Geohash",
@@ -366,14 +342,14 @@
         "comments": {
           "title": "Comments",
           "$comment": "dc:description",
-          "description": "Provide additional information that helps users understand or use the dataset but is not captured elsewhere.",
+          "description": "Provide additional information that helps users understand or use the dataset but is not captured elsewhere. References should be recorded under Related Resources.",
           "type": "string"
         },
         "rightsHolder": {
           "title": "Rights Holder",
           "$comment": "dcterms:rightsHolder",
           "default": "Bioeconomy Science Institute Maiangi Taiao",
-          "description": "Identify the person or organisation that owns or controls the rights to this dataset if not Bioeconomy Science Institute Maiangi Taiao.",
+          "description": "Identify the person or organisation that owns or controls rights to the dataset if not the Bioeconomy Science Institute Maiangi Taiao. More than one rights holder may be named in this field where necessary. Leave blank where rights-holder information is not recorded.",
           "type": "string"
         },
         "accessRights": {
@@ -397,7 +373,7 @@
             },
             "accessRightsDescription": {
               "title": "Description of Access Rights",
-              "description": "Free-text description of the access rights.",
+              "description": "A free-text description of the access rights. For sensitive or Māori-governed data, describe any governance or approval requirements that determine access. A description must be provided when Access Rights is 'Other'",
               "type": "string"
             }
           }
