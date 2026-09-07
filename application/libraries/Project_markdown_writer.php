@@ -54,7 +54,7 @@ class Project_markdown_writer implements IProject_export_writer
 		$converter->getEnvironment()->addConverter(new TableConverter()); // Table converter isn't included by default
 		$markdown = $converter->convert($html);
 		$markdown = $this->remove_duplicate_nested_headers($markdown);
-		$markdown = $this->remove_excess_blank_lines($markdown);
+		$markdown = $this->replace_multiple_empty_lines_with_single($markdown);
 		file_put_contents($output_file, $markdown . PHP_EOL);
 
 		return $output_file;
@@ -68,7 +68,7 @@ class Project_markdown_writer implements IProject_export_writer
 		return $html;
 	}
 
-	private function remove_excess_blank_lines(string $text)
+	private function replace_multiple_empty_lines_with_single(string $text)
 	{
 		$text = trim($text);
 		$at_least_three_empty_lines = "/( ?\r?\n){3,}/"; // Match at least three consecutive empty lines, optionally preceded by a space
@@ -78,7 +78,7 @@ class Project_markdown_writer implements IProject_export_writer
 
 	private function remove_duplicate_nested_headers(string $text)
 	{
-		// Remove duplicate nested headers (e.g., "## Header" followed by a newline then "### Header"). Remove only if the two headers are identical except for their header level.
+		// Remove duplicate nested headers (e.g., "## Header" followed by a newline then "### Header"). Remove only if the two headers are identical except for their header level and whitespace.
 		$pattern = "/^(#{1,6})[ \t]*(.+?)[ \t]*\R\R?#{1,6}[ \t]*\\2[ \t]*$/m";
 		$text = preg_replace($pattern, "$1 $2\n", $text);
 		return $text;
