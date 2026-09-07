@@ -39,7 +39,7 @@
         "agents": {
           "title": "Agents",
           "$comment": "dc:creator / dc:contributor",
-          "description": "List people or organisations who have been involved with the creation and management of the dataset. It is important to state who the creator (Author) was. Author is used for the person or organisation chiefly responsible for the intellectual content./n/n For a person, enter the organisation they are affiliated with in relation to this dataset. Normally leave blank when the agent is an organisation.",
+          "description": "List people or organisations who have been involved with the creation and management of the dataset. It is important to state who the creator (Author) was. Author is used for the person or organisation chiefly responsible for the intellectual content.\n\nFor a person, enter the organisation they are affiliated with in relation to this dataset. Normally leave blank when the agent is an organisation.",
           "type": "array",
           "minItems": 1,
           "items": {
