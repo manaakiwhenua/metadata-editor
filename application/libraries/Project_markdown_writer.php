@@ -55,6 +55,7 @@ class Project_markdown_writer implements IProject_export_writer
 		$markdown = $converter->convert($html);
 		$markdown = $this->remove_duplicate_nested_headers($markdown);
 		$markdown = $this->replace_multiple_empty_lines_with_single($markdown);
+		$markdown = $this->remove_excess_spaces_in_headers($markdown);
 		file_put_contents($output_file, $markdown . PHP_EOL);
 
 		return $output_file;
@@ -81,6 +82,13 @@ class Project_markdown_writer implements IProject_export_writer
 		// Remove duplicate nested headers (e.g., "## Header" followed by a newline then "### Header"). Remove only if the two headers are identical except for their header level and whitespace.
 		$pattern = "/^(#{1,6})[ \t]*(.+?)[ \t]*(?:\R\R?#{1,6}[ \t]*\\2[ \t]*)+$/m";
 		$text = preg_replace($pattern, "$1 $2\n", $text);
+		return $text;
+	}
+	
+	private function remove_excess_spaces_in_headers(string $text)
+	{
+		$pattern = "/^(#{1,6})[ \t]+(.+?)$/m";
+		$text = preg_replace($pattern, "$1 $2", $text);
 		return $text;
 	}
 }
