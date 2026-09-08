@@ -39,7 +39,7 @@ class Project_markdown_writer implements IProject_export_writer
 	public function generate($project_id, $output_file, $options = array())
 	{
 
-		$header_level_for_field_label = 4; // Some nested fields have label classes instead of html headers.
+		$header_level_for_field_label = 5; // Some nested fields have label classes instead of html headers.
 
 		// Use generate_for_pdf() to exclude any unnecessary HTML and css
 		$html = $this->ci->html_report->generate_for_pdf($project_id, $options);
@@ -79,7 +79,7 @@ class Project_markdown_writer implements IProject_export_writer
 	private function remove_duplicate_nested_headers(string $text)
 	{
 		// Remove duplicate nested headers (e.g., "## Header" followed by a newline then "### Header"). Remove only if the two headers are identical except for their header level and whitespace.
-		$pattern = "/^(#{1,6})[ \t]*(.+?)[ \t]*\R\R?#{1,6}[ \t]*\\2[ \t]*$/m";
+		$pattern = "/^(#{1,6})[ \t]*(.+?)[ \t]*(?:\R\R?#{1,6}[ \t]*\\2[ \t]*)+$/m";
 		$text = preg_replace($pattern, "$1 $2\n", $text);
 		return $text;
 	}
