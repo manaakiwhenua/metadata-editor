@@ -12,6 +12,7 @@ class Project_export_controller
 	{
 		$this->ci =& get_instance();
 		$this->ci->load->model('Editor_model');
+		$this->ci->load->helper('date');
 	}
 
 	/**
@@ -46,7 +47,7 @@ class Project_export_controller
 			throw new Exception("Download project '" . $export_writer->export_type() . "': Project folder not found");
 		}
 
-		$options = $this->add_provenance($options);
+		$options = $this->add_provenance($options, $project['created_by']);
 
 		$filename = trim((string)$project['idno']) !== '' ? trim($project['idno']) : nada_hash($project_id);
 		$output_file = $project_folder . '/' . $filename . '.' . $export_writer->file_extension();
@@ -54,13 +55,14 @@ class Project_export_controller
 		return $export_writer->generate($project_id, $output_file, $options);
 	}
 
-	private function add_provenance(array $options)
-	{
-		$user = $this->ci->api_user();
+	private function add_provenance(array $options, string $project_owner_id)
+	{		
+		$user = $this->ci->ion_auth->get_user($project_owner_id);
 		$user_name = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? ''));
+		$generated_on_unix_timestamp = now();
 		
 		if (!isset($options['provenance'])) {
-			$provenance = new Metadata_provenance($user_name);
+			$provenance = new Metadata_provenance($user_name, $generated_on_unix_timestamp);
 			$options['provenance'] = $provenance;
 		}
 		return $options;
