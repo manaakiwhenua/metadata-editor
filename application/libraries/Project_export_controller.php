@@ -57,12 +57,12 @@ class Project_export_controller
 
 	private function add_provenance(array $options, string $project_owner_id)
 	{		
-		$user = $this->ci->ion_auth->get_user($project_owner_id);
-		$user_name = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? ''));
-		$generated_on_unix_timestamp = now();
+
+		$generated_on_local_datetime = unix_to_human(now(), $seconds=TRUE, 'euro'); // functions from date helper. unix_to_human uses PHP's default timezone setting, which we can also fetch with date_default_timezone_get(). Euro specifies 24-hour format.
+		$local_timezone = date_default_timezone_get();
 		
 		if (!isset($options['provenance'])) {
-			$provenance = new Metadata_provenance($user_name, $generated_on_unix_timestamp);
+			$provenance = new Metadata_provenance($generated_on_local_datetime, $local_timezone);
 			$options['provenance'] = $provenance;
 		}
 		return $options;
