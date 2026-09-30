@@ -198,10 +198,25 @@ Vue.component('datafiles', {
             this.dialog_datafile_import_fid=data_file.file_id;
             this.dialog_datafile_import=true;
         },
+        dataFileSizeDisplay:function(file){
+            if (!file || !file.file_info || !file.file_info.csv) {
+                return '—';
+            }
+            if (file.file_info.csv.file_exists && file.file_info.csv.file_size) {
+                return file.file_info.csv.file_size;
+            }
+            return '—';
+        },
         exportMetadataFile: function(file_idx){
             let data_file = this.data_files[file_idx];
             if (!data_file) return;
             let url = CI.base_url + '/api/datafiles/export_metadata/' + this.dataset_id + '/' + encodeURIComponent(data_file.file_id);
+            window.location.href = url;
+        },
+        exportDictionaryCsv: function(file_idx) {
+            let data_file = this.data_files[file_idx];
+            if (!data_file) return;
+            let url = CI.base_url + '/api/variables/export_csv/' + this.dataset_id + '/' + encodeURIComponent(data_file.file_id) + '?download=1';
             window.location.href = url;
         },
         openImportMetadataDialog: function(file_idx){
@@ -418,7 +433,7 @@ Vue.component('datafiles', {
             }catch(e){
                 console.log("failed",e);
                 this.dialog.is_loading=false;
-                this.dialog.message_error="Failed to import summary statistics: "+e.response.data.message;
+                this.dialog.message_error="Failed to import summary statistics: "+(e.response && e.response.data && e.response.data.message ? e.response.data.message : e.message);
             }
         },
         reloadDataFileVariables: async function(file_id){
@@ -570,6 +585,7 @@ Vue.component('datafiles', {
                         <th><span class="mdi mdi-swap-vertical"></span></th>
                         <th style="width:80px;">{{$t("file")}}#</th>
                         <th>{{$t("file_name")}}</th>
+                        <th>{{$t("data")}}</th>
                         <th>{{$t("variables")}}</th>
                         <th>{{$t("cases")}}</th>
                         <th>{{$t("Modified")}}</th>
@@ -582,29 +598,11 @@ Vue.component('datafiles', {
                         <td><v-icon class="handle">mdi-drag</v-icon></td>
                         <td><v-icon color="primary" >mdi-file-document</v-icon> {{data_file.file_id}}</td>
                         <td>
-                            <div>
-                                <div class="d-flex align-center">
-                                    <div v-if="hasCsvFile(data_file.file_id) || data_file.store_data==1" 
-                                         class="mr-2" 
-                                         style="width: 8px; height: 8px; border-radius: 50%; background-color: #4CAF50;"
-                                         :title="$t('Has data')">
-                                    </div>
-                                    <div v-else 
-                                         class="mr-2" 
-                                         style="width: 8px; height: 8px; border-radius: 50%; background-color: #9E9E9E;"
-                                         :title="$t('No data')">
-                                    </div>
-                                    <div style="cursor:pointer;color:#0D47A1;font-weight:500" @click="editFile(index)">
-                                        {{data_file.file_name}}
-                                    </div>
-                                </div>
-                                <div class="text-secondary text-small mt-1" v-if="data_file.file_info.original">                                                                
-                                    <span v-if="hasCsvFile(data_file.file_id)" >
-                                    <v-chip small outlined>{{data_file.file_info.csv.filename}} {{data_file.file_info.csv.file_size}}</v-chip>
-                                    </span>
-                                </div>
+                            <div style="cursor:pointer;color:#0D47A1;font-weight:500" @click="editFile(index)">
+                                {{data_file.file_name}}
                             </div>
                         </td>
+                        <td class="text-secondary">{{dataFileSizeDisplay(data_file)}}</td>
                         <td>{{data_file.var_count}}</td>
                         <td>{{data_file.case_count}}</td>                       
                         <td>{{momentDate(data_file.changed)}}</td>
@@ -698,6 +696,13 @@ Vue.component('datafiles', {
                                                 <v-icon>mdi-code-json</v-icon>
                                             </v-list-item-icon>
                                             <v-list-item-title>{{$t("export_metadata")}}</v-list-item-title>
+                                        </v-list-item>
+
+                                        <v-list-item @click="exportDictionaryCsv(index)">
+                                            <v-list-item-icon>
+                                                <v-icon>mdi-book-open-variant</v-icon>
+                                            </v-list-item-icon>
+                                            <v-list-item-title>{{$t("export_data_dictionary")}}</v-list-item-title>
                                         </v-list-item>
                                         
                                         <v-list-item @click="openImportMetadataDialog(index)">

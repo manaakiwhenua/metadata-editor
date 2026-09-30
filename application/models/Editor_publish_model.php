@@ -25,11 +25,7 @@ class Editor_publish_model extends ci_model {
 
     function publish_to_catalog($sid,$user_id,$catalog_connection_id,$options=[])
 	{
-		$conn_info=$this->Catalog_connections_model->get_connection($user_id,$catalog_connection_id);
-
-		if (!$conn_info){
-			throw new Exception("Target catalog was not found");
-		}
+		$conn_info=$this->Catalog_connections_model->require_connection($user_id,$catalog_connection_id);
 
 		$project=$this->Editor_model->get_basic_info($sid);
 
@@ -57,7 +53,7 @@ class Editor_publish_model extends ci_model {
 		$catalog_api_key=$conn_info['api_key'];
 		
 		//project metadata (NADA: JSON create; on failure for survey, fallback to import_ddi)
-		return $this->publish_metadata(
+		$result = $this->publish_metadata(
 			$sid,
 			$catalog_url,
 			$catalog_api_key,
@@ -65,6 +61,33 @@ class Editor_publish_model extends ci_model {
 			$project_type,
 			$import_ddi_url
 		);
+
+		$this->record_nada_publication_quietly($sid, $user_id, $conn_info, $options, $project, $result);
+
+		return $result;
+	}
+
+	/**
+	 * Best-effort placement ledger. Never fails the NADA publish.
+	 */
+	private function record_nada_publication_quietly($sid, $user_id, $conn_info, $options, $project, $nada_response)
+	{
+		try {
+			if (!$this->db->table_exists('project_publications')) {
+				return;
+			}
+			$this->load->model('Project_publications_model');
+			$this->Project_publications_model->record_nada_publish(
+				$sid,
+				$user_id,
+				$conn_info,
+				$options,
+				$project,
+				$nada_response
+			);
+		} catch (Exception $e) {
+			log_message('error', 'project_publications record failed for project '.$sid.': '.$e->getMessage());
+		}
 	}
 
 	function get_project_metadata_json_path($sid)
@@ -130,15 +153,34 @@ class Editor_publish_model extends ci_model {
 			$classified = $this->classify_catalog_error_body($response_text, $content_type);
 
 			if ($nada_dataset_type === 'survey' && !empty($import_ddi_url)) {
+				$json_error_summary = $this->summarize_catalog_error($classified, $resp->getStatusCode());
+				$json_error_details = $this->catalog_error_details_payload($classified, $resp, $catalog_url);
+
 				try {
-					return $this->publish_metadata_import_ddi($sid, $import_ddi_url, $catalog_api_key, $options);
+					$ddi_result = $this->publish_metadata_import_ddi($sid, $import_ddi_url, $catalog_api_key, $options);
+
+					// DDI succeeded — keep JSON failure visible so users can fix schema/field issues.
+					log_message(
+						'error',
+						'NADA JSON publish failed for project '.$sid.'; published via import_ddi. '.$json_error_summary
+					);
+
+					if (is_array($ddi_result)) {
+						$ddi_result['_published_via'] = 'import_ddi';
+						$ddi_result['_json_publish_warning'] = array(
+							'message' => $json_error_summary,
+							'details' => $json_error_details,
+						);
+					}
+
+					return $ddi_result;
 				} catch (Exception $ddi_ex) {
 					$ddi_details = ($ddi_ex instanceof ApiRequestException) ? $ddi_ex->getDetails() : null;
 					throw new ApiRequestException(
-						$this->summarize_catalog_error($classified, $resp->getStatusCode())
+						$json_error_summary
 							. ' | DDI import: ' . $ddi_ex->getMessage(),
 						array_merge(
-							$this->catalog_error_details_payload($classified, $resp, $catalog_url),
+							$json_error_details,
 							[
 								'ddi_fallback_error' => $ddi_ex->getMessage(),
 								'ddi_fallback_details' => $ddi_details,
@@ -157,7 +199,7 @@ class Editor_publish_model extends ci_model {
 
 	/**
 	 * POST DDI XML to NADA datasets/import_ddi (multipart).
-	 * Uses publish option keys: overwrite, repositoryid, access_policy, published, data_remote_url.
+	 * Uses publish option keys: repositoryid, access_policy, published, data_remote_url.
 	 *
 	 * @param string $sid Project id
 	 * @param string $import_ddi_url Full URL to .../api/datasets/import_ddi
@@ -202,7 +244,7 @@ class Editor_publish_model extends ci_model {
 	}
 
 	/**
-	 * Multipart fields for NADA import_ddi: file, overwrite, repositoryid, access_policy, published, data_remote_url.
+	 * Multipart fields for NADA import_ddi: file, overwrite (always yes), repositoryid, access_policy, published, data_remote_url.
 	 *
 	 * @param string $ddi_path Absolute path to DDI XML
 	 * @param array $options Keys from metadata editor publish options
@@ -223,11 +265,7 @@ class Editor_publish_model extends ci_model {
 			],
 		];
 
-		$overwrite = isset($options['overwrite']) ? strtolower(trim((string) $options['overwrite'])) : 'no';
-		if ($overwrite !== 'yes' && $overwrite !== 'no') {
-			$overwrite = 'no';
-		}
-		$multipart[] = ['name' => 'overwrite', 'contents' => $overwrite];
+		$multipart[] = ['name' => 'overwrite', 'contents' => 'yes'];
 
 		foreach (['repositoryid', 'access_policy', 'data_remote_url'] as $key) {
 			if (!isset($options[$key])) {
@@ -249,11 +287,7 @@ class Editor_publish_model extends ci_model {
 
 	function publish_thumbnail($sid,$user_id,$catalog_connection_id,$options=[])
 	{
-		$conn_info=$this->Catalog_connections_model->get_connection($user_id,$catalog_connection_id);
-
-		if (!$conn_info){
-			throw new Exception("Target catalog was not found");
-		}
+		$conn_info=$this->Catalog_connections_model->require_connection($user_id,$catalog_connection_id);
 
 		$project=$this->Editor_model->get_basic_info($sid);
 
@@ -305,11 +339,7 @@ class Editor_publish_model extends ci_model {
 
 	function publish_external_resources($sid,$user_id,$catalog_connection_id,$options=[])
 	{
-		$conn_info=$this->Catalog_connections_model->get_connection($user_id,$catalog_connection_id);
-
-		if (!$conn_info){
-			throw new Exception("Target catalog was not found");
-		}
+		$conn_info=$this->Catalog_connections_model->require_connection($user_id,$catalog_connection_id);
 
 		$project=$this->Editor_model->get_basic_info($sid);
 
@@ -332,11 +362,7 @@ class Editor_publish_model extends ci_model {
 
 	public function publish_external_resource($sid, $user_id, $connection_id, $resource_id, $overwrite = 'no', $nada_upload_id = null)
 	{
-		$conn_info=$this->Catalog_connections_model->get_connection($user_id,$connection_id);
-
-		if (!$conn_info){
-			throw new Exception("Target catalog was not found");
-		}
+		$conn_info=$this->Catalog_connections_model->require_connection($user_id,$connection_id);
 
 		$project=$this->Editor_model->get_basic_info($sid);
 
@@ -479,10 +505,7 @@ class Editor_publish_model extends ci_model {
 	 */
 	public function get_catalog_info($user_id, $catalog_connection_id, $project_id)
 	{
-		$conn_info = $this->Catalog_connections_model->get_connection($user_id, $catalog_connection_id);
-		if (!$conn_info) {
-			throw new Exception("Target catalog was not found");
-		}
+		$conn_info = $this->Catalog_connections_model->require_connection($user_id, $catalog_connection_id);
 
 		$project=$this->Editor_model->get_basic_info($project_id);
 		if (!$project) {
@@ -593,7 +616,7 @@ class Editor_publish_model extends ci_model {
 		}
 
 		$conn_info = $this->Catalog_connections_model->get_connection($user_id, $catalog_connection_id);
-		if (!$conn_info) {
+		if (!$conn_info || empty($conn_info['api_key'])) {
 			return $out;
 		}
 
@@ -653,10 +676,7 @@ class Editor_publish_model extends ci_model {
 	public function get_nada_catalog_client($user_id, $catalog_connection_id)
 	{
 		require_once APPPATH . 'libraries/Nada_catalog_client.php';
-		$conn_info = $this->Catalog_connections_model->get_connection($user_id, $catalog_connection_id);
-		if (!$conn_info) {
-			throw new Exception('Target catalog was not found');
-		}
+		$conn_info = $this->Catalog_connections_model->require_connection($user_id, $catalog_connection_id);
 
 		return Nada_catalog_client::from_connection($conn_info);
 	}

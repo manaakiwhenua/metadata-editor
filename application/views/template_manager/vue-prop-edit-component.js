@@ -16,6 +16,13 @@ Vue.component('prop-edit', {
             "dropdown",
             "dropdown-custom"
           ],
+          field_date_formats: [
+            { value: "partial", text: "Partial date (YYYY, YYYY-MM, or YYYY-MM-DD)" },
+            { value: "date", text: "Date (YYYY-MM-DD)" },
+            { value: "year-month", text: "Year and month (YYYY-MM)" },
+            { value: "year", text: "Year (YYYY)" },
+            { value: "datetime", text: "Date and time (ISO 8601)" }
+          ],
           enum_store_options:[
             {
               "value":"both",
@@ -33,14 +40,17 @@ Vue.component('prop-edit', {
         }
     },
     mounted: function(){
-      // Ensure prop_key is correct on mount (fixes any existing incorrect prop_keys)
-      if (this.prop && this.prop.key && this.parent) {
-        const parentPath = (this.parent.prop_key) ? this.parent.prop_key : (this.parent.key ? this.parent.key : '');
-        const expectedPropKey = parentPath ? `${parentPath}.${this.prop.key}` : this.prop.key;
-        // Only update if prop_key is missing or incorrect
-        if (!this.prop.prop_key || this.prop.prop_key !== expectedPropKey) {
-          this.prop.prop_key = expectedPropKey;
-        }
+      // Set prop_key only when missing (never overwrite — avoids doubling section prefixes onto row-local keys).
+      if (this.prop && this.prop.key && this.parent && !this.prop.prop_key) {
+        const schemaKeys = this.$store.state.schema_field_keys || [];
+        const aliases = this.$store.state.schema_key_aliases || {};
+        this.prop.prop_key = computeTemplatePropKey(
+          this.prop,
+          this.parent,
+          this.$store.state.user_tree_items || [],
+          schemaKeys,
+          aliases
+        );
       }
     },    
     computed: {        
@@ -101,6 +111,59 @@ Vue.component('prop-edit', {
             Vue.set(this.prop, "enum_store_column", newValue);
           }
         },
+        schemaFieldForProp: function(){
+          if (!this.prop || this.TemplateDataType() === 'custom') {
+            return null;
+          }
+          const schemaKeys = this.$store.state.schema_field_keys || [];
+          const aliases = this.$store.state.schema_key_aliases || {};
+          const path = typeof resolveTemplatePropSchemaPath === 'function'
+            ? resolveTemplatePropSchemaPath(
+                this.prop,
+                this.$store.state.user_tree_items || [],
+                schemaKeys,
+                aliases
+              )
+            : (this.prop.prop_key || this.prop.key);
+          if (!path) {
+            return null;
+          }
+          return this.$store.getters.getSchemaFieldByDottedKey(path);
+        },
+        propEnumSchemaWarnings: function(){
+          const schemaField = this.schemaFieldForProp;
+          if (!schemaField || !schemaField.enum || !Array.isArray(schemaField.enum) || schemaField.enum.length === 0) {
+            return [];
+          }
+          if (!this.prop || !this.prop.enum || !Array.isArray(this.prop.enum)) {
+            return [];
+          }
+          if (this.PropEnumStoreColumn === 'label') {
+            return [];
+          }
+          const allowed = {};
+          schemaField.enum.forEach(function(v) {
+            allowed[String(v)] = true;
+          });
+          const warnings = [];
+          this.prop.enum.forEach(function(row) {
+            if (!row || row.code === undefined || row.code === null || row.code === '') {
+              return;
+            }
+            const code = String(row.code);
+            if (!allowed[code]) {
+              warnings.push(code);
+            }
+          });
+          return warnings;
+        },
+        schemaEnumAllowedLabel: function(){
+          const schemaField = this.schemaFieldForProp;
+          if (!schemaField || !schemaField.enum) {
+            return '';
+          }
+          return schemaField.enum.join(', ');
+        },
     },
     methods:{
       TemplateDataType(){
@@ -111,13 +174,17 @@ Vue.component('prop-edit', {
       },
       updatePropKey: function(e)
       {
-        console.log("updating prop key", e);
         const cleanedKey = (e || '').trim();
-        this.prop.key=cleanedKey;
-        // prop_key is always the full path based on parent + key
-        // Use parent.prop_key if available (for nested arrays), otherwise use parent.key
-        const parentPath = (this.parent && this.parent.prop_key) ? this.parent.prop_key : (this.parent && this.parent.key ? this.parent.key : '');
-        this.prop.prop_key = parentPath ? `${parentPath}.${cleanedKey}` : cleanedKey;
+        this.prop.key = cleanedKey;
+        const schemaKeys = this.$store.state.schema_field_keys || [];
+        const aliases = this.$store.state.schema_key_aliases || {};
+        this.prop.prop_key = computeTemplatePropKey(
+          this.prop,
+          this.parent,
+          this.$store.state.user_tree_items || [],
+          schemaKeys,
+          aliases
+        );
       },    
       isField: function(field_type){
         let field_types= [
@@ -141,6 +208,9 @@ Vue.component('prop-edit', {
 
         return false;
       },
+      isFlatObjectArrayProp: function (prop) {
+        return typeof isFlatObjectArrayField === 'function' && isFlatObjectArrayField(prop);
+      },
       EnumListUpdate: function(e) {
         if (Array.isArray(e)){
           this.$set(this.prop, "enum", e);
@@ -160,6 +230,28 @@ Vue.component('prop-edit', {
       RulesUpdate: function (e)
       {
         this.$set(this.prop, "rules", e);
+      },
+      getPropDateFormat: function() {
+        if (!this.prop) {
+          return 'partial';
+        }
+        var fmt = this.prop.display_options && this.prop.display_options.format;
+        if (fmt === 'datetime_iso') {
+          return 'datetime';
+        }
+        if (['partial', 'date', 'year-month', 'year', 'datetime'].indexOf(fmt) !== -1) {
+          return fmt;
+        }
+        return 'partial';
+      },
+      setPropDateFormat: function(fmt) {
+        if (!this.prop) {
+          return;
+        }
+        if (!this.prop.display_options) {
+          this.$set(this.prop, 'display_options', {});
+        }
+        this.$set(this.prop.display_options, 'format', fmt);
       },
       HasAdditionalPrefix(value){
         return value.indexOf('additional.')==0;

@@ -16,6 +16,7 @@ class Validation extends MY_REST_Controller
         parent::__construct();
         $this->load->model('Editor_model');
         $this->load->model('Metadata_schemas_model');
+        $this->load->model('Project_translations_model');
         $this->load->library('editor_acl');
         $this->is_authenticated_or_die();
         $this->api_user = $this->api_user();
@@ -305,8 +306,9 @@ class Validation extends MY_REST_Controller
     }
 
     /**
-     * Get template validation report for a project
-     * 
+     * Get template validation report for a project.
+     * Optional query param template_uid validates against that template instead of the assigned one.
+     *
      * @param int $sid Project ID
      */
     function template_get($sid=null)
@@ -321,38 +323,23 @@ class Validation extends MY_REST_Controller
 
             $this->editor_acl->user_has_project_access($sid, $permission='view');
 
-            $metadata = $project['metadata'];
-            $template_uid = isset($project['template_uid']) ? $project['template_uid'] : null;
-
+            $resolved = $this->_resolve_validation_template($project);
             $result = array(
-                'template_uid' => $template_uid,
-                'valid' => false,
+                'template_uid' => $resolved['template_uid'],
+                'template_uid_source' => $resolved['template_uid_source'],
+                'valid' => null,
                 'issues' => array(),
                 'validation_report' => array()
             );
 
-            if (!$template_uid){
-                $result['error'] = "Project does not have a template assigned";
+            if (!empty($resolved['error'])) {
+                $result['error'] = $resolved['error'];
             } else {
-                $this->load->model('Editor_template_model');
-                $template = $this->Editor_template_model->get_template_by_uid($template_uid);
-
-                if (!$template){
-                    $result['error'] = "Template not found: $template_uid";
-                } else {
-                    // Get template items structure
-                    $template_items = isset($template['template']) && is_array($template['template']) ? $template['template'] : array();
-                    
-                    if (empty($template_items)) {
-                        $result['error'] = "Template has no items defined";
-                    } else {
-                        // Use validation library
-                        $this->load->library('Project_validation');
-                        $template_data = isset($template['template']) ? $template['template'] : array();
-                        $validation_result = $this->project_validation->validate_template($metadata, $template_data);
-                        $result = array_merge($result, $validation_result);
-                    }
-                }
+                $this->load->library('Project_validation');
+                $validation_result = $this->project_validation->validate_template($project['metadata'], $resolved['template_data']);
+                $result = array_merge($result, $validation_result);
+                $result['template_uid'] = $resolved['template_uid'];
+                $result['template_uid_source'] = $resolved['template_uid_source'];
             }
 
             $response = array(
@@ -369,6 +356,105 @@ class Validation extends MY_REST_Controller
             );
             $this->set_response($error_output, REST_Controller::HTTP_BAD_REQUEST);
         }
+    }
+
+    /**
+     * Resolve which template to use for validation/extra-field reports.
+     * Query param template_uid overrides (dry-run; does not save).
+     * Otherwise: assigned project template, then the type default, then the first core template
+     * (same order as Editor_template_model::resolve_template_for_project).
+     * Override not-found or type mismatch throw (HTTP 400). Missing templates stay as result.error (HTTP 200).
+     *
+     * @param array $project
+     * @return array{template_uid: ?string, template_uid_source: string, template_data: array, error: ?string}
+     */
+    private function _resolve_validation_template($project)
+    {
+        $assigned_uid = isset($project['template_uid']) ? trim((string) $project['template_uid']) : '';
+        $override_uid = $this->get('template_uid');
+        if ($override_uid === null || $override_uid === false || $override_uid === '') {
+            $override_uid = $this->input->get('template_uid');
+        }
+        if (is_array($override_uid)) {
+            $override_uid = '';
+        }
+        $override_uid = is_string($override_uid) ? trim($override_uid) : '';
+        $is_override = ($override_uid !== '');
+
+        $this->load->model('Editor_template_model');
+
+        $resolved = array(
+            'template_uid' => null,
+            'template_uid_source' => $is_override ? 'override' : 'assigned',
+            'template_data' => array(),
+            'error' => null
+        );
+
+        if ($is_override) {
+            $template = $this->Editor_template_model->get_template_by_uid($override_uid);
+            if (!$template) {
+                throw new Exception("Template not found: $override_uid");
+            }
+            $source = 'override';
+        } else {
+            try {
+                $template = $this->Editor_template_model->resolve_template_for_project($project);
+            } catch (Exception $e) {
+                $resolved['error'] = $e->getMessage();
+                return $resolved;
+            }
+            $source = $this->_validation_template_source($project, $assigned_uid, $template['uid']);
+        }
+
+        $resolved['template_uid'] = $template['uid'];
+        $resolved['template_uid_source'] = $source;
+
+        $project_type = $this->Editor_model->resolve_canonical_type($project['type']);
+        if ($project_type === false) {
+            $project_type = $project['type'];
+        }
+        $template_type = $this->Editor_model->resolve_canonical_type($template['data_type']);
+        if ($template_type === false) {
+            $template_type = $template['data_type'];
+        }
+
+        if ($project_type != $template_type) {
+            $message = "TEMPLATE_TYPE_MISMATCHED: ".$template['data_type'].'!='.$project['type'];
+            if ($is_override) {
+                throw new Exception($message);
+            }
+            $resolved['error'] = $message;
+            return $resolved;
+        }
+
+        $template_data = (isset($template['template']) && is_array($template['template'])) ? $template['template'] : array();
+        if (empty($template_data) || !isset($template_data['items']) || !is_array($template_data['items']) || empty($template_data['items'])) {
+            $resolved['error'] = "Template has no items defined";
+            return $resolved;
+        }
+
+        $resolved['template_data'] = $template_data;
+        return $resolved;
+    }
+
+    /**
+     * @param array $project
+     * @param string $assigned_uid
+     * @param string $resolved_uid
+     * @return string assigned|default|core
+     */
+    private function _validation_template_source($project, $assigned_uid, $resolved_uid)
+    {
+        if ($assigned_uid !== '' && $assigned_uid === $resolved_uid) {
+            return 'assigned';
+        }
+
+        $default = $this->Editor_template_model->get_default_template($project['type']);
+        if (!empty($default['template_uid']) && $default['template_uid'] === $resolved_uid) {
+            return 'default';
+        }
+
+        return 'core';
     }
 
     // All validation logic has been moved to Project_validation library
@@ -512,35 +598,19 @@ class Validation extends MY_REST_Controller
 
             $this->editor_acl->user_has_project_access($sid, $permission='view');
 
-            $metadata = $project['metadata'];
-            $template_uid = isset($project['template_uid']) ? $project['template_uid'] : null;
+            $resolved = $this->_resolve_validation_template($project);
 
             $result = array(
-                'template_uid' => $template_uid,
+                'template_uid' => $resolved['template_uid'],
+                'template_uid_source' => $resolved['template_uid_source'],
                 'extra_fields' => array()
             );
 
-            if (!$template_uid){
-                $result['error'] = "Project does not have a template assigned";
+            if (!empty($resolved['error'])) {
+                $result['error'] = $resolved['error'];
             } else {
-                $this->load->model('Editor_template_model');
-                $template = $this->Editor_template_model->get_template_by_uid($template_uid);
-
-                if (!$template){
-                    $result['error'] = "Template not found: $template_uid";
-                } else {
-                    // Get template items structure
-                    $template_items = isset($template['template']) && is_array($template['template']) ? $template['template'] : array();
-                    
-                    if (empty($template_items)) {
-                        $result['error'] = "Template has no items defined";
-                    } else {
-                        // Use validation library
-                        $this->load->library('Project_validation');
-                        $template_data = isset($template['template']) ? $template['template'] : array();
-                        $result['extra_fields'] = $this->project_validation->find_template_extra_fields($metadata, $template_data);
-                    }
-                }
+                $this->load->library('Project_validation');
+                $result['extra_fields'] = $this->project_validation->find_template_extra_fields($project['metadata'], $resolved['template_data']);
             }
 
             $response = array(
@@ -888,6 +958,39 @@ class Validation extends MY_REST_Controller
                 'status' => 'success',
                 'removed_fields' => $removed_fields,
                 'errors' => $errors
+            );
+
+            $this->set_response($response, REST_Controller::HTTP_OK);
+        }
+        catch(Exception $e){
+            $error_output = array(
+                'status' => 'failed',
+                'message' => $e->getMessage()
+            );
+            $this->set_response($error_output, REST_Controller::HTTP_BAD_REQUEST);
+        }
+    }
+
+    /**
+     * Check translation overlays against current source metadata.
+     *
+     * @param int $sid Project ID
+     */
+    function translations_get($sid=null)
+    {
+        try{
+            $sid = $this->get_sid($sid);
+            $project = $this->Editor_model->get_row($sid);
+
+            if (!$project){
+                throw new Exception("project not found");
+            }
+
+            $this->editor_acl->user_has_project_access($sid, $permission='view');
+
+            $response = array(
+                'status' => 'success',
+                'validation' => $this->Project_translations_model->validate_overlays($sid),
             );
 
             $this->set_response($response, REST_Controller::HTTP_OK);

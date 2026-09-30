@@ -41,7 +41,13 @@ class Project_versions
 			'changed',
 			'created_by',
 			'changed_by',
-			'store_data'
+			'store_data',
+			'source_format',
+			'source_format_version',
+			'source_upload_filename',
+			'source_status',
+			'source_attached_at',
+			'source_attached_by'
 		);
 		
 		$this->variable_fields = array(
@@ -194,7 +200,6 @@ class Project_versions
 			'nation' => $project_info['nation'],
 			'year_start' => $project_info['year_start'],
 			'year_end' => $project_info['year_end'],
-			'published' => $project_info['published'],
 			'created' => $project_info['created'],
 			'changed' => $project_info['changed'],
 			'varcount' => $project_info['varcount'],
@@ -210,6 +215,14 @@ class Project_versions
 			'version_notes' => $version_notes,
 			'metadata' => $project_info['metadata']
 		];
+
+		if (isset($project_info['status']) && $project_info['status'] !== null && $project_info['status'] !== '') {
+			$options['status'] = $project_info['status'];
+		}
+
+		if ($this->ci->db->field_exists('language', 'editor_projects') && array_key_exists('language', $project_info)) {
+			$options['language'] = $project_info['language'];
+		}
 
 		//create target project
 		$new_sid = $this->ci->Editor_model->create_project($project_info['type'], $options);
@@ -258,6 +271,43 @@ class Project_versions
 		$output['variable_groups'] = $this->copy_project_variable_groups($source_sid, $target_sid);
 		$output['external_resources'] = $this->copy_external_resources($source_sid, $target_sid);
 		$output['files'] = $this->copy_project_files($source_sid, $target_sid);
+		$output['translations'] = $this->copy_project_translations($source_sid, $target_sid);
+
+		return $output;
+	}
+
+	/**
+	 * Copy study-metadata translation overlays to the target project.
+	 *
+	 * @param int $source_sid
+	 * @param int $target_sid
+	 * @return array
+	 */
+	function copy_project_translations($source_sid, $target_sid)
+	{
+		$output = array(
+			'languages' => 0
+		);
+
+		if (!$this->ci->db->table_exists('project_translations')) {
+			return $output;
+		}
+
+		$source_sid = (int) $source_sid;
+		$target_sid = (int) $target_sid;
+
+		$headers = $this->ci->db->get_where('project_translations', array('sid' => $source_sid))->result_array();
+		foreach ($headers as $header) {
+			unset($header['id']);
+			$header['sid'] = $target_sid;
+
+			if (!$this->ci->db->insert('project_translations', $header)) {
+				$db_error = $this->ci->db->error();
+				throw new Exception('FAILED_TO_COPY_PROJECT_TRANSLATIONS: ' . $db_error['message']);
+			}
+
+			$output['languages']++;
+		}
 
 		return $output;
 	}
@@ -485,7 +535,41 @@ class Project_versions
 			throw new Exception("FAILED_TO_COPY_VARIABLE_GROUPS: " . $db_error['message']);
 		}
 
+		$this->ci->load->model('Editor_variable_groups_model');
+		$this->ci->Editor_variable_groups_model->remap_variable_uids(
+			$target_sid,
+			$this->variable_uid_map($source_sid, $target_sid)
+		);
+
 		return $result;
+	}
+
+	/**
+	 * Map source variable UIDs to the UIDs created by copy_project_variables().
+	 *
+	 * @param int $source_sid
+	 * @param int $target_sid
+	 * @return array old_uid => new_uid
+	 */
+	function variable_uid_map($source_sid, $target_sid)
+	{
+		$sql = 'SELECT s.uid AS old_uid, t.uid AS new_uid
+			FROM editor_variables s
+			INNER JOIN editor_variables t
+				ON t.sid = ?
+				AND t.fid <=> s.fid
+				AND t.vid <=> s.vid
+				AND t.name <=> s.name
+				AND t.sort_order <=> s.sort_order
+			WHERE s.sid = ?';
+
+		$rows = $this->ci->db->query($sql, array($target_sid, $source_sid))->result_array();
+		$map = array();
+		foreach ($rows as $row) {
+			$map[(int) $row['old_uid']] = (int) $row['new_uid'];
+		}
+
+		return $map;
 	}
 
 	/**
@@ -562,6 +646,8 @@ class Project_versions
 			'link_type',
 			'data_file_changed',
 			'source_csv_mtime',
+			'source_mode',
+			'source_physical_mtime',
 			'generated_at',
 			'created',
 			'created_by',
@@ -673,10 +759,8 @@ class Project_versions
 	function copy_data_file_physical_files($source_sid, $target_sid)
 	{
 		// Get all data files for the source project
-		$this->ci->db->select('file_physical_name');
+		$this->ci->db->select('file_physical_name, file_name');
 		$this->ci->db->where('sid', $source_sid);
-		$this->ci->db->where('file_physical_name IS NOT NULL');
-		$this->ci->db->where('file_physical_name !=', '');
 		$data_files = $this->ci->db->get('editor_data_files')->result_array();
 
 		$output = array();
@@ -684,36 +768,44 @@ class Project_versions
 
 		foreach ($data_files as $data_file) {
 			try {
-				
-				// csv file
-				$file_parts = pathinfo($data_file['file_physical_name']);
-				$source_file = $this->ci->Editor_model->get_project_folder($source_sid) . '/data/' . $file_parts['filename'] . '.csv';
+				$project_folder_src = $this->ci->Editor_model->get_project_folder($source_sid) . '/data/';
+				$project_folder_tgt = $this->ci->Editor_model->get_project_folder($target_sid) . '/data';
+				$physical = isset($data_file['file_physical_name']) ? $data_file['file_physical_name'] : '';
+				$file_name = isset($data_file['file_name']) ? $data_file['file_name'] : '';
 
-				// Skip if file doesn't exist
-				if (!file_exists($source_file)) {
-					$output[] = [
-						'file' => $source_file,
-						'copied' => false,
-						'type' => 'data_file'
-					];
-					continue;
+				$candidates = array();
+				if ($physical !== '') {
+					$candidates[] = $physical;
+				}
+				if ($file_name !== '') {
+					$candidates[] = $file_name . '.csv';
 				}
 
-				// Determine target path - keep same filename in target project folder
-				$filename = basename($source_file);
-				$target_file = $this->ci->Editor_model->get_project_folder($target_sid) . '/data/' . $filename;
-
-				// Copy file
-				$copied = $this->copy_file_with_dir_creation($source_file, $target_file);
-				
-				if ($copied) {
-					$output[] = [
-						'file' => $filename,
-						'copied' => true,
-						'type' => 'data_file'
-					];
+				if (!file_exists($project_folder_tgt)) {
+					mkdir($project_folder_tgt, 0777, true);
 				}
-				
+
+				$seen = array();
+				foreach ($candidates as $filename) {
+					$basename = basename($filename);
+					if ($basename === '' || isset($seen[$basename])) {
+						continue;
+					}
+					$seen[$basename] = true;
+					$source_file = $project_folder_src . $basename;
+					if (!file_exists($source_file) || !is_file($source_file)) {
+						continue;
+					}
+					$target_file = $project_folder_tgt . '/' . $basename;
+					$copied = $this->copy_file_with_dir_creation($source_file, $target_file);
+					if ($copied) {
+						$output[] = array(
+							'file' => $basename,
+							'copied' => true,
+							'type' => 'data_file'
+						);
+					}
+				}
 			} catch (Exception $e) {
 				$errors[] = $e->getMessage();
 			}

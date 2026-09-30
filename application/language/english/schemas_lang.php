@@ -18,7 +18,8 @@ $lang['edit_schema']="Edit schema";
 $lang['schema_created']="Schema created successfully.";
 $lang['schema_updated']="Schema updated successfully.";
 $lang['schema_deleted']="Schema deleted successfully.";
-$lang['delete_schema_confirm']="Are you sure you want to delete this schema?";
+$lang['delete_schema_confirm']="Delete schema \"{title}\"? All templates for this schema will be removed.";
+$lang['schema_delete_in_use_by_projects']="This schema is in use by one or more projects. Remove or delete those projects before you can delete the schema.";
 $lang['schema_not_found']="Schema not found.";
 $lang['failed_to_load_schema']="Failed to load schema.";
 $lang['core_schema_edit_forbidden']="Core schemas cannot be edited.";
@@ -104,6 +105,12 @@ $lang['regenerate_template_confirm']="Regenerate the template for this schema? T
 $lang['schema_template_regenerated']="Schema template regenerated successfully.";
 $lang['regenerate_template_failed']="Failed to regenerate template.";
 $lang['generated_template_locked']="Generated templates are read-only. Duplicate the template to customize it.";
+
+// Reserved root properties (custom schemas)
+$lang['schema_has_issues']="Schema has issues. Open it to view the validation report.";
+$lang['reserved_root_properties_report_title']="Reserved root-level properties detected";
+$lang['reserved_root_properties_report_intro']="These root-level properties cannot be saved in project metadata:";
+$lang['reserved_root_properties_report_fix']="Nest them under an object grouping, then replace the main schema file.";
 
 // Miscellaneous
 $lang['not_implemented']="Not implemented yet.";

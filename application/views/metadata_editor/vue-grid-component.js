@@ -60,7 +60,7 @@ Vue.component('grid-component', {
                         <div>
 
                         <validation-provider 
-                                :rules="column.rules" 
+                                :rules="getValidationRules(column)" 
                                 :name="columnName(column,path)"
                                 v-slot="{ errors }"                                
                                 >
@@ -101,6 +101,14 @@ Vue.component('grid-component', {
                                         {{ enum_.label }}
                                     </option>
                                 </select>
+                            </div>
+
+                            <div v-else-if="fieldDisplayType(column)=='date'">
+                                <editor-date-field
+                                    :value="field_data[index][column.key]"
+                                    :field="column"
+                                    @input="field_data[index][column.key] = $event"
+                                ></editor-date-field>
                             </div>
                             
                             <div v-else>
@@ -160,6 +168,13 @@ Vue.component('grid-component', {
             }            
             
             return field.type;
+        },
+        getValidationRules(column)
+        {
+            if (typeof FieldValidationRulesUtil !== 'undefined') {
+                return FieldValidationRulesUtil.normalize(column);
+            }
+            return column && column.rules ? column.rules : {};
         }
     }
 })

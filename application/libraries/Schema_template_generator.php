@@ -117,6 +117,7 @@ class Schema_template_generator
         // Ensure templates have at least one section_container or section for template manager compatibility
         // If no top-level containers exist, wrap all items in a default section_container
         $items = $this->ensure_section_container($items, $title);
+        $items = $this->normalize_section_container_structure($items);
 
         return array(
             'type' => 'template',
@@ -124,6 +125,97 @@ class Schema_template_generator
             'description' => $description,
             'items' => $items
         );
+    }
+
+    /**
+     * Ensure fields are nested under section folders, not directly under section_container.
+     *
+     * @param array $items Template items (top-level or nested)
+     * @return array Normalized items
+     */
+    protected function normalize_section_container_structure($items)
+    {
+        if (!is_array($items) || empty($items)) {
+            return $items;
+        }
+
+        $normalized = array();
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                $normalized[] = $item;
+                continue;
+            }
+
+            if (!empty($item['items']) && is_array($item['items'])) {
+                $item['items'] = $this->normalize_section_container_structure($item['items']);
+            }
+
+            if (isset($item['type']) && $item['type'] === 'section_container' && !empty($item['items'])) {
+                $item['items'] = $this->wrap_loose_fields_in_section_folders(
+                    $item['items'],
+                    isset($item['key']) ? $item['key'] : 'container',
+                    isset($item['title']) ? $item['title'] : 'Fields'
+                );
+                $item['items'] = $this->normalize_section_container_structure($item['items']);
+            }
+
+            $normalized[] = $item;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Move non-structural children of a section_container into section nodes.
+     *
+     * @param array $items Direct children of a section_container
+     * @param string $container_key Container key (for generated section keys)
+     * @param string $container_title Container title (for generated section titles)
+     * @return array Child list with only section / section_container entries
+     */
+    protected function wrap_loose_fields_in_section_folders($items, $container_key, $container_title)
+    {
+        $structural = array('section' => true, 'section_container' => true);
+        $result = array();
+        $loose_batch = array();
+        $section_index = 0;
+
+        $flush_loose = function () use (&$loose_batch, &$result, $container_key, $container_title, &$section_index) {
+            if (empty($loose_batch)) {
+                return;
+            }
+            $section_title = $container_title !== '' ? $container_title : 'Fields';
+            $suffix = $section_index === 0 ? '.__fields_section' : '.__fields_section_' . $section_index;
+            $section_index++;
+            $result[] = array(
+                'type' => 'section',
+                'key' => $container_key . $suffix,
+                'title' => $section_title,
+                'help_text' => '',
+                'expanded' => true,
+                'items' => $loose_batch
+            );
+            $loose_batch = array();
+        };
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                $loose_batch[] = $item;
+                continue;
+            }
+
+            $type = isset($item['type']) ? $item['type'] : '';
+            if ($type !== '' && isset($structural[$type])) {
+                $flush_loose();
+                $result[] = $item;
+            } else {
+                $loose_batch[] = $item;
+            }
+        }
+
+        $flush_loose();
+
+        return $result;
     }
 
     /**
@@ -213,7 +305,7 @@ class Schema_template_generator
 
     protected function build_field($schema, $path, $name, $is_required = false)
     {
-        return array(
+        $field = array(
             'key' => $path,
             'title' => $this->resolve_title($schema, $name),
             'type' => $this->normalize_type($schema),
@@ -221,26 +313,243 @@ class Schema_template_generator
             'help_text' => isset($schema['description']) ? $schema['description'] : '',
             'display_type' => $this->resolve_display_type($schema)
         );
+        $this->apply_schema_vocabulary($field, $schema);
+
+        return $field;
     }
 
     protected function build_array_field($schema, $path, $name, $depth, $is_required = false)
     {
         $items_schema = isset($schema['items']) ? $schema['items'] : array();
-        $props = $this->build_array_props($items_schema, $path);
-        $child_items = array();
+        $kind = $this->classify_array_items_schema($items_schema);
 
-        if (!empty($items_schema) && is_array($items_schema)) {
-            $child_items = $this->build_section_items($items_schema, $path, $depth);
+        if ($kind === 'primitive') {
+            return $this->build_simple_array_field($schema, $path, $name, $is_required, $items_schema);
         }
+
+        if ($kind === 'object') {
+            return $this->build_object_array_field($schema, $path, $name, $is_required, $items_schema);
+        }
+
+        return $this->build_array_of_array_field($schema, $path, $name, $is_required, $items_schema);
+    }
+
+    /**
+     * Classify JSON Schema "items" for an array field.
+     *
+     * @return string primitive|object|array
+     */
+    protected function classify_array_items_schema($items_schema)
+    {
+        if (!is_array($items_schema) || empty($items_schema)) {
+            return 'primitive';
+        }
+
+        if ($this->is_array_schema($items_schema)) {
+            return 'array';
+        }
+
+        if ($this->is_object_schema($items_schema) && !empty($items_schema['properties'])) {
+            return 'object';
+        }
+
+        return 'primitive';
+    }
+
+    protected function build_simple_array_field($schema, $path, $name, $is_required, $items_schema)
+    {
+        $field = array(
+            'key' => $path,
+            'title' => $this->resolve_title($schema, $name),
+            'type' => 'simple_array',
+            'required' => (bool)$is_required,
+            'help_text' => isset($schema['description']) ? $schema['description'] : '',
+            'display_type' => $this->resolve_display_type($items_schema)
+        );
+        $this->apply_schema_vocabulary($field, $items_schema);
+
+        return $field;
+    }
+
+    /**
+     * Array of objects: column metadata in props only (matches core templates).
+     */
+    protected function build_object_array_field($schema, $path, $name, $is_required, $items_schema)
+    {
+        $props = $this->build_array_props($items_schema, $path);
+        $template_type = $this->resolve_object_array_template_type($props);
 
         return array(
             'key' => $path,
             'title' => $this->resolve_title($schema, $name),
-            'type' => 'array',
+            'type' => $template_type,
             'required' => (bool)$is_required,
             'help_text' => isset($schema['description']) ? $schema['description'] : '',
-            'props' => $props,
-            'items' => !empty($child_items) ? $child_items : null
+            'props' => $props
+        );
+    }
+
+    /**
+     * Array whose items are arrays (matrix / list-of-lists).
+     * Uses nested_array rows; inner primitive lists use a simple_array column.
+     */
+    protected function build_array_of_array_field($schema, $path, $name, $is_required, $items_schema)
+    {
+        $inner_items = isset($items_schema['items']) ? $items_schema['items'] : array();
+        $inner_kind = $this->classify_array_items_schema($inner_items);
+
+        if ($inner_kind === 'primitive') {
+            return array(
+                'key' => $path,
+                'title' => $this->resolve_title($schema, $name),
+                'type' => 'nested_array',
+                'required' => (bool)$is_required,
+                'help_text' => isset($schema['description']) ? $schema['description'] : '',
+                'props' => array(
+                    $this->build_simple_array_prop('value', $path, $inner_items, $this->resolve_title($items_schema, 'value'))
+                )
+            );
+        }
+
+        if ($inner_kind === 'object') {
+            return array(
+                'key' => $path,
+                'title' => $this->resolve_title($schema, $name),
+                'type' => 'nested_array',
+                'required' => (bool)$is_required,
+                'help_text' => isset($schema['description']) ? $schema['description'] : '',
+                'props' => array(
+                    array(
+                        'key' => 'items',
+                        'title' => $this->resolve_title($items_schema, 'items'),
+                        'type' => 'nested_array',
+                        'help_text' => isset($items_schema['description']) ? $items_schema['description'] : '',
+                        'props' => $this->build_array_props($inner_items, $this->join_key($path, 'items'))
+                    )
+                )
+            );
+        }
+
+        // Deeper nesting: nested_array column whose props describe the next level
+        return array(
+            'key' => $path,
+            'title' => $this->resolve_title($schema, $name),
+            'type' => 'nested_array',
+            'required' => (bool)$is_required,
+            'help_text' => isset($schema['description']) ? $schema['description'] : '',
+            'props' => array(
+                $this->build_array_prop_column($items_schema, 'items', $this->join_key($path, 'items'))
+            )
+        );
+    }
+
+    protected function build_simple_array_prop($column_key, $base_path, $items_schema, $title = null)
+    {
+        $prop_path = $this->join_key($base_path, $column_key);
+
+        $prop = array(
+            'key' => $column_key,
+            'title' => $title !== null ? $title : $this->resolve_title($items_schema, $column_key),
+            'type' => 'simple_array',
+            'prop_key' => $prop_path,
+            'required' => false,
+            'help_text' => isset($items_schema['description']) ? $items_schema['description'] : '',
+            'display_type' => $this->resolve_display_type($items_schema)
+        );
+        $this->apply_schema_vocabulary($prop, $items_schema);
+
+        return $prop;
+    }
+
+    protected function resolve_object_array_template_type($props)
+    {
+        if (!is_array($props)) {
+            return 'array';
+        }
+
+        foreach ($props as $prop) {
+            if (!is_array($prop) || !isset($prop['type'])) {
+                continue;
+            }
+            if (in_array($prop['type'], array('simple_array', 'nested_array', 'section'), true)) {
+                return 'nested_array';
+            }
+        }
+
+        return 'array';
+    }
+
+    protected function build_array_prop_column($array_schema, $name, $prop_path)
+    {
+        $items_schema = isset($array_schema['items']) ? $array_schema['items'] : array();
+        $kind = $this->classify_array_items_schema($items_schema);
+
+        if ($kind === 'primitive') {
+            $prop = array(
+                'key' => $name,
+                'title' => $this->resolve_title($array_schema, $name),
+                'type' => 'simple_array',
+                'prop_key' => $prop_path,
+                'required' => false,
+                'help_text' => isset($array_schema['description']) ? $array_schema['description'] : '',
+                'display_type' => $this->resolve_display_type($items_schema)
+            );
+            $this->apply_schema_vocabulary($prop, $items_schema);
+
+            return $prop;
+        }
+
+        if ($kind === 'object') {
+            return array(
+                'key' => $name,
+                'title' => $this->resolve_title($array_schema, $name),
+                'type' => 'nested_array',
+                'help_text' => isset($array_schema['description']) ? $array_schema['description'] : '',
+                'props' => $this->build_array_props($items_schema, $prop_path)
+            );
+        }
+
+        // Array column (including array-of-array)
+        $inner_items = isset($items_schema['items']) ? $items_schema['items'] : array();
+        $inner_kind = $this->classify_array_items_schema($inner_items);
+
+        if ($inner_kind === 'primitive') {
+            return array(
+                'key' => $name,
+                'title' => $this->resolve_title($array_schema, $name),
+                'type' => 'nested_array',
+                'help_text' => isset($array_schema['description']) ? $array_schema['description'] : '',
+                'props' => array(
+                    $this->build_simple_array_prop('value', $prop_path, $inner_items, $this->resolve_title($items_schema, 'value'))
+                )
+            );
+        }
+
+        if ($inner_kind === 'object') {
+            return array(
+                'key' => $name,
+                'title' => $this->resolve_title($array_schema, $name),
+                'type' => 'nested_array',
+                'help_text' => isset($array_schema['description']) ? $array_schema['description'] : '',
+                'props' => array(
+                    array(
+                        'key' => 'items',
+                        'title' => $this->resolve_title($items_schema, 'items'),
+                        'type' => 'nested_array',
+                        'props' => $this->build_array_props($inner_items, $this->join_key($prop_path, 'items'))
+                    )
+                )
+            );
+        }
+
+        return array(
+            'key' => $name,
+            'title' => $this->resolve_title($array_schema, $name),
+            'type' => 'nested_array',
+            'help_text' => isset($array_schema['description']) ? $array_schema['description'] : '',
+            'props' => array(
+                $this->build_array_prop_column($items_schema, 'items', $this->join_key($prop_path, 'items'))
+            )
         );
     }
 
@@ -256,13 +565,22 @@ class Schema_template_generator
             foreach ($schema['properties'] as $name => $child) {
                 $prop_path = $this->join_key($base_path, $name);
 
-                if ($this->is_object_schema($child)) {
+                if ($this->is_array_schema($child)) {
+                    $column = $this->build_array_prop_column($child, $name, $prop_path);
+                    if (isset($required[$name])) {
+                        $column['required'] = true;
+                    }
+                    $props[] = $column;
+                    continue;
+                }
+
+                if ($this->is_object_schema($child) && isset($child['properties'])) {
                     $nested = $this->build_array_props($child, $prop_path);
                     $props = array_merge($props, $nested);
                     continue;
                 }
 
-                $props[] = array(
+                $prop = array(
                     'key' => $name,
                     'title' => $this->resolve_title($child, $name),
                     'type' => $this->normalize_type($child),
@@ -271,23 +589,69 @@ class Schema_template_generator
                     'help_text' => isset($child['description']) ? $child['description'] : '',
                     'display_type' => $this->resolve_display_type($child)
                 );
+                $this->apply_schema_vocabulary($prop, $child);
+                $props[] = $prop;
             }
 
             return $props;
         }
 
-        // Fallback for arrays of primitives
-        $props[] = array(
-            'key' => 'value',
-            'title' => $this->resolve_title($schema, 'value'),
-            'type' => $this->normalize_type($schema),
-            'prop_key' => $base_path,
-            'required' => false,
-            'help_text' => isset($schema['description']) ? $schema['description'] : '',
-            'display_type' => $this->resolve_display_type($schema)
-        );
-
         return $props;
+    }
+
+    /**
+     * Copy JSON Schema enum into template controlled vocabulary metadata.
+     */
+    protected function apply_schema_vocabulary(array &$field, array $schema)
+    {
+        $enum = $this->build_template_enum($schema);
+        if ($enum === null) {
+            return;
+        }
+
+        $field['display_type'] = 'dropdown-custom';
+        $field['enum'] = $enum;
+        $field['enum_store_column'] = 'code';
+    }
+
+    protected function schema_has_enum($schema)
+    {
+        return isset($schema['enum']) && is_array($schema['enum']) && count($schema['enum']) > 0;
+    }
+
+    /**
+     * @return array<int, array{code: string, label: string}>|null
+     */
+    protected function build_template_enum($schema)
+    {
+        if (!$this->schema_has_enum($schema)) {
+            return null;
+        }
+
+        $entries = array();
+        foreach ($schema['enum'] as $value) {
+            if (is_array($value) || is_object($value)) {
+                continue;
+            }
+            if (is_bool($value)) {
+                $code = $value ? 'true' : 'false';
+            } else {
+                $code = (string)$value;
+            }
+            $entries[] = array(
+                'code' => $code,
+                'label' => $this->enum_label_from_value($code),
+            );
+        }
+
+        return count($entries) > 0 ? $entries : null;
+    }
+
+    protected function enum_label_from_value($code)
+    {
+        $spaced = preg_replace('/([a-z])([A-Z])/', '$1 $2', (string)$code);
+
+        return $this->humanize($spaced);
     }
 
     protected function resolve_title($schema, $fallback)
@@ -301,6 +665,10 @@ class Schema_template_generator
 
     protected function resolve_display_type($schema)
     {
+        if ($this->schema_has_enum($schema)) {
+            return 'dropdown-custom';
+        }
+
         $type = $this->normalize_type($schema);
 
         switch ($type) {
@@ -313,9 +681,6 @@ class Schema_template_generator
             default:
                 if (isset($schema['format']) && in_array($schema['format'], array('date', 'date-time'), true)) {
                     return 'text';
-                }
-                if (isset($schema['enum']) && is_array($schema['enum']) && count($schema['enum']) > 0) {
-                    return 'select';
                 }
                 return 'text';
         }

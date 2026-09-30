@@ -72,7 +72,7 @@ Vue.component('variables', {
                 "var_qstn_qstnlit",
                 "var_codinstr",
                 "var_imputation",
-                "var_qstn_ivuinstr",
+                "var_qstn_ivulnstr",
                 "var_resp_unit",
                 "sum_stats_options",
                 "var_wgt_id",
@@ -827,6 +827,13 @@ Vue.component('variables', {
 
             return classes.join(' ');
         },        
+        exportDictionaryCsv: function() {
+            if (!this.fid || !this.ProjectID) {
+                return;
+            }
+            var url = CI.base_url + '/api/variables/export_csv/' + this.ProjectID + '/' + encodeURIComponent(this.fid) + '?download=1';
+            window.location.href = url;
+        },
         refreshSummaryStats: async function(){
 
             if (!confirm(this.$t("confirm_import_summary_statistics"))){
@@ -877,7 +884,7 @@ Vue.component('variables', {
             }catch(e){
                 console.log("failed",e);
                 this.summaryStatsDialog.is_loading=false;
-                this.summaryStatsDialog.message_error=this.$t("failed") + ": " + e.response.data.message;
+                this.summaryStatsDialog.message_error=this.$t("failed") + ": " + (e.response && e.response.data && e.response.data.message ? e.response.data.message : e.message);
             }
         },
         reloadDataFileVariables: async function(){
@@ -1211,6 +1218,9 @@ Vue.component('variables', {
                                             </span>
                                         </span>
                                         <span v-show="variablesAllForFile.length > 0" class="ml-2">
+                                            <span @click="exportDictionaryCsv" :title="$t('export_data_dictionary')">
+                                                <v-icon aria-hidden="false" class="var-icon">mdi-book-open-variant</v-icon>
+                                            </span>
                                             <span @click="batchSumStatsOptionsDialog = true" :title="$t('batch_sum_stats_options')">
                                                 <v-icon aria-hidden="false" class="var-icon">mdi-tune-variant</v-icon>
                                             </span>

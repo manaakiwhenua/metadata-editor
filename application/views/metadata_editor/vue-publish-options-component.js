@@ -1,6 +1,16 @@
 /// publish project options
 Vue.component('publish-options', {
-    props:['value'],
+    props: {
+        value: {},
+        embedded: {
+            type: Boolean,
+            default: false,
+        },
+        publicationId: {
+            type: [Number, String],
+            default: 0,
+        },
+    },
     data: function () {    
         return {
             field_data: this.value,
@@ -89,15 +99,27 @@ Vue.component('publish-options', {
             data_access_list:[],
             study_info: null,
             publish_responses:{},//all publish responses
-            microdata_status: null
+            microdata_status: null,
+            publicationPrefill: null,
+            publicationPrefillCatalogApplied: false,
+            publicationPrefillRunId: 0,
         }
     },
-    mounted: async function(){
-        this.loadCatalogConnections();
-        this.getProjectBasicInfo();
-        this.loadMicrodataStatus();
+    mounted: function(){
         var vm = this;
-        this.$nextTick(function () {
+        vm.loadCatalogConnections();
+        vm.getProjectBasicInfo();
+        vm.loadMicrodataStatus();
+        vm.refreshIndicatorPublishLocal();
+        var runPrefill = function () {
+            vm.schedulePublicationPrefill();
+        };
+        if (vm.$router && typeof vm.$router.onReady === 'function') {
+            vm.$router.onReady(runPrefill);
+        } else {
+            vm.$nextTick(runPrefill);
+        }
+        vm.$nextTick(function () {
             vm.panels = vm.getDefaultExpandedPanels();
             vm.applyPublishOptionDefaults();
         });
@@ -234,6 +256,7 @@ Vue.component('publish-options', {
                 "metadata":{
                     "messages":[],
                     "errors":[],
+                    "warnings":[],
                 },
                 "thumbnail":{
                     "messages":[],
@@ -303,6 +326,50 @@ Vue.component('publish-options', {
                 return false;
             }
             return true;
+        },
+        /**
+         * When JSON create failed and NADA accepted DDI import, surface the JSON error.
+         */
+        buildDdiFallbackWarning: function (data) {
+            if (!data || typeof data !== 'object') {
+                return null;
+            }
+            var via = data._published_via || data.published_via;
+            var warningPayload = data._json_publish_warning || data.json_publish_warning;
+            if (via !== 'import_ddi' && !warningPayload) {
+                return null;
+            }
+            var summary = this.$te('metadata_published_via_ddi_fallback')
+                ? this.$t('metadata_published_via_ddi_fallback')
+                : 'Published via DDI/XML because JSON publish failed. JSON may include fields not carried by DDI — review the catalog error below.';
+            var out = {
+                summary: summary,
+                message: '',
+                httpStatus: null,
+                bodyFormat: null,
+                nada: null,
+                jsonDetail: null,
+                rawBody: ''
+            };
+            if (!warningPayload || typeof warningPayload !== 'object') {
+                return out;
+            }
+            out.message = typeof warningPayload.message === 'string' ? warningPayload.message : '';
+            var details = warningPayload.details && typeof warningPayload.details === 'object'
+                ? warningPayload.details
+                : null;
+            if (details) {
+                out.nada = details;
+                out.httpStatus = details.status != null ? details.status : null;
+                out.bodyFormat = details.body_format || null;
+                if (details.response_ != null) {
+                    out.jsonDetail = details.response_;
+                }
+                if (details.raw_body) {
+                    out.rawBody = details.raw_body;
+                }
+            }
+            return out;
         },
         saveUnsavedProjectIfNeeded: async function () {
             var root = this.$root;
@@ -695,6 +762,10 @@ Vue.component('publish-options', {
                     successMsg = vm.$t("metadata_published_with_idno") + data.dataset.idno;
                 }
                 vm.publish_responses.metadata.messages.push(successMsg);
+                var ddiWarning = vm.buildDdiFallbackWarning(data);
+                if (ddiWarning) {
+                    vm.publish_responses.metadata.warnings.push(ddiWarning);
+                }
                 return true;
             } catch (error) {
                 console.log("publishing project failed", error);
@@ -979,6 +1050,35 @@ Vue.component('publish-options', {
         {
             this.applyPublishOptionDefaults();
         },
+        refreshIndicatorPublishLocal: function() {
+            var vm = this;
+            if (vm.ProjectType !== 'indicator' && vm.ProjectType !== 'timeseries') {
+                return Promise.resolve();
+            }
+            var url = CI.base_url + '/api/indicator_dsd/binding/' + vm.ProjectID;
+            return axios.get(url)
+                .then(function(res) {
+                    var data = res.data || {};
+                    if (!vm.indicator_publish) {
+                        vm.indicator_publish = { local: {}, nada_dsd: null, nada_data: null };
+                    }
+                    if (!vm.indicator_publish.local) {
+                        vm.indicator_publish.local = {};
+                    }
+                    vm.indicator_publish.local.bound = !!data.bound;
+                    vm.indicator_publish.local.has_published_data = !!data.has_published_data;
+                    vm.indicator_publish.local.published_row_count = data.published_row_count != null
+                        ? data.published_row_count
+                        : null;
+                    if (data.data_structure_reference) {
+                        vm.indicator_publish.local.data_structure_reference = data.data_structure_reference;
+                    }
+                    vm.applyPublishOptionDefaults();
+                })
+                .catch(function(err) {
+                    console.log('failed to refresh indicator publish state', err);
+                });
+        },
         async prepareProjectExport()
         {
             var ok = true;
@@ -1010,20 +1110,143 @@ Vue.component('publish-options', {
             return ok;
         },
         loadCatalogConnections: function() {
-            vm=this;
-            let url=CI.site_url + '/api/publish/catalog_connections';
-            axios.get(url)
+            var vm = this;
+            var url = CI.site_url + '/api/publish/catalog_connections';
+            return axios.get(url)
             .then(function (response) {
-                if(response.data){
-                    vm.catalog_connections=response.data.connections;
+                if (response.data) {
+                    vm.catalog_connections = response.data.connections;
                 }
             })
             .catch(function (error) {
                 console.log(error);
-            })
-            .then(function () {
-                console.log("request completed");
             });
+        },
+        getRoutePublicationId: function () {
+            var propId = parseInt(String(this.publicationId || ''), 10);
+            if (!isNaN(propId) && propId > 0) {
+                return propId;
+            }
+            var query = this.$route && this.$route.query ? this.$route.query : {};
+            if (query.publication_id || query.publication_id === 0) {
+                var routeId = parseInt(String(query.publication_id), 10);
+                if (!isNaN(routeId) && routeId > 0) {
+                    return routeId;
+                }
+            }
+            var hash = window.location.hash || '';
+            var qIndex = hash.indexOf('?');
+            if (qIndex === -1) {
+                return 0;
+            }
+            try {
+                var params = new URLSearchParams(hash.substring(qIndex + 1));
+                var hashId = parseInt(String(params.get('publication_id') || ''), 10);
+                return isNaN(hashId) || hashId < 1 ? 0 : hashId;
+            } catch (e) {
+                return 0;
+            }
+        },
+        schedulePublicationPrefill: function () {
+            var vm = this;
+            var runId = ++vm.publicationPrefillRunId;
+            vm.publicationPrefillCatalogApplied = false;
+            return Promise.all([
+                vm.loadCatalogConnections(),
+                vm.loadPublicationPrefill(),
+            ]).then(function () {
+                if (runId !== vm.publicationPrefillRunId) {
+                    return;
+                }
+                vm.applyPublicationPrefillCatalog();
+            });
+        },
+        ensurePrefillCatalogConnection: function (placement) {
+            if (!placement || !placement.catalog_id) {
+                return;
+            }
+            var catalogId = parseInt(String(placement.catalog_id), 10);
+            if (isNaN(catalogId) || catalogId < 1) {
+                return;
+            }
+            if (this.getConnectionInfo(catalogId)) {
+                return;
+            }
+            this.catalog_connections.push({
+                id: catalogId,
+                title: placement.catalog_title || ('Catalog #' + catalogId),
+                url: placement.catalog_url || '',
+                type: placement.catalog_type || 'nada',
+                has_credential: false,
+            });
+        },
+        loadPublicationPrefill: function () {
+            var vm = this;
+            var publicationId = vm.getRoutePublicationId();
+            if (!publicationId) {
+                vm.publicationPrefill = null;
+                return Promise.resolve(null);
+            }
+            return axios.get(CI.site_url + '/api/publish_requests/' + publicationId)
+                .then(function (response) {
+                    var data = response.data || {};
+                    if (data.status && data.status !== 'success') {
+                        vm.publicationPrefill = null;
+                        return null;
+                    }
+                    if (String(data.sid) !== String(vm.ProjectID)) {
+                        vm.publicationPrefill = null;
+                        return null;
+                    }
+                    vm.publicationPrefill = data;
+                    return data;
+                })
+                .catch(function (error) {
+                    console.log('publication prefill failed', error);
+                    vm.publicationPrefill = null;
+                    return null;
+                });
+        },
+        applyPublicationPrefillCatalog: function () {
+            if (!this.publicationPrefill || !this.publicationPrefill.catalog_id) {
+                return;
+            }
+            if (this.publicationPrefillCatalogApplied) {
+                this.applyPendingPublicationPrefillOptions();
+                return;
+            }
+            var catalogId = parseInt(String(this.publicationPrefill.catalog_id), 10);
+            if (isNaN(catalogId) || catalogId < 1) {
+                return;
+            }
+            this.ensurePrefillCatalogConnection(this.publicationPrefill);
+            var connection = this.getConnectionInfo(catalogId);
+            this.catalog = connection ? connection.id : catalogId;
+            this.publicationPrefillCatalogApplied = true;
+            this.onCatalogSelection();
+        },
+        applyPlacementOptionsToForm: function (options) {
+            if (!options || typeof options !== 'object') {
+                return;
+            }
+            if (options.access_policy !== undefined && options.access_policy !== null && options.access_policy !== '') {
+                this.publish_options.access_policy.value = options.access_policy;
+            }
+            if (options.repositoryid !== undefined && options.repositoryid !== null) {
+                this.publish_options.repositoryid.value = options.repositoryid;
+            }
+            if (options.data_remote_url !== undefined && options.data_remote_url !== null) {
+                this.publish_options.data_remote_url.value = options.data_remote_url;
+            }
+            if (options.published !== undefined && options.published !== null && options.published !== '') {
+                this.publish_options.published.value = String(options.published);
+            }
+        },
+        applyPendingPublicationPrefillOptions: function () {
+            if (!this.publicationPrefill || !this.publicationPrefill.options) {
+                return;
+            }
+            this.applyPlacementOptionsToForm(this.publicationPrefill.options);
         },
         getConnectionInfo: function(id)
         {
@@ -1145,6 +1368,7 @@ Vue.component('publish-options', {
                     }
                     vm.$nextTick(function () {
                         vm.applyStudyInfoToPublishOptions(response.data.study_info || null);
+                        vm.applyPendingPublicationPrefillOptions();
                     });
                 })
                 .catch(function (error) {
@@ -1158,6 +1382,12 @@ Vue.component('publish-options', {
         }
     },
     watch: {
+        publicationId: function () {
+            this.schedulePublicationPrefill();
+        },
+        '$route.query.publication_id': function () {
+            this.schedulePublicationPrefill();
+        },
         publish_metadata: function (val) {
             if (!val && !this.studyExistsOnNada && this.publish_indicator_data) {
                 this.publish_indicator_data = false;
@@ -1236,7 +1466,14 @@ Vue.component('publish-options', {
             let connections=[];
             for (let i=0;i<this.catalog_connections.length;i++){
                 let connection=this.catalog_connections[i];
-                connection.connection_title=connection.title + ' - ' + connection.url;
+                if (connection.type && connection.type !== 'nada') {
+                    continue;
+                }
+                let title = connection.title + (connection.url ? (' - ' + connection.url) : '');
+                if (!connection.has_credential) {
+                    title += ' (' + this.$t('no_api_key') + ')';
+                }
+                connection.connection_title=title;
                 connections.push(connection);
             }
 
@@ -1252,6 +1489,32 @@ Vue.component('publish-options', {
         },
         catalogSelected(){
             return this.catalog !== false && this.catalog !== null;
+        },
+        queuePrefillActive: function () {
+            return this.getRoutePublicationId() > 0 && !!this.publicationPrefill;
+        },
+        queuePrefillMissingApiKey: function () {
+            if (!this.queuePrefillActive || !this.publicationPrefillCatalogApplied) {
+                return false;
+            }
+            if (this.catalog === false || this.catalog === null) {
+                return false;
+            }
+            var connection = this.getConnectionInfo(this.catalog);
+            if (!connection) {
+                return true;
+            }
+            return !connection.has_credential;
+        },
+        queuePrefillCatalogTitle: function () {
+            if (this.publicationPrefill && this.publicationPrefill.catalog_title) {
+                return this.publicationPrefill.catalog_title;
+            }
+            var connection = this.getConnectionInfo(this.catalog);
+            return connection && connection.title ? connection.title : '';
+        },
+        CatalogSettingsUrl(){
+            return CI.site_url + '/settings/catalogs';
         },
         /** True when a thumbnail file exists on the project (from basic_info). */
         hasProjectThumbnail(){
@@ -1364,17 +1627,32 @@ Vue.component('publish-options', {
         }
     },  
     template: `
-            <div class="import-options-component mt-5 p-3">
+            <div :class="embedded ? 'publish-options-embedded' : 'import-options-component mt-5 p-3'">
 
-                <v-card>
-                    <v-card-title>{{$t("publish_to_nada")}}</v-card-title>
-                    <v-card-subtitle>{{$t("publish_to_nada_note")}}</v-card-subtitle>
+                <v-card :flat="embedded" :elevation="embedded ? 0 : undefined">
+                    <v-card-title v-if="!embedded">{{$t("publish_to_nada")}}</v-card-title>
+                    <v-card-subtitle :class="embedded ? 'px-0' : ''">{{$t("publish_to_nada_note")}}</v-card-subtitle>
                 
-                    <v-card-text>
+                    <v-card-text :class="embedded ? 'px-0 pt-2' : ''">
+
+                    <v-alert
+                        v-if="queuePrefillMissingApiKey"
+                        type="warning"
+                        dense
+                        outlined
+                        class="mb-3"
+                    >
+                        <div>
+                            {{ $t('publish_queue_missing_api_key', { catalog: queuePrefillCatalogTitle }) }}
+                        </div>
+                        <div class="mt-2">
+                            <a :href="CatalogSettingsUrl">{{ $t('configure_catalog') }}</a>
+                        </div>
+                    </v-alert>
                     
                     <v-card elevation="2" class="p-3 mb-3">
                             <div class="form-group-x" elevation="10">
-                                <label for="catalog_id">{{$t("catalog")}} <router-link class="btn btn-sm btn-link" to="/configure-catalog">{{$t("configure_catalog")}}</router-link></label>
+                                <label for="catalog_id">{{$t("catalog")}} <a class="btn btn-sm btn-link" :href="CatalogSettingsUrl">{{$t("configure_catalog")}}</a></label>
 
                                 <v-select
                                     v-model="catalog"
@@ -1830,11 +2108,28 @@ Vue.component('publish-options', {
                                             <pre v-if="err.rawBody && err.jsonDetail == null" class="bg-light border rounded p-2 mt-1 small text-dark" style="max-height:240px;overflow:auto;white-space:pre-wrap;">{{ err.rawBody }}</pre>
                                         </div>    
                                     </div>
-                                    <div v-else-if="publish_responses.metadata.messages.length>0">
-                                        <div class="border m-1 text-success" v-for="(message, msg_index) in publish_responses.metadata.messages" :key="'pub-meta-msg-' + msg_index">
-                                            <span class="mdi mdi-check-circle text-success"></span> {{ message }}
+                                    <template v-else>
+                                        <div v-if="publish_responses.metadata.messages.length>0">
+                                            <div class="border m-1 text-success" v-for="(message, msg_index) in publish_responses.metadata.messages" :key="'pub-meta-msg-' + msg_index">
+                                                <span class="mdi mdi-check-circle text-success"></span> {{ message }}
+                                            </div>
                                         </div>
-                                    </div>
+                                        <div v-if="publish_responses.metadata.warnings && publish_responses.metadata.warnings.length>0" class="mt-2">
+                                            <div class="border rounded border-warning p-2 mb-2 text-left text-body" v-for="(warn, warn_index) in publish_responses.metadata.warnings" :key="'pub-meta-warn-' + warn_index">
+                                                <div class="text-warning font-weight-bold">
+                                                    <span class="mdi mdi-alert"></span> {{ warn.summary }}
+                                                </div>
+                                                <div v-if="warn.message" class="small mt-1">
+                                                    <strong>{{ $te('metadata_json_publish_error') ? $t('metadata_json_publish_error') : 'JSON publish error' }}:</strong> {{ warn.message }}
+                                                </div>
+                                                <div v-if="warn.httpStatus != null" class="text-muted small">Catalog HTTP {{ warn.httpStatus }}</div>
+                                                <div v-if="warn.nada && warn.nada.api_url" class="text-muted small text-break">URL: {{ warn.nada.api_url }}</div>
+                                                <div v-if="warn.bodyFormat" class="text-muted small">Catalog response: {{ warn.bodyFormat }}</div>
+                                                <pre v-if="warn.jsonDetail != null" class="bg-light border rounded p-2 mt-1 small text-dark" style="max-height:240px;overflow:auto;white-space:pre-wrap;">{{ formatJsonForDisplay(warn.jsonDetail) }}</pre>
+                                                <pre v-if="warn.rawBody && warn.jsonDetail == null" class="bg-light border rounded p-2 mt-1 small text-dark" style="max-height:240px;overflow:auto;white-space:pre-wrap;">{{ warn.rawBody }}</pre>
+                                            </div>
+                                        </div>
+                                    </template>
                                 </div>
 
                                 <div v-if="publish_selection_snapshot && publish_selection_snapshot.is_indicator_project && publish_selection_snapshot.publish_dsd" class="mt-3">

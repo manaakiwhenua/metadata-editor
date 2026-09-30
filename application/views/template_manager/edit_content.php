@@ -79,6 +79,32 @@
         </v-row>
     </div>
 
+    <div v-if="applicableEditorProjectModules.length > 0" class="mb-3 p-2 elevation-2 border" style="background-color: #fff;">
+        <label class="mb-2 d-block">
+            <v-icon color="primary">mdi-view-dashboard-outline</v-icon>
+            <strong>{{$t('project_editor_modules')}}:</strong>
+        </label>
+        <div class="text-secondary font-small mb-2">{{$t('project_editor_modules_help')}}</div>
+        <div class="border bg-light p-3">
+            <div
+                v-for="module in applicableEditorProjectModules"
+                :key="module.id"
+                class="border-bottom pb-1 mb-1"
+                style="padding: 2px 0;"
+            >
+                <v-switch
+                    :input-value="isEditorProjectModuleVisible(module)"
+                    @change="setEditorProjectModuleVisible(module, $event)"
+                    :label="editorProjectModuleLabel(module)"
+                    hide-details
+                    :disabled="!isEditable"
+                    class="mt-0 mb-0"
+                    dense
+                ></v-switch>
+            </div>
+        </div>
+    </div>
+
     <div v-if="MissingSectionContainers && MissingSectionContainers.length > 0" class="mb-3 p-2 elevation-2 border" style="background-color: #fff;">
         <label for="name" class="mb-2 d-block">
             
@@ -95,7 +121,7 @@
                 </div>
                 <div>
                     <v-icon 
-                        v-if="!isItemInUse(container.key) && user_has_edit_access"
+                        v-if="!isItemInUse(container.key) && isEditable"
                         color="#007bff" 
                         @click="addSectionContainer(container)"
                         style="cursor: pointer;"
@@ -113,7 +139,64 @@
                 </div>
             </div>
         </div>
-    </div>    
+    </div>
+
+    <div v-if="FieldsDirectlyUnderSectionContainer && FieldsDirectlyUnderSectionContainer.length > 0" class="mb-3 p-2 elevation-2 border" style="background-color: #fff;">
+        <label class="mb-2 d-block">
+            <v-icon color="warning">mdi-alert-circle</v-icon>
+            <strong>{{$t("fields_directly_under_section_container")}}:</strong>
+        </label>
+        <div class="text-secondary font-small mb-2">{{$t("fields_directly_under_section_container_help")}}</div>
+        <div class="border bg-light p-3">
+            <div
+                v-for="issue in FieldsDirectlyUnderSectionContainer"
+                :key="'direct-field:' + issue.container_key + ':' + issue.field_key"
+                class="d-flex align-items-center justify-content-between border-bottom pb-2 mb-2"
+                style="padding: 8px; cursor: pointer;"
+                @click="selectTemplateNodeByKey(issue.select_key)"
+            >
+                <div class="flex-grow-1">
+                    <strong>{{issue.field_title || issue.field_key}}</strong>
+                    <div class="text-secondary font-small" style="font-size: 0.875rem;">{{issue.field_key}}</div>
+                    <div class="text-secondary font-small" style="font-size: 0.8125rem;">
+                        {{issue.container_title || issue.container_key}}
+                    </div>
+                    <div class="text-danger font-small mt-1" style="font-size: 0.75rem;">{{issue.message}}</div>
+                </div>
+                <div>
+                    <v-icon color="#007bff" title="Open field">mdi-chevron-right</v-icon>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="TemplateValidationIssues && TemplateValidationIssues.length > 0" class="mb-3 p-2 elevation-2 border" style="background-color: #fff;">
+        <label class="mb-2 d-block">
+            <v-icon color="warning">mdi-alert-circle</v-icon>
+            <strong>{{$t("invalid_template_keys")}}:</strong>
+        </label>
+        <div class="text-secondary font-small mb-2">{{$t("invalid_template_keys_help")}}</div>
+        <div class="border bg-light p-3">
+            <div
+                v-for="issue in TemplateValidationIssues"
+                :key="issue.issue_type + ':' + issue.key + ':' + (issue.code || '') + ':' + issue.message"
+                class="d-flex align-items-center justify-content-between border-bottom pb-2 mb-2"
+                style="padding: 8px; cursor: pointer;"
+                @click="selectTemplateNodeByKey(issue.select_key)"
+            >
+                <div class="flex-grow-1">
+                    <strong>{{issue.title || issue.key}}</strong>
+                    <span v-if="issue.issue_type === 'enum_mismatch'" class="badge badge-warning ml-2">{{$t("issue_type_enum_mismatch")}}</span>
+                    <span v-else-if="issue.issue_type === 'invalid_key'" class="badge badge-secondary ml-2">{{$t("issue_type_invalid_key")}}</span>
+                    <div class="text-secondary font-small" style="font-size: 0.875rem;">{{issue.key}}</div>
+                    <div class="text-danger font-small mt-1" style="font-size: 0.75rem;">{{issue.message}}</div>
+                </div>
+                <div>
+                    <v-icon color="#007bff" title="Open field">mdi-chevron-right</v-icon>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Show description editing when description node is selected -->
@@ -140,7 +223,7 @@
         outlined
         dense
         hide-details
-        :disabled="!user_has_edit_access"
+        :disabled="!isEditable"
       ></v-text-field>
     </div>
 
@@ -152,7 +235,7 @@
         outlined
         dense
         hide-details
-        :disabled="!user_has_edit_access"
+        :disabled="!isEditable"
       ></v-text-field>
     </div>
 
@@ -164,7 +247,7 @@
         outlined
         dense
         hide-details
-        :disabled="!user_has_edit_access"
+        :disabled="!isEditable"
       ></v-text-field>
     </div>
 
@@ -176,7 +259,7 @@
         outlined
         dense
         hide-details
-        :disabled="!user_has_edit_access"
+        :disabled="!isEditable"
       ></v-text-field>
     </div>
 
@@ -188,7 +271,7 @@
         outlined
         dense
         hide-details
-        :disabled="!user_has_edit_access"
+        :disabled="!isEditable"
       ></v-text-field>
     </div>
 
@@ -200,7 +283,7 @@
         outlined
         rows="8"
         hide-details
-        :disabled="!user_has_edit_access"
+        :disabled="!isEditable"
       ></v-textarea>
     </div>
 
@@ -213,7 +296,7 @@
         rows="12"
         hide-details
         class="mt-2"
-        :disabled="!user_has_edit_access"
+        :disabled="!isEditable"
       ></v-textarea>
     </div>
 </div>
@@ -244,7 +327,7 @@
         outlined
         dense
         hide-details
-        :disabled="!user_has_edit_access"
+        :disabled="!isEditable"
     ></v-text-field>
 </div>
 <div v-if="ActiveNode && !ActiveNodeIsProp && ActiveNode.key && coreTemplateParts[ActiveNode.key]" class="text-secondary font-small mb-3" style="font-size:small">Original label: {{coreTemplateParts[ActiveNode.key].title}} <span class="pl-3">Name: {{ActiveNode.key}}</span> <span class="pl-3">Type: {{ActiveNode.type}}</span>  </div>
@@ -268,7 +351,7 @@
         outlined
         dense
         hide-details
-        :disabled="!user_has_edit_access"
+        :disabled="!isEditable"
     ></v-select>
 </div>
 
@@ -280,7 +363,7 @@
             @change="markDirty"
             :label="$t('required')"
             hide-details
-            :disabled="!user_has_edit_access"
+            :disabled="!isEditable"
         ></v-checkbox>
     </v-col>
 
@@ -291,7 +374,7 @@
             @change="markDirty"
             :label="$t('recommended')"
             hide-details
-            :disabled="!user_has_edit_access"
+            :disabled="!isEditable"
         ></v-checkbox>
     </v-col>
 
@@ -302,7 +385,7 @@
             @change="markDirty"
             :label="$t('private')"
             hide-details
-            :disabled="!user_has_edit_access"
+            :disabled="!isEditable"
         ></v-checkbox>
     </v-col>
 
@@ -313,7 +396,7 @@
             @change="markDirty"
             :label="$t('readonly')"
             hide-details
-            :disabled="!user_has_edit_access"
+            :disabled="!isEditable"
         ></v-checkbox>
     </v-col>
 </v-row>
@@ -326,7 +409,7 @@
         outlined
         rows="8"
         hide-details
-        :disabled="!user_has_edit_access"
+        :disabled="!isEditable"
     ></v-textarea>
 </div>
 <div v-if="ActiveNode && (ActiveNode.key || ActiveNode.prop_key) && !ActiveNodeIsProp && ActiveNode.key" class="text-secondary p-1 mb-3" style="font-size:small;">
@@ -348,13 +431,14 @@
         :key="ActiveNode.prop_key" 
         :parent="propParentNode"
         v-model="ActiveNode"
+        @vocab-change="markDirty"
     ></prop-edit>
 </div>
 
 <template v-if="ActiveNode && ActiveNode.type!=='section_container' && ActiveNode.type!=='section' && !ActiveNodeIsProp && !ActiveNodeIsInsideNestedArray && ActiveNode.key">
     <v-tabs background-color="transparent" class="mb-5" :key="ActiveNode.key">
         <v-tab v-if="ActiveNode.key && isControlField(ActiveNode.type) == true">{{$t("display")}}</v-tab>
-        <v-tab v-if="!ActiveArrayNodeIsNested"><span v-if="ActiveNodeEnumCount>0"><v-icon style="color:green;">mdi-circle-medium</v-icon></span>{{$t("controlled_vocabulary")}}</v-tab>
+        <v-tab v-if="!ActiveArrayNodeIsNested"><span v-if="ActiveNodeVocabConfigured"><v-icon style="color:green;">mdi-circle-medium</v-icon></span>{{$t("controlled_vocabulary")}}</v-tab>
         <v-tab v-if="!ActiveArrayNodeIsNested || (ActiveNode && isControlField(ActiveNode.type) == true)"><span v-if="ActiveNode && ActiveNode.default"><v-icon style="color:green;">mdi-circle-medium</v-icon></span>{{$t("default")}}</v-tab>
         <v-tab v-if="ActiveNode && isControlField(ActiveNode.type)"><span v-if="ActiveNode && ActiveNode.rules && Object.keys(ActiveNode.rules).length>0"><v-icon style="color:green;">mdi-circle-medium</v-icon></span>{{$t("validation_rules")}}</v-tab>
         <v-tab>{{$t("json")}}</v-tab>
@@ -370,7 +454,7 @@
                     outlined
                     dense
                     hide-details
-                    :disabled="!user_has_edit_access"
+                    :disabled="!isEditable"
                 ></v-select>
             </div>
 
@@ -383,7 +467,7 @@
                     outlined
                     dense
                     hide-details
-                    :disabled="!user_has_edit_access"
+                    :disabled="!isEditable"
                 ></v-select>
             </div>
 
@@ -399,7 +483,23 @@
                     outlined
                     dense
                     hide-details
-                    :disabled="!user_has_edit_access"
+                    :disabled="!isEditable"
+                ></v-select>
+            </div>
+
+            <div v-if="ActiveNode.display_type=='date'" class="mb-3">
+                <label class="mb-1 d-block">{{$t("field_date_format")}}:</label>
+                <div class="text-secondary font-small mb-2">{{$t("field_date_format_help")}}</div>
+                <v-select
+                    :value="getNodeDateFormat(ActiveNode)"
+                    @change="setNodeDateFormat(ActiveNode, $event)"
+                    :items="field_date_formats"
+                    item-text="text"
+                    item-value="value"
+                    outlined
+                    dense
+                    hide-details
+                    :disabled="!isEditable"
                 ></v-select>
             </div>
 
@@ -411,53 +511,18 @@
             <template >
             <div class="mb-3" >
                 <label for="controlled_vocab">{{$t("controlled_vocabulary")}}:</label>
-                <div class="bg-white border " style="max-height:300px;overflow:auto;">
+                <div class="template-controlled-vocabulary-panel">
 
 
-                    <template v-if="!ActiveNodeControlledVocabColumns"> 
-
-                        <div>
-
-                            <div class="m-3">
-                                <div>{{$t("enum_store_options_label")}}:</div>
-
-                                <v-select
-                                    style="max-width:300px;"
-                                    v-model="ActiveNodeEnumStoreColumn"
-                                    :items="enum_store_options"
-                                    :item-text="item => item.label"
-                                    :item-value="item => item.value"
-                                    dense 
-                                    outlined
-                                    clearable
-                                    label=""
-                                    :disabled="!user_has_edit_access"
-                                ></v-select>
-                            </div>
-                        </div>
-
-                        <table-grid-component
-                            v-if="ActiveNode && ActiveNode.key"
-                            :key="ActiveNode.key"
-                            :columns="ActiveNodeSimpleControlledVocabColumns" 
-                            v-model="ActiveNodeEnum"
-                            @update:value="EnumUpdate"
-                            class="border m-2 pb-2"
-                        ></table-grid-component>
-                         
-                    </template>
-                    <template v-else>
-
-                        <table-grid-component
-                            v-if="ActiveNode && ActiveNode.key"
-                            :key="ActiveNode.key"
-                            :columns="ActiveNodeControlledVocabColumns" 
-                            v-model="ActiveNodeEnum"
-                            @update:value="EnumUpdate"
-                            class="border m-2 pb-2"
-                        ></table-grid-component>
-                        
-                    </template>
+                    <template-controlled-vocabulary
+                        v-if="ActiveNode && ActiveNode.key && ActiveNode.type !== 'template_root' && ActiveNode.type !== 'template_description'"
+                        :key="ActiveNode.key + '-cv'"
+                        :field-node="ActiveNode"
+                        :schema-field="ActiveNodeSchemaField"
+                        :data-type="TemplateDataType"
+                        :disabled="!isEditable"
+                        @change="markDirty"
+                    ></template-controlled-vocabulary>
                 </div>
 
             </div>
@@ -489,7 +554,7 @@
                             rows="8"
                             hide-details
                             class="mt-2"
-                            :disabled="!user_has_edit_access"
+                            :disabled="!isEditable"
                         ></v-textarea>
                         <v-select
                             v-else-if="ActiveNode && ActiveNode.type=='boolean'"
@@ -500,7 +565,7 @@
                             clearable
                             hide-details
                             class="mt-2"
-                            :disabled="!user_has_edit_access"
+                            :disabled="!isEditable"
                         ></v-select>
                         <v-text-field
                             v-else
@@ -510,7 +575,7 @@
                             v-model="ActiveNode.default"
                             hide-details
                             class="mt-2"
-                            :disabled="!user_has_edit_access"
+                            :disabled="!isEditable"
                         ></v-text-field>
                     </div>
                 </div>

@@ -817,7 +817,7 @@ class Editor extends MY_REST_Controller
 
 			if ($file_ext=='xml'){
 				if ($project['type']=='survey' || $project['type']=='microdata'){
-					$result=$this->Editor_model->importDDI($sid, $parseOnly=false,$options);
+					$result=$this->Editor_model->import_ddi_from_path($sid, $uploaded_filepath, $parseOnly=false, $options);
 				}
 			}else{
 				$this->load->library('ImportJsonMetadata');
@@ -1250,10 +1250,13 @@ class Editor extends MY_REST_Controller
 	{		
 		try{
 			$sid=$this->get_sid($sid);
+
 			$exists=$this->Editor_model->check_id_exists($sid);
 			$include_private_fields=0;
 			$template_uid=null;
 			$include_external_resources=0;
+			$include_variable_list=1;
+			$include_variable_details=1;
 			$external_resource_ids=array();
 
 			if(!$exists){
@@ -1272,11 +1275,21 @@ class Editor extends MY_REST_Controller
 				$include_external_resources=1;
 			}
 
+			if ($this->input->get("include_variable_list") !== null){
+				$include_variable_list=((int)$this->input->get("include_variable_list")===1) ? 1 : 0;
+			}
+
+			if ($this->input->get("include_variable_details") !== null){
+				$include_variable_details=((int)$this->input->get("include_variable_details")===1) ? 1 : 0;
+			}
+
 			$this->editor_acl->user_has_project_access($sid,$permission='view', $user=$this->api_user());
 			$result=$this->Editor_model->generate_project_pdf($sid, $pdf_options=array(
 				'include_private_fields'=>$include_private_fields,
 				'template_uid'=>$template_uid,
-				'include_external_resources'=>$include_external_resources
+				'include_external_resources'=>$include_external_resources,
+				'include_variable_list'=>$include_variable_list,
+				'include_variable_details'=>$include_variable_details
 			));
 
 			$output=array(
@@ -1676,12 +1689,19 @@ class Editor extends MY_REST_Controller
 				throw new Exception("Parameter `projects` is required");
 			}
 
-			$new_user_id=$options['owner_id'];
+			$new_user_id=(int)$options['owner_id'];
 			
 			foreach($options['projects'] as $project_id){
 
 				$sid=$this->get_sid($project_id);
 				$this->editor_acl->user_has_project_access($sid,$permission='admin',$this->api_user);
+
+				$previous_owner_id=0;
+				$this->load->model('editor_owners_model');
+				$previous_owner=$this->editor_owners_model->get_project_owner($sid);
+				if (is_array($previous_owner) && !empty($previous_owner['id'])){
+					$previous_owner_id=(int)$previous_owner['id'];
+				}
 
 				$result=$this->Editor_model->transfer_ownership($project_id,$new_user_id);
 				$this->audit_log->log_event(
@@ -1691,6 +1711,33 @@ class Editor extends MY_REST_Controller
 					$metadata=array('new_owner_id'=>$new_user_id),
 					$user_id
 				);
+
+				if ($new_user_id > 0 && $new_user_id !== $previous_owner_id){
+					$context=array(
+						'sid'=>(int)$sid,
+						'new_owner_id'=>$new_user_id,
+						'previous_owner_id'=>$previous_owner_id,
+					);
+					$this->load->library('Notification_service');
+					$new_context=$context;
+					$new_context['audience']='new';
+					$this->notification_service->notify_safe(
+						'project.ownership_transferred',
+						array($new_user_id),
+						$new_context,
+						$user_id
+					);
+					if ($previous_owner_id > 0){
+						$previous_context=$context;
+						$previous_context['audience']='previous';
+						$this->notification_service->notify_safe(
+							'project.ownership_transferred',
+							array($previous_owner_id),
+							$previous_context,
+							$user_id
+						);
+					}
+				}
 			}
 
 			$response=array(
