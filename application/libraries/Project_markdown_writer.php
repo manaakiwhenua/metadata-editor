@@ -4,6 +4,7 @@ use League\HTMLToMarkdown\HtmlConverter;
 use League\HTMLToMarkdown\Converter\TableConverter;
 
 require_once 'application/libraries/IProject_export_writer.php';
+require_once 'application/libraries/Metadata_provenance.php';
 
 class Project_markdown_writer implements IProject_export_writer
 {
@@ -56,6 +57,12 @@ class Project_markdown_writer implements IProject_export_writer
 		$markdown = $this->remove_duplicate_nested_headers($markdown);
 		$markdown = $this->replace_multiple_empty_lines_with_single($markdown);
 		$markdown = $this->remove_excess_spaces_in_headers($markdown);
+
+		if (isset($options['provenance']) && $options['provenance'] instanceof Metadata_provenance) {
+			$provenance = $options['provenance']->get_provenance_text_markdown();
+			$markdown = $provenance . PHP_EOL . $markdown;
+		}
+
 		file_put_contents($output_file, $markdown . PHP_EOL);
 
 		return $output_file;
@@ -84,7 +91,7 @@ class Project_markdown_writer implements IProject_export_writer
 		$text = preg_replace($pattern, "$1 $2\n", $text);
 		return $text;
 	}
-	
+
 	private function remove_excess_spaces_in_headers(string $text)
 	{
 		$pattern = "/^(#{1,6})[ \t]+(.+?)$/m";
