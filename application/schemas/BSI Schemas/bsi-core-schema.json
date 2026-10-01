@@ -92,8 +92,7 @@
           "title": "Date Created",
           "$comment": "dcterms:created",
           "description": "Date the dataset was created, in ISO 8601 format (YYYY-MM-DD). Date of creation differs from the temporal coverage. For example, a dataset might have been created in February 2009 (2009-02-15) but the data was collected during the year 2008 (temporal coverage from 2008-01-01 to 2008-12-31).",
-          "type": "string",
-          "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
+          "type": "string"
         },
         "keywords": {
           "title": "Keywords",
@@ -167,8 +166,7 @@
               "date": {
                 "title": "Date",
                 "description": "The date the dataset was modified or a new version released, in ISO 8601 format (YYYY-MM-DD).",
-                "type": "string",
-                "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
+                "type": "string"
               },
               "version": {
                 "title": "Version",
@@ -182,8 +180,7 @@
           "title": "Date Published / Released",
           "$comment": "dcterms:issued",
           "description": "The date the dataset was first published or made publicly available, in ISO 8601 format (YYYY-MM-DD).",
-          "type": "string",
-          "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
+          "type": "string"
         },
         "audience": {
           "title": "Audience / Intended Users",
@@ -246,14 +243,12 @@
             "start": {
               "title": "Start Date",
               "description": "Start of the temporal coverage period, in ISO 8601 format (YYYY-MM-DD).",
-              "type": "string",
-              "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
+              "type": "string"
             },
             "end": {
               "title": "End Date",
               "description": "End of the temporal coverage period, in ISO 8601 format (YYYY-MM-DD). Omit if ongoing.",
-              "type": "string",
-              "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
+              "type": "string"
             },
             "description": {
               "title": "Temporal Description",
