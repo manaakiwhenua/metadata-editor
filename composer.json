@@ -16,7 +16,8 @@
         "ramsey/uuid": "^4.2",
         "nelexa/zip": "^3.3",
         "swaggest/json-diff": "^3.11",
-        "halaxa/json-machine": "^1.2"
+        "halaxa/json-machine": "^1.2",
+        "league/html-to-markdown": "^5.1"
     },
     "config": {
         "platform": {

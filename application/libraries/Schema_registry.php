@@ -45,9 +45,58 @@ class Schema_registry
                 $schema['icon_full_url'] = $this->get_schema_icon_full_url($schema['uid']);
                 $schema['display_name'] = $this->get_schema_display_name($schema['uid']);
             }
+
+            // Custom schemas only: boolean flag for list UI (avoid sending full field list)
+            $conflicts = $this->get_custom_schema_reserved_root_properties($schema);
+            $schema['has_schema_issues'] = !empty($conflicts);
         }
+        unset($schema);
 
         return $schemas;
+    }
+
+    /**
+     * For custom schemas, return root property names that collide with excluded metadata fields.
+     * Core schemas are skipped (empty array).
+     *
+     * @param array $schema
+     * @return array
+     */
+    public function get_custom_schema_reserved_root_properties($schema)
+    {
+        if (!is_array($schema) || empty($schema['uid'])) {
+            return array();
+        }
+
+        // Core schemas are skipped (strict int check; empty("0") is true in PHP)
+        if (isset($schema['is_core']) && (int)$schema['is_core'] === 1) {
+            return array();
+        }
+
+        try {
+            $path = $this->get_model()->get_schema_file_path($schema['uid']);
+            if (!is_file($path)) {
+                return array();
+            }
+
+            $contents = file_get_contents($path);
+            if ($contents === false) {
+                return array();
+            }
+
+            $decoded = json_decode($contents, true);
+            if (!is_array($decoded)) {
+                return array();
+            }
+
+            $this->ci->load->model('Editor_model');
+            return self::find_excluded_root_properties(
+                $decoded,
+                $this->ci->Editor_model->get_metadata_excluded_fields()
+            );
+        } catch (Exception $e) {
+            return array();
+        }
     }
 
     /**
@@ -203,7 +252,81 @@ class Schema_registry
             }
         }
 
+        $this->load_transitive_schema_ref_documents($documents, $schema_dir);
+
         return $documents;
+    }
+
+    /**
+     * Load sibling JSON schema files referenced via $ref from already-loaded documents.
+     */
+    private function load_transitive_schema_ref_documents(array &$documents, $schema_dir)
+    {
+        $pending = array_keys($documents);
+
+        while (!empty($pending)) {
+            $filename = array_shift($pending);
+            if (!isset($documents[$filename])) {
+                continue;
+            }
+
+            foreach ($this->collect_json_file_refs($documents[$filename]) as $ref_file) {
+                if (isset($documents[$ref_file])) {
+                    continue;
+                }
+
+                $path = unix_path($schema_dir . '/' . $ref_file);
+                if (!is_file($path)) {
+                    continue;
+                }
+
+                $content = file_get_contents($path);
+                if ($content === false) {
+                    continue;
+                }
+
+                $decoded = json_decode($content, true);
+                if ($decoded === null) {
+                    continue;
+                }
+
+                $documents[$ref_file] = $decoded;
+                $pending[] = $ref_file;
+            }
+        }
+    }
+
+    /**
+     * @param array|mixed $node
+     * @return string[] Basenames like foo-schema.json
+     */
+    private function collect_json_file_refs($node)
+    {
+        $refs = array();
+
+        if (!is_array($node)) {
+            return $refs;
+        }
+
+        foreach ($node as $key => $value) {
+            if ($key === '$ref' && is_string($value)) {
+                $target = trim(explode('#', $value, 2)[0]);
+                if ($target === '' || strpos($target, '#') === 0 || preg_match('#^https?://#i', $target)) {
+                    continue;
+                }
+                $target = str_replace('\\', '/', $target);
+                $target = basename($target);
+                if (preg_match('/^[a-zA-Z0-9_-]+\.json$/', $target)) {
+                    $refs[] = $target;
+                }
+            } elseif (is_array($value)) {
+                foreach ($this->collect_json_file_refs($value) as $ref) {
+                    $refs[] = $ref;
+                }
+            }
+        }
+
+        return array_values(array_unique($refs));
     }
 
     /**
@@ -245,6 +368,61 @@ class Schema_registry
             }
             throw new Exception("Schema validation failed: " . implode("; ", $messages));
         }
+    }
+
+    /**
+     * Find root-level schema property names that collide with excluded metadata fields.
+     *
+     * Only direct properties on the schema document are checked (nested keys are allowed).
+     *
+     * @param array|object $schema_data
+     * @param array $excluded_fields
+     * @return array Sorted list of conflicting root property names
+     */
+    public static function find_excluded_root_properties($schema_data, array $excluded_fields)
+    {
+        $schema_array = json_decode(json_encode($schema_data), true);
+        if (!is_array($schema_array)
+            || empty($schema_array['properties'])
+            || !is_array($schema_array['properties'])
+        ) {
+            return array();
+        }
+
+        $conflicts = array_intersect(array_keys($schema_array['properties']), $excluded_fields);
+        $conflicts = array_values(array_unique($conflicts));
+        sort($conflicts);
+
+        return $conflicts;
+    }
+
+    /**
+     * Reject main schemas whose root properties use reserved project/metadata field names.
+     *
+     * These names are stripped from the metadata blob on project save
+     * (Editor_model::get_metadata_excluded_fields), so root-level form fields
+     * with these keys cannot be persisted.
+     *
+     * @param array|object $schema_data
+     * @param string|null $filename
+     * @throws Exception
+     */
+    public function assert_no_excluded_root_properties($schema_data, $filename = null)
+    {
+        $this->ci->load->model('Editor_model');
+        $excluded = $this->ci->Editor_model->get_metadata_excluded_fields();
+        $conflicts = self::find_excluded_root_properties($schema_data, $excluded);
+
+        if (empty($conflicts)) {
+            return;
+        }
+
+        $label = $filename ? " ({$filename})" : '';
+        throw new Exception(
+            "Schema{$label} defines reserved root-level properties that cannot be saved in project metadata: "
+            . implode(', ', $conflicts)
+            . ". Nest these fields under an object grouping instead of placing them at the schema root."
+        );
     }
 
     /**
@@ -686,6 +864,77 @@ class Schema_registry
         }
 
         return rtrim($base, '/') . '/' . $segment;
+    }
+
+    /**
+     * Template key prefix aliases for item-form sections.
+     *
+     * Maps template prefixes to schema array property names so validation can
+     * accept e.g. variable.name when the schema path is variables.name.
+     *
+     * @param string $schema_uid Schema UID or alias (microdata, survey, …)
+     * @return array template_prefix => schema_prefix
+     */
+    public function get_template_key_aliases($schema_uid)
+    {
+        $uid = strtolower((string)$schema_uid);
+
+        if (in_array($uid, array('microdata', 'survey'), true)) {
+            return array(
+                'variable' => 'variables',
+                'data_file' => 'data_files'
+            );
+        }
+
+        return array();
+    }
+
+    /**
+     * Convert collected schema fields to dotted template-style keys.
+     *
+     * @param array $fields Output of collect_schema_fields()
+     * @return array{keys: string[], fields: array}
+     */
+    public function fields_to_dotted_template_keys($fields)
+    {
+        $dotted_fields = array();
+        $keys = array();
+
+        if (!is_array($fields)) {
+            return array('keys' => array(), 'fields' => array());
+        }
+
+        foreach ($fields as $field) {
+            $slash_path = isset($field['path']) ? $field['path'] : '';
+            $slash_path = ltrim((string)$slash_path, '/');
+            if ($slash_path === '') {
+                continue;
+            }
+
+            $slash_path = str_replace('/*/', '/', $slash_path);
+            $slash_path = preg_replace('#/\*$#', '', $slash_path);
+            $dotted_key = str_replace('/', '.', $slash_path);
+
+            if ($dotted_key === '' || isset($keys[$dotted_key])) {
+                continue;
+            }
+
+            $keys[$dotted_key] = true;
+            $dotted_fields[] = array(
+                'key' => $dotted_key,
+                'path' => $slash_path,
+                'title' => isset($field['title']) ? $field['title'] : '',
+                'description' => isset($field['description']) ? $field['description'] : '',
+                'type' => isset($field['type']) ? $field['type'] : '',
+                'required' => !empty($field['required']),
+                'enum' => (isset($field['enum']) && is_array($field['enum'])) ? $field['enum'] : null,
+            );
+        }
+
+        return array(
+            'keys' => array_keys($keys),
+            'fields' => $dotted_fields
+        );
     }
 
     private function looks_like_json_schema($schema)

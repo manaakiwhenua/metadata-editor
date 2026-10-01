@@ -14,50 +14,56 @@
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="<?php echo base_url();?>vue-app/assets/leaflet.css" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
-  <style>[v-cloak]{display:none !important;}</style>
+  <style>[v-cloak]{display:none !important;}
+  .global-registry-scalar-field-input--picker input,
+  .global-registry-scalar-field-input--picker .v-input__slot { cursor: pointer; }
+  /* Clear, then picker, then issues — dots stay rightmost inside the field */
+  .global-registry-scalar-field-input .v-input__append-inner {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+  }
+  .global-registry-scalar-field-input--picker .v-input__append-inner .v-input__icon--clear {
+    order: 1;
+  }
+  .global-registry-scalar-field-input .v-input__append-inner > span.d-inline-flex {
+    order: 2;
+  }
+  .translation-edit { font-size: 0.875rem; background: #fff; color: #222; }
+  .translation-edit h5 { font-size: 1.05rem; }
+  .translation-toolbar { position: sticky; top: 56px; z-index: 6; background: #fff; padding: 16px 0 10px; border-bottom: 1px solid #e0e0e0; }
+  .translation-language-list { max-height: 360px; overflow-y: auto; border: 1px solid #eee; }
+  .translation-lang-chip { min-width: 36px; justify-content: center; font-weight: 600; letter-spacing: 0.03em; }
+  .translation-language-list .v-list-item--active { background: #e3f2fd; }
+  .translation-language-search.v-text-field--outlined.v-input--dense .v-input__slot { min-height: 36px !important; }
+  .translation-toolbar .d-flex { gap: 8px; }
+  .translation-complete { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+  .translation-complete-track { flex: 1; height: 8px; background: #eceff1; border-radius: 999px; overflow: hidden; }
+  .translation-complete-fill { height: 100%; background: #1976d2; border-radius: 999px; }
+  .translation-complete-meta { font-size: 0.75rem; color: #555; white-space: nowrap; }
+  .translation-complete-meta span { color: #1976d2; font-weight: 600; margin-left: 6px; }
+  .translation-board { background: linear-gradient(to right, #f3f5f7 50%, #fff 50%); }
+  .translation-pair { display: grid; grid-template-columns: 1fr 1fr; column-gap: 0; width: 100%; }
+  .translation-col { min-width: 0; overflow-x: auto; padding: 8px 16px; background: transparent; }
+  .translation-source { white-space: pre-wrap; overflow-x: auto; background: #e8eef3; border: 0; padding: 6px 8px; min-height: 32px; font-size: 0.875rem; color: #222; line-height: 1.5; }
+  .translation-source--area { min-height: 84px; }
+  .translation-grid-head { position: sticky; top: 0; z-index: 4; font-size: 0.8125rem; font-weight: 600; color: #222; background: linear-gradient(to right, #f3f5f7 50%, #fff 50%); padding-top: 8px; border-bottom: 1px solid #c8c8c8; }
+  .translation-section-title { margin: 1.25rem 0 0.35rem; padding: 0 16px 0.35rem; font-size: 0.95rem; font-weight: 600; color: #111; }
+  .translation-field { padding: 8px 0 10px; background: transparent; border-bottom: 1px solid #d0d0d0; }
+  .translation-field-title { padding: 8px 16px 4px; font-size: 0.8125rem; font-weight: 600; color: #222; }
+  .translation-sublabel { font-size: 0.75rem; font-weight: 600; color: #555; margin-bottom: 2px; }
+  .translation-idx { display: inline-block; min-width: 1.4rem; color: #666; font-weight: 600; }
+  .translation-col .table { width: max-content; min-width: 100%; margin-bottom: 0; background: transparent; }
+  .translation-col .table th,
+  .translation-col .table td { font-size: 0.8125rem; padding: 0.4rem 0.5rem; vertical-align: middle; background: transparent; border: 0; border-bottom: 1px solid #d0d0d0; }
+  .translation-col .table thead th { font-weight: 600; color: #222; white-space: nowrap; background: transparent; border-bottom: 1px solid #bdbdbd; }
+  .translation-col .table .translation-source { min-height: 0; padding: 4px 6px; display: block; }
+  .translation-col .table tbody tr:last-child td { border-bottom: 0; }
+  .translation-col .table th:first-child,
+  .translation-col .table td:first-child { width: 2.25rem; color: #666; }
+  .translation-edit .form-control { font-size: 0.875rem; background: #e8eef3; border-color: #cfcfcf; }
+  </style>
 </head>
-
-<?php
-  //break template into smaller templates by spliting template ['items']
-  $template_parts=array();
-  
-  //update template_parts
-  //get_template_part($metadata_template_arr['items'],$template_parts);
-
-  function get_template_part($items,&$output)
-  {
-    foreach($items as $item){
-      if (isset($item['items'])){
-        get_template_part($item['items'],$output);
-      }
-      if (isset($item['key'])){
-        $output[$item['key']]=$item;
-      }
-    }
-  } 
-
-  $template_keys = array();
-  if (is_array($metadata_template_arr)
-    && isset($metadata_template_arr['items'])
-    && is_array($metadata_template_arr['items'])) {
-    get_template_keys($metadata_template_arr['items'],$template_keys);
-  }
-  function get_template_keys($items,&$output)
-  {
-    foreach($items as $item){
-      if (isset($item['items'])){
-        get_template_keys($item['items'],$output);
-      }
-      if (!isset($item['type'])){
-        $item['type']='string';
-      }
-      if (isset($item['key']) && $item['type']!='section' ){
-        $output[]=$item['key'];
-      }
-    }        
-  }
-  
-?>
 
 <body class="hold-transition sidebar-mini layout-fixed">
 
@@ -66,13 +72,14 @@
       $user=$this->session->userdata('username');
       $this->load->helper('user_access');
 
-      $user_info=[
+      $user_info=array_merge(array(
         'username'=> $user,
         'is_logged_in'=> !empty($user),
         'is_admin'=> $this->ion_auth->is_admin(),
         'can_access_site_admin'=> $this->ion_auth->can_access_site_admin(),
+        'can_access_admin_dashboard'=> $this->ion_auth->can_access_admin_dashboard(),
         'metadata_assessment_enabled'=> metadata_assessment_enabled(),
-      ];
+      ), site_features_user_info());
       
     ?>
 
@@ -84,9 +91,7 @@
           'user_info': <?php echo json_encode($user_info); ?>
         }; 
         let sid='<?php echo $sid;?>';
-        let form_template=<?php echo $metadata_template;?>;
-        let form_template_parts= <?php echo json_encode($template_parts,JSON_PRETTY_PRINT); ?>;
-        var template_structure_valid=<?php echo (!isset($template_structure_valid) || $template_structure_valid) ? 'true' : 'false'; ?>;
+        let project_template_uid=<?php echo json_encode(isset($template_uid) ? $template_uid : ''); ?>;
     </script>
 
   <div id="app" data-app>
@@ -252,6 +257,8 @@
         await this.$store.dispatch('initData',{dataset_id:this.dataset_id});
         await this.$store.dispatch('initTreeItems');
         this.init_tree_data();
+        await this.$store.dispatch('syncActiveNodeFromRoute', this.$route);
+        this.$store.state.app_bootstrap_complete = true;
 
         let vm=this;
 
@@ -291,6 +298,13 @@
         },
         UserHasEditAccess(){
           return this.$store.state.user_has_edit_access && !this.$store.state.project_is_locked;
+        },
+        issuesFeatureEnabled(){
+          return !(CI && CI.user_info && CI.user_info.issues_enabled === false);
+        },
+        translationsFeatureEnabled(){
+          return typeof projectTranslationsUiEnabled === 'function'
+            && projectTranslationsUiEnabled(this.dataset_type || this.$store.state.project_type);
         },
         ProjectIsLocked(){
           return this.$store.state.project_is_locked;
@@ -560,6 +574,9 @@
         },
         $route(to, from) {
           this.setTreeActiveNode(to.path);
+          if (to.path.startsWith('/study/')) {
+            this.$store.dispatch('syncActiveNodeFromRoute', to);
+          }
         },
         ProjectMetadata: 
         {
@@ -582,6 +599,18 @@
         }
       },
       methods:{
+        projectEditorTemplateRoot: function() {
+          if (typeof EditorProjectModulesUtil === 'undefined') {
+            return null;
+          }
+          return EditorProjectModulesUtil.getTemplateRootFromFormTemplate(this.$store.state.formTemplate);
+        },
+        isProjectModuleVisible: function(moduleId) {
+          if (typeof EditorProjectModulesUtil === 'undefined') {
+            return true;
+          }
+          return EditorProjectModulesUtil.isModuleVisible(this.projectEditorTemplateRoot(), moduleId);
+        },
         loadSchemaCoreMappings: function(){
           if (!this.dataset_type){
             this.schema_core_fields = { idno:[], title:[] };
@@ -955,21 +984,24 @@
           }
 
           if (this.dataset_type=='geospatial'){
-            tree_data.push({
-              title: this.$t('feature_catalogue'),
-              type: 'geospatial-features',
-              file: 'database',
-              key:'feature-catalogue',
-              items:this.GeospatialFeatures
-            });
+            if (this.isProjectModuleVisible('feature_catalogue')) {
+              tree_data.push({
+                title: this.$t('feature_catalogue'),
+                type: 'geospatial-features',
+                file: 'database',
+                key:'feature-catalogue',
+                items:this.GeospatialFeatures
+              });
+            }
 
-            tree_data.push({
-              title: this.$t('image_gallery'),
-              type: 'geospatial-gallery',
-              file: 'database',
-              key:'geospatial-gallery'
-            });
-
+            if (this.isProjectModuleVisible('geospatial_gallery')) {
+              tree_data.push({
+                title: this.$t('image_gallery'),
+                type: 'geospatial-gallery',
+                file: 'database',
+                key:'geospatial-gallery'
+              });
+            }
           }
 
           if (this.dataset_type=='indicator' || this.dataset_type=='timeseries'){

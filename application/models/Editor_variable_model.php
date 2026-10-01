@@ -89,11 +89,16 @@ class Editor_variable_model extends ci_model {
         $this->db->where('sid',$sid);
         $this->db->where_in('uid',$uid_list);
         $this->db->delete('editor_variables');
-        return 
+        $result=
         [
             'rows'=>$this->db->affected_rows(),
             'query'=>$this->db->last_query()
         ];
+
+        $this->load->model('Editor_variable_groups_model');
+        $this->Editor_variable_groups_model->remove_variable_uids($sid,$uid_list);
+
+        return $result;
     }
 
 
@@ -249,62 +254,225 @@ class Editor_variable_model extends ci_model {
 
     function bulk_upsert_dictionary($sid,$fileid,$variables)
     {
-        $valid_data_files=$this->Editor_datafile_model->list($sid);
-		$max_variable_id=$this->get_max_vid($sid);
-			
-		foreach($variables as $idx=>$variable)
-        {
-			$max_variable_id=$max_variable_id+1;
-			$variable['file_id']=$fileid;
-			$variable['vid']= 'V'.$max_variable_id;
+        $ctx = $this->begin_dictionary_import($sid, $fileid);
+        return $this->upsert_dictionary_chunk($sid, $fileid, $variables, $ctx);
+    }
 
-			if (!in_array($fileid,$valid_data_files)){
-				throw new Exception("Invalid `file_id`: valid values are: ". implode(", ", $valid_data_files ));
-			}
+    /**
+     * Initialize import context: one project check, one existing-variable index, one max vid scan.
+     */
+    function begin_dictionary_import($sid, $fileid)
+    {
+        $this->Editor_model->check_project_editable($sid);
 
-			//check if variable already exists
-			$variable_info=$this->variable_by_name($sid,$fileid,$variable['name'],true);
+        $valid_data_files = $this->Editor_datafile_model->list($sid);
+        if (!in_array($fileid, $valid_data_files)) {
+            throw new Exception("Invalid `file_id`: valid values are: " . implode(", ", $valid_data_files));
+        }
 
-			$variable['fid']=$fileid;
+        return array(
+            'existing_by_name' => $this->variables_for_file_indexed($sid, $fileid),
+            'max_variable_id' => $this->get_max_vid($sid),
+            'imported_vids' => array(),
+        );
+    }
 
-			//extract interval type [categorical - for enabling frequencies]
-			if (isset($variable['var_intrvl'])) {
-				$variable['interval_type'] = $variable['var_intrvl'];
-			}
+    /**
+     * Upsert a chunk of dictionary variables using preloaded context (batch inserts for new rows).
+     *
+     * @param array $ctx By-reference import context from begin_dictionary_import()
+     * @return array Imported vids for this chunk
+     */
+    function upsert_dictionary_chunk($sid, $fileid, array $variables, array &$ctx)
+    {
+        $insert_rows = array();
+        $name = null;
 
-			$this->validate($variable);
+        foreach ($variables as $variable) {
+            if (!isset($variable['name']) || trim((string)$variable['name']) === '') {
+                throw new Exception('Variable name is required');
+            }
 
-			if($variable_info){
-                // for existing variables, merge metadata with existing metadata
-                // update only few fields e.g. sum_stats, catgry, etc
-                $variable_info['metadata']=$this->update_summary_stats($sid,$variable_info['uid'],$variable_info['metadata'],$variable);
-                
-                if (!isset($variable_info['uid'])){
-                    var_dump($variable_info);
-                    die();
+            $name = trim((string)$variable['name']);
+            $variable['name'] = $name;
+            $variable['file_id'] = $fileid;
+            $variable['fid'] = $fileid;
+
+            if (isset($variable['var_intrvl'])) {
+                $variable['interval_type'] = $variable['var_intrvl'];
+            }
+
+            $ctx['max_variable_id'] = $ctx['max_variable_id'] + 1;
+            $variable['vid'] = 'V' . $ctx['max_variable_id'];
+
+            $this->validate($variable);
+
+            if (isset($ctx['existing_by_name'][$name])) {
+                $variable_info = $ctx['existing_by_name'][$name];
+                $variable_info['metadata'] = $this->update_summary_stats(
+                    $sid,
+                    $variable_info['uid'],
+                    $variable_info['metadata'],
+                    $variable
+                );
+
+                if (!isset($variable_info['uid'])) {
+                    throw new Exception('Existing variable is missing uid: ' . $name);
                 }
 
-                if (isset($variable_info['metadata']['update_required'])){
+                if (isset($variable_info['metadata']['update_required'])) {
                     unset($variable_info['metadata']['update_required']);
                 }
-                
-				$this->update($sid,$variable_info['uid'],$variable_info);
-			}
-			else{
-                $variable['metadata']=$variable;
-                
-                // Set sum_stats_options based on data type for new variables
+
+                $this->update($sid, $variable_info['uid'], $variable_info);
+                $ctx['existing_by_name'][$name] = $variable_info;
+                $ctx['imported_vids'][] = $variable_info['vid'];
+            } else {
+                $variable['metadata'] = $variable;
                 if (!isset($variable['metadata']['sum_stats_options'])) {
                     $variable['metadata']['sum_stats_options'] = $this->parse_sum_stats_options($variable);
                 }
-                
-				$this->insert($sid,$variable);
-			}
+                $insert_rows[] = $this->prepare_dictionary_insert_row($sid, $fileid, $variable);
+                $ctx['imported_vids'][] = $variable['vid'];
+            }
+        }
 
-			$result[]=$variable['vid'];
-		}
+        if (!empty($insert_rows)) {
+            $this->insert_dictionary_rows_batch($insert_rows);
+            $inserted_names = array_column($insert_rows, 'name');
+            foreach ($this->variables_rows_by_names($sid, $fileid, $inserted_names) as $row) {
+                $ctx['existing_by_name'][$row['name']] = $row;
+            }
+        }
 
-		return $result;
+        $chunk_vids = array_slice($ctx['imported_vids'], -count($variables));
+        return $chunk_vids;
+    }
+
+    /**
+     * Stream an NDJSON dictionary file and upsert in internal chunks (single PHP run).
+     */
+    function import_dictionary_from_ndjson($sid, $fileid, $file_path, $chunk_size = 500)
+    {
+        if (!is_file($file_path)) {
+            throw new Exception('Dictionary import file not found');
+        }
+
+        $ctx = $this->begin_dictionary_import($sid, $fileid);
+        $fp = fopen($file_path, 'r');
+        if ($fp === false) {
+            throw new Exception('Failed to open dictionary import file');
+        }
+
+        $batch = array();
+        while (!feof($fp)) {
+            $line = fgets($fp);
+            if ($line === false || trim($line) === '') {
+                continue;
+            }
+            $variable = json_decode($line, true);
+            if (!is_array($variable)) {
+                fclose($fp);
+                throw new Exception('Invalid dictionary import file entry');
+            }
+            $batch[] = $variable;
+            if (count($batch) >= $chunk_size) {
+                $this->upsert_dictionary_chunk($sid, $fileid, $batch, $ctx);
+                $batch = array();
+            }
+        }
+        fclose($fp);
+
+        if (!empty($batch)) {
+            $this->upsert_dictionary_chunk($sid, $fileid, $batch, $ctx);
+        }
+
+        return count($ctx['imported_vids']);
+    }
+
+    /**
+     * Load all variables for a file indexed by name (metadata decoded).
+     */
+    function variables_for_file_indexed($sid, $fid)
+    {
+        $this->db->select('*');
+        $this->db->where('sid', $sid);
+        $this->db->where('fid', $fid);
+        $rows = $this->db->get('editor_variables')->result_array();
+
+        $indexed = array();
+        foreach ($rows as $row) {
+            if (isset($row['metadata'])) {
+                $row['metadata'] = $this->Editor_model->decode_metadata($row['metadata']);
+                $this->normalize_variable_metadata($row['metadata']);
+            } else {
+                $row['metadata'] = array();
+            }
+            $indexed[$row['name']] = $row;
+        }
+        return $indexed;
+    }
+
+    /**
+     * @return array<int, array> Rows with decoded metadata in metadata key
+     */
+    function variables_rows_by_names($sid, $fid, array $names)
+    {
+        if (empty($names)) {
+            return array();
+        }
+
+        $this->db->select('*');
+        $this->db->where('sid', $sid);
+        $this->db->where('fid', $fid);
+        $this->db->where_in('name', $names);
+        $rows = $this->db->get('editor_variables')->result_array();
+
+        foreach ($rows as $key => $row) {
+            if (isset($row['metadata'])) {
+                $rows[$key]['metadata'] = $this->Editor_model->decode_metadata($row['metadata']);
+                $this->normalize_variable_metadata($rows[$key]['metadata']);
+            } else {
+                $rows[$key]['metadata'] = array();
+            }
+        }
+        return $rows;
+    }
+
+    private function prepare_dictionary_insert_row($sid, $fileid, array $variable)
+    {
+        $options = $variable;
+        foreach ($options as $key => $value) {
+            if (!in_array($key, $this->fields)) {
+                unset($options[$key]);
+            }
+        }
+        if (isset($options['name'])) {
+            $options['name'] = trim($options['name']);
+        }
+        $options['sid'] = $sid;
+        $options['fid'] = $fileid;
+
+        if (isset($options['metadata'])) {
+            $options['metadata'] = $this->sync_invalrng_and_is_missing($options['metadata']);
+            $options['metadata'] = $this->remove_catgry_when_freq_disabled($options['metadata']);
+            $this->normalize_variable_metadata($options['metadata']);
+            $core = $this->get_variable_core_fields($options['metadata']);
+            $options = array_merge($options, $core);
+            $options['metadata'] = $this->Editor_model->encode_metadata($options['metadata']);
+        }
+
+        return $options;
+    }
+
+    private function insert_dictionary_rows_batch(array $rows)
+    {
+        $batch_size = 100;
+        $total = count($rows);
+        for ($offset = 0; $offset < $total; $offset += $batch_size) {
+            $slice = array_slice($rows, $offset, $batch_size);
+            $this->db->insert_batch('editor_variables', $slice);
+        }
     }
 
 
@@ -408,6 +576,115 @@ class Editor_variable_model extends ci_model {
 	}
 
 
+	/**
+	 * Remint codebook IDs that are reused across data files.
+	 *
+	 * NADA and DDI require vid unique per study. Rows that share a vid are
+	 * rewritten to {fid}_{vid} (same convention as NADA DDI import). The
+	 * original ID is kept in metadata.vid_original. No-op when all vids are
+	 * already unique. Updates the vid column directly so export/publish can
+	 * heal existing projects without an editable-project check.
+	 *
+	 * @param int $sid
+	 * @return array{updated:int,skipped:int}
+	 */
+	function ensure_unique_vids($sid)
+	{
+		$sid = (int) $sid;
+		if ($sid < 1) {
+			return array('updated' => 0, 'skipped' => 0);
+		}
+
+		$this->db->select('uid, fid, vid, metadata');
+		$this->db->where('sid', $sid);
+		$this->db->order_by('fid, sort_order, uid');
+		$rows = $this->db->get('editor_variables')->result_array();
+
+		if (!$rows) {
+			return array('updated' => 0, 'skipped' => 0);
+		}
+
+		$counts = array();
+		foreach ($rows as $row) {
+			$vid = trim((string) $row['vid']);
+			if ($vid === '') {
+				continue;
+			}
+			$counts[$vid] = isset($counts[$vid]) ? $counts[$vid] + 1 : 1;
+		}
+
+		$has_dupes = false;
+		foreach ($counts as $count) {
+			if ($count > 1) {
+				$has_dupes = true;
+				break;
+			}
+		}
+
+		if (!$has_dupes) {
+			return array('updated' => 0, 'skipped' => count($rows));
+		}
+
+		$this->load->library('DDI_Utils');
+
+		$used = array();
+		foreach ($rows as $row) {
+			$vid = trim((string) $row['vid']);
+			if ($vid !== '' && isset($counts[$vid]) && $counts[$vid] === 1) {
+				$used[$vid] = true;
+			}
+		}
+
+		$updated = 0;
+		$skipped = 0;
+
+		foreach ($rows as $row) {
+			$vid = trim((string) $row['vid']);
+			if ($vid === '' || !isset($counts[$vid]) || $counts[$vid] <= 1) {
+				$skipped++;
+				continue;
+			}
+
+			$new_vid = DDI_Utils::prefix_vid($row['fid'], $vid);
+			if ($new_vid === '' || $new_vid === $vid || isset($used[$new_vid])) {
+				$base = ($new_vid !== '' && $new_vid !== $vid) ? $new_vid : (trim((string) $row['fid']) . '_' . $vid);
+				$base = trim($base, '_');
+				if ($base === '') {
+					$base = $vid;
+				}
+				$candidate = $base;
+				$n = 2;
+				while (isset($used[$candidate]) || $candidate === $vid) {
+					$candidate = $base . '_' . $n;
+					$n++;
+				}
+				$new_vid = $candidate;
+			}
+
+			$used[$new_vid] = true;
+
+			$options = array('vid' => $new_vid);
+			$metadata = $this->Editor_model->decode_metadata(isset($row['metadata']) ? $row['metadata'] : '');
+			if (is_array($metadata)) {
+				if (!isset($metadata['vid_original']) || (string) $metadata['vid_original'] === '') {
+					$metadata['vid_original'] = $vid;
+				}
+				$metadata['vid'] = $new_vid;
+				$metadata['file_id'] = $row['fid'];
+				$metadata['fid'] = $row['fid'];
+				$options['metadata'] = $this->Editor_model->encode_metadata($metadata);
+			}
+
+			$this->db->where('sid', $sid);
+			$this->db->where('uid', $row['uid']);
+			$this->db->update('editor_variables', $options);
+			$updated++;
+		}
+
+		return array('updated' => $updated, 'skipped' => $skipped);
+	}
+
+
 
     /**
      * 
@@ -494,6 +771,33 @@ class Editor_variable_model extends ci_model {
 
         return false;
     }
+
+	function vids_by_uids($sid, $uids)
+	{
+		if (!is_array($uids)) {
+			$uids = array($uids);
+		}
+
+		$uids = array_values(array_unique(array_filter($uids, function ($uid) {
+			return $uid !== '' && $uid !== null;
+		})));
+
+		if (empty($uids)) {
+			return array();
+		}
+
+		$this->db->select('uid, vid');
+		$this->db->where('sid', $sid);
+		$this->db->where_in('uid', $uids);
+		$rows = $this->db->get('editor_variables')->result_array();
+
+		$map = array();
+		foreach ($rows as $row) {
+			$map[$row['uid']] = $row['vid'];
+		}
+
+		return $map;
+	}
 
 	function uid_by_vid($sid,$vid)
     {
@@ -691,6 +995,34 @@ class Editor_variable_model extends ci_model {
 				unset($var_metadata['var_wgt_id']);
 			}
 		}
+
+		// Legacy typo var_qstn_ivuinstr → canonical var_qstn_ivulnstr (NADA / variable-schema)
+		if (array_key_exists('var_qstn_ivuinstr', $var_metadata)) {
+			$legacy = $var_metadata['var_qstn_ivuinstr'];
+			if (($var_metadata['var_qstn_ivulnstr'] ?? '') === '' && $legacy !== '' && $legacy !== null) {
+				$var_metadata['var_qstn_ivulnstr'] = $legacy;
+			}
+			unset($var_metadata['var_qstn_ivuinstr']);
+		}
+	}
+
+	/**
+	 * Interviewer instructions (DDI ivuInstr), canonical metadata key var_qstn_ivulnstr.
+	 *
+	 * @param array $variable Variable row or metadata array
+	 * @return string
+	 */
+	public static function var_qstn_ivulnstr_value($variable)
+	{
+		if (!is_array($variable)) {
+			return '';
+		}
+		$canonical = $variable['var_qstn_ivulnstr'] ?? '';
+		if ($canonical !== '' && $canonical !== null) {
+			return (string)$canonical;
+		}
+		$legacy = $variable['var_qstn_ivuinstr'] ?? '';
+		return $legacy !== null ? (string)$legacy : '';
 	}
 
 	/**
@@ -898,6 +1230,7 @@ class Editor_variable_model extends ci_model {
             $options['metadata'] = $this->sync_invalrng_and_is_missing($options['metadata']);
             // Remove var_catgry when freq is disabled
             $options['metadata'] = $this->remove_catgry_when_freq_disabled($options['metadata']);
+            $this->normalize_variable_metadata($options['metadata']);
             
             $core=$this->get_variable_core_fields($options['metadata']);
             $options=array_merge($options,$core);
@@ -931,6 +1264,7 @@ class Editor_variable_model extends ci_model {
             $options['metadata'] = $this->sync_invalrng_and_is_missing($options['metadata']);
             // Remove var_catgry when sum_stats_options.freq is false
             $options['metadata'] = $this->remove_catgry_when_freq_disabled($options['metadata']);
+            $this->normalize_variable_metadata($options['metadata']);
             
             $core=$this->get_variable_core_fields($options['metadata']);
             $options=array_merge($options,$core);

@@ -8,7 +8,7 @@
             <template v-else>
                 <v-icon style="font-size:x-large;">mdi-file-tree</v-icon>
             </template>
-            <strong v-cloak>{{Title}}</strong>            
+            <strong v-cloak>{{Title}}</strong>
         </div>
         <!--<div>{{ProjectMetadata.idno}} </div>-->        
     </div>
@@ -56,8 +56,9 @@
             {{$t('Save')}}
         </v-btn>
         </template>
+
         </template>
-        <template v-else>
+        <template v-else-if="!UserHasEditAccess">
             <v-btn
                 color="red"
                 dark
@@ -142,7 +143,22 @@
                                     <?php echo t("export_json"); ?>
                                 </v-list-item-title>
                             </v-list-item>
-
+                            <v-list-item @click="onLinkClick(base_url + '/api/editor/project_export/' + dataset_id + '/markdown')">
+                                <v-list-item-icon>
+                                    <v-icon>mdi-language-markdown</v-icon>
+                                </v-list-item-icon>
+                                <v-list-item-title>
+                                    <?php echo t("download_markdown"); ?>
+                                </v-list-item-title>
+                            </v-list-item>
+                            <v-list-item @click="onLinkClick(base_url + '/api/editor/html/' + dataset_id +'?download=true')">
+                                <v-list-item-icon>
+                                    <v-icon>mdi-monitor-arrow-down-variant</v-icon>
+                                </v-list-item-icon>
+                                <v-list-item-title>
+                                    <?php echo t("download_html"); ?>
+                                </v-list-item-title>
+                            </v-list-item>
                             <v-list-item v-if="dataset_type=='indicator'" @click="onLinkClick(base_url + '/api/sdmx/msd/?template_uid=' + projectTemplateUID)">
                                 <v-list-item-icon>
                                     <v-icon>mdi-file</v-icon>
@@ -173,12 +189,12 @@
 
 
                             <v-list-item @click="onRouterLinkClick('/publish')">
-                            <v-list-item-icon>
-                                <v-icon>mdi-arrow-top-right-thick</v-icon>
-                            </v-list-item-icon>
-                            <v-list-item-title>
-                                <?php echo t("publish_to_nada"); ?>
-                            </v-list-item-title>
+                                <v-list-item-icon>
+                                    <v-icon>mdi-arrow-top-right-thick</v-icon>
+                                </v-list-item-icon>
+                                <v-list-item-title>
+                                    {{$t('publish_to_catalog')}}
+                                </v-list-item-title>
                             </v-list-item>
                             <v-list-item @click="onRouterLinkClick('/generate-pdf')">
                             <v-list-item-icon>
@@ -196,7 +212,15 @@
                                     {{$t('Change log')}}
                                 </v-list-item-title>
                             </v-list-item>
-                            <v-list-item @click="onRouterLinkClick('/issues')">
+                            <v-list-item v-if="translationsFeatureEnabled" @click="onRouterLinkClick('/translations')">
+                                <v-list-item-icon>
+                                    <v-icon>mdi-translate</v-icon>
+                                </v-list-item-icon>
+                                <v-list-item-title>
+                                    {{$t('Translations')}}
+                                </v-list-item-title>
+                            </v-list-item>
+                            <v-list-item v-if="issuesFeatureEnabled" @click="onRouterLinkClick('/issues')">
                                 <v-list-item-icon>
                                     <v-icon>mdi-alert-circle-outline</v-icon>
                                 </v-list-item-icon>

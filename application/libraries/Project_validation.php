@@ -37,6 +37,11 @@ class Project_validation
             'created_by',
             'changed_by',
             'user_id',
+            // API request-only keys that must not be validated as study metadata
+            'collection_ids',
+            'overwrite',
+            'validate',
+            'sid',
         );
     }
 
@@ -62,6 +67,101 @@ class Project_validation
             unset($out[$key]);
         }
         return $out;
+    }
+
+    /**
+     * Drop allOf/anyOf/oneOf wrapper errors when a more specific error exists
+     * under the same path. justinrainbow emits "Failed to match all schemas"
+     * at the composition root in addition to the actual field errors.
+     *
+     * @param array $errors JsonSchema validator errors or structured issues
+     * @return array
+     */
+    public static function filter_redundant_json_schema_errors(array $errors)
+    {
+        if (count($errors) < 2) {
+            return array_values($errors);
+        }
+
+        $composition = array('allOf', 'anyOf', 'oneOf');
+        $kept = array();
+
+        foreach ($errors as $index => $error) {
+            $constraint = self::json_schema_error_constraint_name($error);
+            if (!in_array($constraint, $composition, true)) {
+                $kept[] = $error;
+                continue;
+            }
+
+            $wrapper_path = self::json_schema_error_path($error);
+            $has_more_specific = false;
+            foreach ($errors as $other_index => $other) {
+                if ($other_index === $index) {
+                    continue;
+                }
+                $other_path = self::json_schema_error_path($other);
+                if (self::json_schema_path_is_under($other_path, $wrapper_path)) {
+                    $has_more_specific = true;
+                    break;
+                }
+            }
+
+            if (!$has_more_specific) {
+                $kept[] = $error;
+            }
+        }
+
+        return empty($kept) ? array_values($errors) : array_values($kept);
+    }
+
+    /**
+     * @param array $error
+     * @return string
+     */
+    private static function json_schema_error_constraint_name($error)
+    {
+        if (!isset($error['constraint'])) {
+            return '';
+        }
+        if (is_array($error['constraint']) && isset($error['constraint']['name'])) {
+            return (string) $error['constraint']['name'];
+        }
+        if (is_string($error['constraint'])) {
+            return $error['constraint'];
+        }
+        return '';
+    }
+
+    /**
+     * @param array $error
+     * @return string
+     */
+    private static function json_schema_error_path($error)
+    {
+        foreach (array('property', 'path', 'pointer') as $key) {
+            if (!empty($error[$key]) && is_string($error[$key])) {
+                return ltrim($error[$key], '#/');
+            }
+        }
+        return '';
+    }
+
+    /**
+     * True when $child is a nested path under $parent. Empty $parent is the document root.
+     *
+     * @param string $child
+     * @param string $parent
+     * @return bool
+     */
+    private static function json_schema_path_is_under($child, $parent)
+    {
+        if ($child === '') {
+            return false;
+        }
+        if ($parent === '') {
+            return true;
+        }
+        return strpos($child, $parent . '.') === 0 || strpos($child, $parent . '/') === 0;
     }
 
     /**
@@ -137,7 +237,7 @@ class Project_validation
             }
             
             // Convert JsonSchema validator errors to structured issues
-            foreach ($validator->getErrors() as $error) {
+            foreach (self::filter_redundant_json_schema_errors($validator->getErrors()) as $error) {
                 $validation_result['issues'][] = array(
                     'type' => 'validation_error',
                     'property' => $error['property'],
@@ -178,7 +278,7 @@ class Project_validation
         $template_keys = array();
         
         if (isset($template_data['items']) && is_array($template_data['items'])) {
-            $this->collect_template_keys($template_data['items'], '', $template_keys);
+            $this->collect_template_keys($template_data['items'], $template_keys);
             $this->find_template_extra_fields_recursive($metadata, $template_keys, '', $extra_fields);
         }
         
@@ -204,7 +304,7 @@ class Project_validation
             return $validation_result;
         }
 
-        $this->validate_template_items($template_data['items'], $metadata, '', $validation_result['issues'], $validation_result['validation_report']);
+        $this->validate_template_items($template_data['items'], $metadata, $validation_result['issues'], $validation_result['validation_report']);
 
         if (!empty($validation_result['issues'])) {
             $validation_result['valid'] = false;
@@ -392,25 +492,27 @@ class Project_validation
     }
 
     /**
-     * Collect template keys recursively
+     * Collect template keys recursively.
+     * Template item keys are fully-qualified dotted paths (same as the form: study_desc.title_statement.idno).
      */
-    private function collect_template_keys($items, $base_path = '', &$template_keys = array())
+    private function collect_template_keys($items, &$template_keys = array())
     {
         if (!is_array($items)) {
             return;
         }
 
         foreach ($items as $item) {
-            if (!isset($item['key'])) {
+            if (!empty($item['is_custom']) || !isset($item['key'])) {
                 continue;
             }
 
-            $field_key = $item['key'];
-            $field_path = $base_path ? $base_path . '/' . $field_key : '/' . $field_key;
-            $template_keys[] = $field_path;
+            $field_path = self::template_key_to_path($item['key']);
+            if ($field_path !== '') {
+                $template_keys[] = $field_path;
+            }
 
             if (isset($item['items']) && is_array($item['items'])) {
-                $this->collect_template_keys($item['items'], $field_path, $template_keys);
+                $this->collect_template_keys($item['items'], $template_keys);
             }
         }
     }
@@ -479,135 +581,76 @@ class Project_validation
     }
 
     /**
-     * Validate template items recursively
+     * Convert a template field key (dotted, as used by the form) to a JSON-pointer path.
+     * Example: study_desc.title_statement.idno -> /study_desc/title_statement/idno
+     *
+     * @param string $key
+     * @return string
      */
-    private function validate_template_items($items, $metadata, $base_path = '', &$issues = array(), &$validation_report = array())
+    public static function template_key_to_path($key)
     {
-        if (!is_array($items)) {
-            return;
-        }
-
-        foreach ($items as $item) {
-            if (!isset($item['key'])) {
-                continue;
-            }
-
-            $field_key = $item['key'];
-            $field_path = $base_path ? $base_path . '/' . $field_key : '/' . $field_key;
-
-            // Get value from metadata
-            $value = $this->get_value_by_path($metadata, $field_path);
-
-            // Map frontend rules to backend rules
-            $rules = isset($item['rules']) ? $this->map_frontend_to_backend_rules($item['rules']) : '';
-            
-            // Parse rules into array for frontend
-            $rules_applied = array();
-            if (!empty($rules)) {
-                $rules_array = explode('|', $rules);
-                foreach ($rules_array as $rule) {
-                    $rule = trim($rule);
-                    if (!empty($rule)) {
-                        $rules_applied[] = $rule;
-                    }
-                }
-            }
-
-            $errors = array();
-            $is_valid = true;
-            
-            if (!empty($rules)) {
-                $this->ci->load->library('form_validation');
-                $this->ci->form_validation->set_data(array($field_key => $value));
-                $this->ci->form_validation->set_rules($field_key, $item['label'] ?? $field_key, $rules);
-
-                $validation_passed = $this->ci->form_validation->run();
-                if (!$validation_passed) {
-                    $error_message = $this->ci->form_validation->error($field_key);
-                    $errors[] = $error_message;
-                    $is_valid = false;
-                    $issues[] = array(
-                        'type' => 'template_validation_error',
-                        'property' => $field_key,
-                        'path' => $field_path,
-                        'message' => $error_message,
-                        'label' => $item['label'] ?? $field_key
-                    );
-                } else {
-                    $is_valid = true;
-                }
-            } else {
-                // If no rules, skip this item (don't add to validation_report)
-                // Frontend expects only items that were actually validated
-                // Recurse into nested items even if this item has no rules
-                if (isset($item['items']) && is_array($item['items'])) {
-                    $this->validate_template_items($item['items'], $metadata, $field_path, $issues, $validation_report);
-                }
-                continue;
-            }
-
-            // Build validation report item matching frontend expectations
-            // Only include items that have validation rules
-            $validation_report[] = array(
-                'field' => $field_key,
-                'path' => $field_path,
-                'title' => $item['label'] ?? $item['title'] ?? $field_key,
-                'label' => $item['label'] ?? $field_key,
-                'value' => $value,
-                'rules' => $rules,
-                'rules_applied' => $rules_applied,
-                'valid' => $is_valid,
-                'status' => $is_valid ? 'valid' : 'invalid',
-                'errors' => $errors,
-                'error_count' => count($errors)
-            );
-
-            // Recurse into nested items
-            if (isset($item['items']) && is_array($item['items'])) {
-                $this->validate_template_items($item['items'], $metadata, $field_path, $issues, $validation_report);
-            }
-        }
+        $key = str_replace('.', '/', (string) $key);
+        $key = trim($key, '/');
+        return $key === '' ? '' : '/' . $key;
     }
 
     /**
-     * Map frontend validation rules to backend rules
+     * Map VeeValidate / template-manager rules to CodeIgniter form_validation rules.
+     * Accepts a pipe string, a list of rule strings, or an object {rule: true|param}.
+     *
+     * @param mixed $rules
+     * @return string
      */
-    private function map_frontend_to_backend_rules($rules)
+    public static function map_frontend_to_backend_rules($rules)
     {
         $rule_mapping = array(
             'required' => 'required',
             'email' => 'valid_email',
             'url' => 'valid_url',
+            'is_uri' => 'is_uri',
             'numeric' => 'numeric',
             'integer' => 'integer',
             'alpha' => 'alpha',
             'alpha_numeric' => 'alpha_numeric',
+            'alpha_num' => 'alpha_numeric',
+            'alpha_dash' => 'alpha_dash',
             'min' => 'min_length',
-            'max' => 'max_length'
+            'max' => 'max_length',
+            'max_length' => 'max_length',
+            'min_length' => 'min_length',
+            'iso_date' => 'iso_date',
+            'iso_date_partial' => 'iso_date_partial',
+            'iso_year' => 'iso_year',
+            'iso_year_month' => 'iso_year_month',
+            'iso_datetime' => 'iso_datetime'
         );
 
-        $normalize_and_map_rule = function($rule) use ($rule_mapping) {
-            $rule = trim($rule);
-            if (empty($rule)) {
+        $normalize_and_map_rule = function ($rule) use ($rule_mapping) {
+            if (!is_string($rule) && !is_numeric($rule)) {
+                return '';
+            }
+            $rule = trim((string) $rule);
+            if ($rule === '') {
                 return '';
             }
 
-            // Handle rules with parameters (e.g., "min:5" -> "min_length[5]")
-            if (preg_match('/^(\w+):(.+)$/', $rule, $matches)) {
+            if (preg_match('/^(\w+):(.+)$/s', $rule, $matches)) {
                 $rule_name = $matches[1];
                 $rule_value = $matches[2];
-                
+
+                if ($rule_name === 'regex') {
+                    return self::regex_to_ci_rule($rule_value);
+                }
+
                 if (isset($rule_mapping[$rule_name])) {
                     $mapped_rule = $rule_mapping[$rule_name];
-                    // For min/max, convert to CodeIgniter format
-                    if ($rule_name === 'min' || $rule_name === 'max') {
+                    if (in_array($rule_name, array('min', 'max', 'min_length', 'max_length'), true)) {
                         return $mapped_rule . '[' . $rule_value . ']';
                     }
                     return $mapped_rule;
                 }
             }
 
-            // Handle simple rules without parameters
             if (isset($rule_mapping[$rule])) {
                 return $rule_mapping[$rule];
             }
@@ -615,20 +658,567 @@ class Project_validation
             return $rule;
         };
 
+        $rules_array = array();
         if (is_string($rules)) {
             $rules_array = array_map('trim', explode('|', $rules));
         } elseif (is_array($rules)) {
-            $rules_array = $rules;
+            if (self::is_associative_array($rules)) {
+                foreach ($rules as $name => $param) {
+                    if ($param === false || $param === null) {
+                        continue;
+                    }
+                    if ($param === true || $param === '') {
+                        $rules_array[] = (string) $name;
+                    } else {
+                        $rules_array[] = $name . ':' . $param;
+                    }
+                }
+            } else {
+                $rules_array = $rules;
+            }
         } else {
             return '';
         }
 
         $mapped_rules = array_map($normalize_and_map_rule, $rules_array);
-        $mapped_rules = array_filter($mapped_rules, function($rule) {
-            return !empty($rule);
+        $mapped_rules = array_filter($mapped_rules, function ($rule) {
+            return $rule !== '' && $rule !== null;
         });
 
         return implode('|', $mapped_rules);
+    }
+
+    /**
+     * Wrap a regex pattern as a CodeIgniter regex_match rule.
+     * Chooses a PCRE delimiter that is not present in the pattern.
+     *
+     * @param string $pattern Pattern without JS/PCRE delimiters
+     * @return string
+     */
+    public static function regex_to_ci_rule($pattern)
+    {
+        $pattern = (string) $pattern;
+        $delims = array('/', '#', '~', '%', '!', '@', ';');
+        foreach ($delims as $delim) {
+            if (strpos($pattern, $delim) === false) {
+                return 'regex_match[' . $delim . $pattern . $delim . ']';
+            }
+        }
+        return 'regex_match[{' . $pattern . '}]';
+    }
+
+    /**
+     * Merge field-level required / is_required into the field's rules object or pipe string.
+     * Does not strip an existing rules.required entry.
+     *
+     * @param array $item Template field or prop
+     * @return mixed
+     */
+    public static function merge_required_into_rules($item)
+    {
+        $rules = isset($item['rules']) ? $item['rules'] : array();
+        $is_required = !empty($item['is_required']) || !empty($item['required']);
+        if (!$is_required) {
+            return $rules;
+        }
+
+        if (is_string($rules)) {
+            $parts = array_values(array_filter(array_map('trim', explode('|', $rules)), function ($part) {
+                return $part !== '';
+            }));
+            foreach ($parts as $part) {
+                if ($part === 'required' || strpos($part, 'required:') === 0) {
+                    return implode('|', $parts);
+                }
+            }
+            array_unshift($parts, 'required');
+            return implode('|', $parts);
+        }
+
+        if (!is_array($rules) || $rules === array()) {
+            return array('required' => true);
+        }
+
+        if (self::is_associative_array($rules)) {
+            $rules['required'] = true;
+            return $rules;
+        }
+
+        foreach ($rules as $part) {
+            if ($part === 'required' || (is_string($part) && strpos($part, 'required:') === 0)) {
+                return $rules;
+            }
+        }
+        array_unshift($rules, 'required');
+        return $rules;
+    }
+
+    /**
+     * Add the ISO date rule that matches display_options.format when the field is a date.
+     *
+     * @param mixed $rules
+     * @param array $item
+     * @return mixed
+     */
+    public static function merge_date_format_into_rules($rules, $item)
+    {
+        $format = self::explicit_date_format($item);
+        if ($format === null) {
+            return $rules;
+        }
+        $rule_name = self::date_format_rule_name($format);
+        $date_rules = array('iso_date', 'iso_date_partial', 'iso_year', 'iso_year_month', 'iso_datetime');
+
+        if (is_string($rules)) {
+            $parts = array_values(array_filter(array_map('trim', explode('|', $rules)), function ($part) {
+                return $part !== '';
+            }));
+            foreach ($parts as $part) {
+                $name = preg_match('/^(\w+)/', $part, $matches) ? $matches[1] : $part;
+                if (in_array($name, $date_rules, true)) {
+                    return implode('|', $parts);
+                }
+            }
+            $parts[] = $rule_name;
+            return implode('|', $parts);
+        }
+
+        if (!is_array($rules) || $rules === array()) {
+            return array($rule_name => true);
+        }
+
+        if (self::is_associative_array($rules)) {
+            foreach ($date_rules as $existing) {
+                if (!empty($rules[$existing])) {
+                    return $rules;
+                }
+            }
+            $rules[$rule_name] = true;
+            return $rules;
+        }
+
+        foreach ($rules as $part) {
+            $name = is_string($part) && preg_match('/^(\w+)/', $part, $matches) ? $matches[1] : $part;
+            if (in_array($name, $date_rules, true)) {
+                return $rules;
+            }
+        }
+        $rules[] = $rule_name;
+        return $rules;
+    }
+
+    /**
+     * Template date format. Unset display_options.format defaults to partial.
+     *
+     * @param array $item
+     * @return string|null
+     */
+    public static function explicit_date_format($item)
+    {
+        if (!is_array($item) || !isset($item['display_type']) || $item['display_type'] !== 'date') {
+            return null;
+        }
+        if (!isset($item['display_options']['format'])) {
+            return null;
+        }
+        $fmt = $item['display_options']['format'];
+        if ($fmt === 'datetime_iso') {
+            return 'datetime';
+        }
+        $allowed = array('partial', 'date', 'year-month', 'year', 'datetime');
+        if (!in_array($fmt, $allowed, true)) {
+            return null;
+        }
+        return $fmt;
+    }
+
+    public static function resolve_date_format($item)
+    {
+        if (!is_array($item) || !isset($item['display_type']) || $item['display_type'] !== 'date') {
+            return null;
+        }
+        $explicit = self::explicit_date_format($item);
+        return $explicit !== null ? $explicit : 'partial';
+    }
+
+    /**
+     * @param string $format
+     * @return string
+     */
+    public static function date_format_rule_name($format)
+    {
+        switch ($format) {
+            case 'date':
+                return 'iso_date';
+            case 'year-month':
+                return 'iso_year_month';
+            case 'year':
+                return 'iso_year';
+            case 'datetime':
+                return 'iso_datetime';
+            default:
+                return 'iso_date_partial';
+        }
+    }
+
+    /**
+     * YYYY-MM-DD from a date or ISO datetime string.
+     *
+     * @param mixed $value
+     * @return string|null
+     */
+    public static function calendar_date_from_value($value)
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})T/', $value, $matches)) {
+            return $matches[1];
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return $value;
+        }
+        return null;
+    }
+
+    /**
+     * Complete calendar date YYYY-MM-DD (also accepts a legacy ISO datetime).
+     *
+     * @param mixed $value
+     * @return bool
+     */
+    public static function is_iso_date($value)
+    {
+        $date = self::calendar_date_from_value($value);
+        if ($date === null) {
+            return false;
+        }
+        $parts = explode('-', $date);
+        $year = (int) $parts[0];
+        $month = (int) $parts[1];
+        $day = (int) $parts[2];
+        if ($year < 1) {
+            return false;
+        }
+        return checkdate($month, $day, $year);
+    }
+
+    /**
+     * Four-digit year YYYY.
+     *
+     * @param mixed $value
+     * @return bool
+     */
+    public static function is_iso_year($value)
+    {
+        return is_string($value) && preg_match('/^\d{4}$/', $value) && (int) $value >= 1;
+    }
+
+    /**
+     * Year and month YYYY-MM.
+     *
+     * @param mixed $value
+     * @return bool
+     */
+    public static function is_iso_year_month($value)
+    {
+        if (!is_string($value) || !preg_match('/^\d{4}-\d{2}$/', $value)) {
+            return false;
+        }
+        $year = (int) substr($value, 0, 4);
+        $month = (int) substr($value, 5, 2);
+        return $year >= 1 && $month >= 1 && $month <= 12;
+    }
+
+    /**
+     * ISO 8601 date and time.
+     *
+     * @param mixed $value
+     * @return bool
+     */
+    public static function is_iso_datetime($value)
+    {
+        if (!is_string($value)) {
+            return false;
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/', $value)) {
+            return false;
+        }
+        return self::is_iso_date(substr($value, 0, 10));
+    }
+
+    /**
+     * ISO 8601 date allowing YYYY, YYYY-MM, or YYYY-MM-DD (also legacy datetime).
+     *
+     * @param mixed $value
+     * @return bool
+     */
+    public static function is_iso_date_partial($value)
+    {
+        if (!is_string($value)) {
+            return false;
+        }
+        if (self::is_iso_year($value) || self::is_iso_year_month($value)) {
+            return true;
+        }
+        return self::is_iso_date($value);
+    }
+
+    /**
+     * Validate template items recursively. Item keys are fully-qualified dotted paths
+     * (same lookup as the editor form via lodash _.get).
+     */
+    private function validate_template_items($items, $metadata, &$issues = array(), &$validation_report = array())
+    {
+        if (!is_array($items)) {
+            return;
+        }
+
+        foreach ($items as $item) {
+            if (!is_array($item) || !empty($item['is_custom']) || !isset($item['key'])) {
+                continue;
+            }
+
+            $field_key = $item['key'];
+            $field_path = self::template_key_to_path($field_key);
+            $value = $this->get_value_by_path($metadata, $field_path);
+
+            $this->apply_template_field_rules($item, $field_key, $field_path, $value, $issues, $validation_report);
+
+            if (isset($item['items']) && is_array($item['items'])) {
+                $this->validate_template_items($item['items'], $metadata, $issues, $validation_report);
+            }
+
+            if (isset($item['props']) && is_array($item['props']) && $this->is_list_array($value)) {
+                foreach ($value as $index => $row) {
+                    if (!is_array($row) && !is_object($row)) {
+                        continue;
+                    }
+                    $row = (array) $row;
+                    foreach ($item['props'] as $prop) {
+                        if (!is_array($prop) || !isset($prop['key'])) {
+                            continue;
+                        }
+                        $prop_key = $prop['key'];
+                        $prop_path = $field_path . '/' . $index . '/' . $prop_key;
+                        $prop_value = array_key_exists($prop_key, $row) ? $row[$prop_key] : null;
+                        $this->apply_template_field_rules($prop, $prop_key, $prop_path, $prop_value, $issues, $validation_report);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Run mapped template rules against a single field value.
+     *
+     * CodeIgniter form_validation treats unexpected array/object POST values as
+     * empty (it is built for scalar form fields). Structured metadata — arrays
+     * of rows like identifiers — is therefore checked here for required, and
+     * never passed to CI.
+     */
+    private function apply_template_field_rules($item, $field_key, $field_path, $value, &$issues, &$validation_report)
+    {
+        $rules = self::map_frontend_to_backend_rules(self::merge_date_format_into_rules(self::merge_required_into_rules($item), $item));
+        if ($rules === '') {
+            return;
+        }
+
+        $rules_applied = array();
+        foreach (explode('|', $rules) as $rule) {
+            $rule = trim($rule);
+            if ($rule !== '') {
+                $rules_applied[] = $rule;
+            }
+        }
+
+        // Empty optional fields (e.g. keyword URL) skip format rules and
+        // are omitted from the report. Invalid non-empty values still appear.
+        if (!$this->rules_include_required($rules_applied) && $this->is_empty_field_value($value)) {
+            return;
+        }
+
+        $label = $item['label'] ?? $item['title'] ?? $field_key;
+        $errors = array();
+        $is_valid = true;
+
+        if ($this->is_structured_value($value)) {
+            if ($this->rules_include_required($rules_applied) && $this->is_empty_structured_value($value)) {
+                $error_message = $this->required_field_error($label);
+                $errors[] = $error_message;
+                $is_valid = false;
+                $issues[] = array(
+                    'type' => 'template_validation_error',
+                    'property' => $field_key,
+                    'path' => $field_path,
+                    'message' => $error_message,
+                    'label' => $label
+                );
+            }
+        } else {
+            $this->ci->load->library('form_validation');
+            $this->ci->form_validation->reset_validation();
+            $this->ci->form_validation->set_error_delimiters('', '');
+
+            $ci_field = 'template_field';
+            $this->ci->form_validation->set_data(array($ci_field => $value));
+            $this->ci->form_validation->set_rules($ci_field, $label, $rules);
+
+            if (!$this->ci->form_validation->run()) {
+                $error_message = $this->ci->form_validation->error($ci_field);
+                $error_message = is_string($error_message) ? trim($error_message) : '';
+                if ($error_message === '') {
+                    $error_message = 'Validation failed';
+                }
+                $errors[] = $error_message;
+                $is_valid = false;
+                $issues[] = array(
+                    'type' => 'template_validation_error',
+                    'property' => $field_key,
+                    'path' => $field_path,
+                    'message' => $error_message,
+                    'label' => $label
+                );
+            }
+        }
+
+        $validation_report[] = array(
+            'field' => $field_key,
+            'path' => $field_path,
+            'title' => $item['title'] ?? $label,
+            'label' => $label,
+            'value' => $value,
+            'rules' => $rules,
+            'rules_applied' => $rules_applied,
+            'valid' => $is_valid,
+            'status' => $is_valid ? 'valid' : 'invalid',
+            'errors' => $errors,
+            'error_count' => count($errors)
+        );
+    }
+
+    /**
+     * @param mixed $value
+     * @return bool
+     */
+    private function is_list_array($value)
+    {
+        if (!is_array($value) || $value === array()) {
+            return false;
+        }
+        return array_keys($value) === range(0, count($value) - 1);
+    }
+
+    /**
+     * @param mixed $value
+     * @return bool
+     */
+    private function is_structured_value($value)
+    {
+        return is_array($value) || is_object($value);
+    }
+
+    /**
+     * True when a list/object has no meaningful content (empty array, empty
+     * object, or only empty rows/properties). Used for required on repeatable
+     * template fields.
+     *
+     * @param mixed $value
+     * @return bool
+     */
+    private function is_empty_structured_value($value)
+    {
+        if ($value === null) {
+            return true;
+        }
+        if (is_object($value)) {
+            $value = (array) $value;
+        }
+        if (!is_array($value)) {
+            return $this->is_empty_scalar_value($value);
+        }
+        if ($value === array()) {
+            return true;
+        }
+        foreach ($value as $item) {
+            if (is_array($item) || is_object($item)) {
+                if (!$this->is_empty_structured_value($item)) {
+                    return false;
+                }
+            } elseif (!$this->is_empty_scalar_value($item)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @param mixed $value
+     * @return bool
+     */
+    private function is_empty_field_value($value)
+    {
+        if ($this->is_structured_value($value)) {
+            return $this->is_empty_structured_value($value);
+        }
+        return $this->is_empty_scalar_value($value);
+    }
+
+    /**
+     * @param mixed $value
+     * @return bool
+     */
+    private function is_empty_scalar_value($value)
+    {
+        if ($value === null || $value === false) {
+            return true;
+        }
+        if (is_numeric($value)) {
+            return false;
+        }
+        return trim((string) $value) === '';
+    }
+
+    /**
+     * @param array $rules
+     * @return bool
+     */
+    private function rules_include_required($rules)
+    {
+        foreach ($rules as $rule) {
+            if ($rule === 'required' || (is_string($rule) && strpos($rule, 'required:') === 0)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Match CodeIgniter's localized required message.
+     *
+     * @param string $label
+     * @return string
+     */
+    private function required_field_error($label)
+    {
+        $this->ci->lang->load('form_validation');
+        $line = $this->ci->lang->line('form_validation_required');
+        if (!is_string($line) || $line === '') {
+            $line = 'The {field} field is required.';
+        }
+        return str_replace(array('{field}', '{param}'), array($label, ''), $line);
+    }
+
+    /**
+     * @param array $arr
+     * @return bool
+     */
+    private static function is_associative_array($arr)
+    {
+        if (!is_array($arr) || $arr === array()) {
+            return false;
+        }
+        return array_keys($arr) !== range(0, count($arr) - 1);
     }
 
     /**

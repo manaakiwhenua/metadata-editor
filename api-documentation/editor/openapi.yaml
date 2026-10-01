@@ -61,10 +61,26 @@ tags:
     description: Administrative Metadata templates
   - name: Publish projects
     description: Publish projects to NADA catalogs
+  - name: Publish requests
+    description: >-
+      Publish requests support a review-and-publish workflow: project owners submit
+      projects to official catalogs for administrators or catalog curators to review
+      and publish (or return), instead of pushing metadata to NADA themselves.
+      Owners mark projects ready; curators work the queue and record outcomes.
+  - name: Notifications
+    description: Current-user in-app notification inbox
   - name: Catalog connections
     description: Manage catalog connections
+  - name: Project translations
+    description: >-
+      Study-level metadata translations for a project. The project language is
+      the primary language of the canonical metadata. Target languages are
+      stored as overlays and do not include data files, variables, or variable
+      groups.
   - name: Issues
     description: Manage project metadata issues
+  - name: Validation
+    description: Project metadata schema, template, and variable validation reports
   - name: Jobs
     description: Background jobs
   - name: Codelists
@@ -123,12 +139,16 @@ x-tagGroups:
   - name: Publish projects
     tags:
       - Publish projects
+      - Publish requests
   - name: Catalog connections
     tags:
       - Catalog connections
   - name: Issues
     tags:
       - Issues
+  - name: Validation
+    tags:
+      - Validation
   - name: Jobs
     tags:
       - Jobs
@@ -139,6 +159,9 @@ x-tagGroups:
   - name: Indicator DSD
     tags:
       - Indicator DSD
+  - name: Notifications
+    tags:
+      - Notifications
 paths:
   /issues:
     get:
@@ -660,9 +683,12 @@ paths:
       summary: Get project JSON
       description: >
         Get project metadata as JSON. For microdata/survey projects, the response
-        includes all variables by default. Use `exclude_variables=1` to omit
+        includes all variables by default and a `variable_groups` array in
+        interchange form (space-separated VIDs/VGIDs, matching
+        `variable-group-schema.json`). Use `exclude_variables=1` to omit
         variables from the response (useful when only study-level metadata is
-        needed, e.g. for comparison workflows).
+        needed, e.g. for comparison workflows). `variable_groups` is still
+        included when variables are omitted.
       operationId: singleProjectJSON
       parameters:
         - name: id
@@ -682,7 +708,8 @@ paths:
           description: >
             Exclude variables from the response. Only applicable to microdata/survey
             projects. When set to `1`, the `variables` array is omitted from the
-            JSON output. The `data_files` array is still included.
+            JSON output. The `data_files` and `variable_groups` arrays are still
+            included.
           required: false
           schema:
             type: integer
@@ -878,12 +905,50 @@ paths:
                     type: string
       security:
         - ApiKeyAuth: []
-  "/editor/delete/{id}":
+  "/editor/validate/{id}":
     get:
+      tags:
+        - Validation
+        - Projects
+      summary: Validate project metadata (pass/fail)
+      description: >
+        Validate saved project metadata against the JSON Schema for the project type.
+        For microdata/survey projects, also validates all variables against the variable schema.
+
+
+        Returns HTTP 200 with `{status: success}` when valid. Returns HTTP 400 with
+        schema errors when invalid. Template (form) rules are not applied; use
+        `GET /validation/{sid}/schema` and `GET /validation/{sid}/template` for
+        structured reports.
+      operationId: validateProject
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Project ID or IDNO
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Metadata is valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationSuccessStatus'
+        "400":
+          description: Schema validation failed or project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailedErrors'
+      security:
+        - ApiKeyAuth: []
+  "/editor/delete/{id}":
+    post:
       tags:
         - Projects
       summary: Delete project by ID
-      description: Delete project
+      description: Delete a project by ID or IDNO. Requires project edit access.
       operationId: deleteProject
       parameters:
         - name: id
@@ -1034,6 +1099,148 @@ paths:
             application/json:
               schema:
                 type: object
+  "/variable_groups/{id}":
+    get:
+      tags:
+        - Microdata
+      summary: List variable groups
+      description: >
+        Return the editor-native variable group tree for a microdata/survey
+        project. Membership is `editor_variables.uid` integers. Hierarchy is
+        nested `variable_groups` objects, not DDI IDREF strings.
+        This is the shape the editor UI GET/POSTs. Project JSON export
+        (`/editor/json/{id}`) uses interchange rows instead (space-separated
+        VIDs/VGIDs).
+      operationId: listVariableGroups
+      parameters:
+        - name: id
+          in: path
+          description: Project ID (numeric)
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Nested variable group tree
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  variable_groups:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VariableGroupStored"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - ApiKeyAuth: []
+    post:
+      tags:
+        - Microdata
+      summary: Replace variable groups
+      description: >
+        Replace the project's variable group tree. Body must be the nested
+        storage shape (`vgid` required, `variables` unique positive UIDs,
+        nested `variable_groups` objects). DDI-style space-separated VID/VGID
+        strings are rejected. Empty array clears all groups.
+      operationId: replaceVariableGroups
+      parameters:
+        - name: id
+          in: path
+          description: Project ID (numeric)
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - variable_groups
+              properties:
+                variable_groups:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/VariableGroupStored"
+      responses:
+        "200":
+          description: Groups saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+        "400":
+          description: Validation failed (missing vgid, DDI strings, duplicate ids)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - ApiKeyAuth: []
+  "/import_metadata/{id}":
+    post:
+      tags:
+        - Microdata
+      summary: Import metadata into an existing project
+      description: >
+        Import JSON or DDI/XML into an existing project. For microdata DDI,
+        `options` is a comma-separated list of sections to apply.
+        When `variable_groups` is included, the project's group tree is
+        replaced from the DDI (VID membership is mapped to UIDs after
+        variables are imported). JSON import maps `variable_groups` when
+        the key is present (interchange rows or a nested tree).
+      operationId: importProjectMetadata
+      parameters:
+        - name: id
+          in: path
+          description: Project ID (numeric)
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  description: Metadata file (JSON or DDI/XML)
+                  type: string
+                  format: binary
+                options:
+                  description: >
+                    DDI only. Comma-separated sections to import.
+                    Allowed values: `document_description`, `study_description`,
+                    `data_files`, `variable_info`, `variable_documentation`,
+                    `variable_categories`, `variable_questions`,
+                    `variable_weights`, `variable_groups`, `import_new_data`.
+                  type: string
+                  example: study_description,variable_info,variable_groups
+      responses:
+        "200":
+          description: Import completed
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - ApiKeyAuth: []
   "/editor/sdmx/{id}":
     post:
       tags:
@@ -1056,13 +1263,15 @@ paths:
                 $ref: sdmx-json-metadata-schema.json
       security:
         - ApiKeyAuth: []
-  /importproject/:
+  /importproject/preview:
     post:
       tags:
         - Projects
-      summary: Import project
-      description: Create a project by importing metadata (XML/JSON) or project zip package
-      operationId: importProject
+      summary: Preview project import package
+      description: >
+        Validate a completed resumable upload before creating a project. For ZIP packages,
+        reads info.json from the archive and returns 409 when the package IDNO already exists.
+      operationId: previewImportProject
       requestBody:
         content:
           application/x-www-form-urlencoded:
@@ -1070,19 +1279,91 @@ paths:
               type: object
               properties:
                 type:
-                  description: "Project type e.g. microdata, document, table, timeseries, etc "
+                  description: Project type selected for import
                   type: string
-                file:
-                  description: Project file (XML, JSON or package zip)
+                upload_id:
+                  description: Completed resumable upload ID from POST /api/uploads/*
                   type: string
-                  format: binary
               required:
                 - type
-                - file
+                - upload_id
         required: true
       responses:
         "200":
+          description: Package is ready to import
+        "409":
+          description: Package IDNO already exists
+      security:
+        - ApiKeyAuth: []
+  /importproject/:
+    post:
+      tags:
+        - Projects
+      summary: Import project
+      description: >
+        Create a project by importing metadata (XML/JSON/JSONL) or a project ZIP package.
+        Provide either a multipart `file` upload (legacy) or a completed resumable `upload_id`.
+        For ZIP packages with a duplicate package IDNO, use `on_idno_conflict=assign_new_idno`
+        to import as a new project with a generated internal IDNO while preserving study IDNO
+        from the package metadata. Microdata JSON/JSONL/DDI imports `variable_groups`
+        when present (interchange VID/VGID rows or a nested tree; membership is
+        mapped to variable UIDs after variables are imported).
+      operationId: importProject
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - type
+              properties:
+                type:
+                  description: "Project type e.g. microdata, document, table, timeseries, etc "
+                  type: string
+                file:
+                  description: Project file (XML, JSON, JSONL or package zip). Mutually exclusive with upload_id.
+                  type: string
+                  format: binary
+                upload_id:
+                  description: Completed resumable upload ID from POST /api/uploads/*. Mutually exclusive with file.
+                  type: string
+                idno:
+                  description: Optional project IDNO (rare; ZIP packages normally use manifest IDNO)
+                  type: string
+                on_idno_conflict:
+                  description: "ZIP duplicate IDNO handling: fail (default) or assign_new_idno"
+                  type: string
+                  enum:
+                    - fail
+                    - assign_new_idno
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - type
+                - upload_id
+              properties:
+                type:
+                  description: "Project type e.g. microdata, document, table, timeseries, etc "
+                  type: string
+                upload_id:
+                  description: Completed resumable upload ID from POST /api/uploads/*
+                  type: string
+                idno:
+                  description: Optional project IDNO (rare; ZIP packages normally use manifest IDNO)
+                  type: string
+                on_idno_conflict:
+                  description: "ZIP duplicate IDNO handling: fail (default) or assign_new_idno"
+                  type: string
+                  enum:
+                    - fail
+                    - assign_new_idno
+      responses:
+        "200":
           description: successful operation
+        "409":
+          description: Package IDNO already exists and on_idno_conflict=fail
       security:
         - ApiKeyAuth: []
   /editor/create/survey:
@@ -1090,7 +1371,11 @@ paths:
       tags:
         - Microdata
       summary: Create Microdata
-      description: Create a new microdata project
+      description: >
+        Create a new microdata project. The body is the stored DDI document
+        (`survey-schema.json`) plus request-only fields (`project-schema.json`:
+        idno, collection_ids, template_uid) and optional overwrite. Request-only
+        fields are not persisted in the study metadata JSON.
       operationId: createSurvey
       requestBody:
         required: true
@@ -1099,7 +1384,7 @@ paths:
             schema:
               allOf:
                 - $ref: survey-schema.json
-                - $ref: "#/components/schemas/CreateProjectOverwrite"
+                - $ref: "#/components/schemas/CreateProjectRequestParams"
       responses:
         "200":
           description: successful operation
@@ -1201,7 +1486,7 @@ paths:
             schema:
               allOf:
                 - $ref: timeseries-schema.json
-                - $ref: "#/components/schemas/CreateProjectOverwrite"
+                - $ref: "#/components/schemas/CreateProjectRequestParams"
       responses:
         "200":
           description: successful operation
@@ -1251,7 +1536,7 @@ paths:
             schema:
               allOf:
                 - $ref: timeseries-db-schema.json
-                - $ref: "#/components/schemas/CreateProjectOverwrite"
+                - $ref: "#/components/schemas/CreateProjectRequestParams"
       responses:
         "200":
           description: successful operation
@@ -1301,7 +1586,7 @@ paths:
             schema:
               allOf:
                 - $ref: geospatial-schema.json
-                - $ref: "#/components/schemas/CreateProjectOverwrite"
+                - $ref: "#/components/schemas/CreateProjectRequestParams"
       responses:
         "200":
           description: successful operation
@@ -1351,7 +1636,7 @@ paths:
             schema:
               allOf:
                 - $ref: document-schema.json
-                - $ref: "#/components/schemas/CreateProjectOverwrite"
+                - $ref: "#/components/schemas/CreateProjectRequestParams"
       responses:
         "200":
           description: successful operation
@@ -1401,7 +1686,7 @@ paths:
             schema:
               allOf:
                 - $ref: table-schema.json
-                - $ref: "#/components/schemas/CreateProjectOverwrite"
+                - $ref: "#/components/schemas/CreateProjectRequestParams"
       responses:
         "200":
           description: successful operation
@@ -1451,7 +1736,7 @@ paths:
             schema:
               allOf:
                 - $ref: image-schema.json
-                - $ref: "#/components/schemas/CreateProjectOverwrite"
+                - $ref: "#/components/schemas/CreateProjectRequestParams"
       responses:
         "200":
           description: successful operation
@@ -1501,7 +1786,7 @@ paths:
             schema:
               allOf:
                 - $ref: video-schema.json
-                - $ref: "#/components/schemas/CreateProjectOverwrite"
+                - $ref: "#/components/schemas/CreateProjectRequestParams"
       responses:
         "200":
           description: successful operation
@@ -1551,7 +1836,7 @@ paths:
             schema:
               allOf:
                 - $ref: script-schema.json
-                - $ref: "#/components/schemas/CreateProjectOverwrite"
+                - $ref: "#/components/schemas/CreateProjectRequestParams"
       responses:
         "200":
           description: successful operation
@@ -2647,8 +2932,17 @@ paths:
                 dctype:
                   description: Resource type
                   type: string
+                dcformat:
+                  description: Resource file format
+                  type: string
                 title:
                   description: Resource title
+                  type: string
+                subtitle:
+                  description: Resource subtitle
+                  type: string
+                id_number:
+                  description: Unique identifier for the resource (ISBN, DOI, or catalog ID)
                   type: string
                 author:
                   type: string
@@ -2657,6 +2951,9 @@ paths:
                 country:
                   type: string
                 language:
+                  type: string
+                subjects:
+                  description: Keywords or subject terms describing the resource
                   type: string
                 contributor:
                   type: string
@@ -2742,8 +3039,17 @@ paths:
                 dctype:
                   description: Resource type
                   type: string
+                dcformat:
+                  description: Resource file format
+                  type: string
                 title:
                   description: Resource title
+                  type: string
+                subtitle:
+                  description: Resource subtitle
+                  type: string
+                id_number:
+                  description: Unique identifier for the resource (ISBN, DOI, or catalog ID)
                   type: string
                 author:
                   type: string
@@ -2752,6 +3058,9 @@ paths:
                 country:
                   type: string
                 language:
+                  type: string
+                subjects:
+                  description: Keywords or subject terms describing the resource
                   type: string
                 contributor:
                   type: string
@@ -4079,6 +4388,507 @@ paths:
           description: Bad request - project not found or publishing failed
       security:
         - ApiKeyAuth: []
+  /notifications:
+    get:
+      tags:
+        - Notifications
+      summary: List notifications for current user
+      description: >
+        Paginated in-app inbox for the authenticated user. Each row is server-rendered
+        with `title`, `body`, `href`, and `family`. Rows older than the site retention
+        window (`notifications_retention_days`, default 30) are excluded.
+      operationId: listNotifications
+      parameters:
+        - name: limit
+          in: query
+          description: Page size (default 25, max 100)
+          schema:
+            type: integer
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: unread
+          in: query
+          description: When `1` or `true`, return only unread rows
+          schema:
+            type: string
+        - name: type
+          in: query
+          description: Exact notification type filter (e.g. `publish.project_ready`)
+          schema:
+            type: string
+        - name: family
+          in: query
+          description: >-
+            Family filter — `publish`, `sharing`, `ownership`, `collection`, `template`
+          schema:
+            type: string
+            enum: [publish, sharing, ownership, collection, template]
+      responses:
+        "200":
+          description: Inbox page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationsListResponse"
+        "400":
+          description: Bad request
+      security:
+        - ApiKeyAuth: []
+  /notifications/unread_count:
+    get:
+      tags:
+        - Notifications
+      summary: Unread notification count
+      description: Badge count for the header bell. Scoped to current user and retention window.
+      operationId: getNotificationsUnreadCount
+      responses:
+        "200":
+          description: Unread count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationsUnreadCountResponse"
+        "400":
+          description: Bad request
+      security:
+        - ApiKeyAuth: []
+  /notifications/read_all:
+    post:
+      tags:
+        - Notifications
+      summary: Mark all notifications read
+      operationId: markAllNotificationsRead
+      responses:
+        "200":
+          description: All rows marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationsMarkAllReadResponse"
+        "400":
+          description: Bad request
+      security:
+        - ApiKeyAuth: []
+  "/notifications/{id}":
+    get:
+      tags:
+        - Notifications
+      summary: Get one notification
+      description: Returns a single rendered notification for the current user.
+      operationId: getNotification
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Notification row
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationSingleResponse"
+        "404":
+          description: Notification not found
+        "400":
+          description: Bad request
+      security:
+        - ApiKeyAuth: []
+  "/notifications/{id}/read":
+    post:
+      tags:
+        - Notifications
+      summary: Mark one notification read
+      operationId: markNotificationRead
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated row and refreshed unread count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationMarkReadResponse"
+        "404":
+          description: Notification not found
+        "400":
+          description: Bad request
+      security:
+        - ApiKeyAuth: []
+  /publish-requests/queue:
+    get:
+      tags:
+        - Publish requests
+      summary: Publish requests queue
+      description: >
+        Shows pending publish requests for administrators and catalog curators to review.
+        Filter by catalog; results are paginated.
+      operationId: listPublishQueue
+      parameters:
+        - name: catalog_id
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Pending queue page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishQueueResponse"
+        "400":
+          description: Access denied or bad request
+      security:
+        - ApiKeyAuth: []
+  /publish-requests/queue/history:
+    get:
+      tags:
+        - Publish requests
+      summary: Publish requests queue history
+      description: Resolved queue items and publish outcomes across catalogs (curator view).
+      operationId: listPublishQueueHistory
+      parameters:
+        - name: catalog_id
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: History page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishQueueHistoryResponse"
+        "400":
+          description: Access denied or bad request
+      security:
+        - ApiKeyAuth: []
+  "/publish-requests/{publication_id}/resolve":
+    post:
+      tags:
+        - Publish requests
+      summary: Resolve publish request
+      description: >
+        Administrators and catalog curators can accept or reject a publishing request.
+        Provide `action` and `note` in the request body.
+      operationId: resolvePublishQueueItem
+      parameters:
+        - in: path
+          name: publication_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishResolveRequest"
+      responses:
+        "200":
+          description: Resolved placement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishResolveResponse"
+        "400":
+          description: Validation or access error
+      security:
+        - ApiKeyAuth: []
+  /publish-requests/resolve_batch:
+    post:
+      tags:
+        - Publish requests
+      summary: Resolve multiple requests
+      description: >
+        Batch resolve multiple requests. Maximum 100 items.
+      operationId: resolvePublishQueueBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishResolveBatchRequest"
+      responses:
+        "200":
+          description: Batch result summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishResolveBatchResponse"
+        "400":
+          description: Validation or access error
+      security:
+        - ApiKeyAuth: []
+  "/publish-requests/project/{sid}":
+    get:
+      tags:
+        - Publish requests
+      summary: View publish requests by project
+      description: >
+        Returns publish request status for a project — which catalogs are queued,
+        published, or returned.
+      operationId: getProjectPublications
+      parameters:
+        - in: path
+          name: sid
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Placements and summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishProjectPublicationsResponse"
+        "400":
+          description: Bad request
+      security:
+        - ApiKeyAuth: []
+    put:
+      tags:
+        - Publish requests
+      summary: Create publish request
+      description: >
+        Submit a request to publish a project to one or more official catalogs.
+        Administrators and catalog curators are notified to review the request.
+      operationId: markProjectPublishReady
+      parameters:
+        - in: path
+          name: sid
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishMarkReadyRequest"
+      responses:
+        "200":
+          description: Updated placements
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishMarkReadyResponse"
+        "400":
+          description: Validation error
+      security:
+        - ApiKeyAuth: []
+    delete:
+      tags:
+        - Publish requests
+      summary: Cancel publish request
+      description: >
+        A project owner can cancel a submitted publish request before a curator
+        reviews it. Optionally limit to specific catalogs with `catalog_ids` in
+        the body; omit the body to cancel all pending requests on the project.
+        If DELETE is not supported, use `POST /publish-requests/project/{sid}/clear`.
+      operationId: clearProjectPublishReady
+      parameters:
+        - in: path
+          name: sid
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishCatalogIdsRequest"
+      responses:
+        "200":
+          description: Cleared placements
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishClearReadyResponse"
+        "400":
+          description: Bad request
+      security:
+        - ApiKeyAuth: []
+  "/publish-requests/project/{sid}/clear":
+    post:
+      tags:
+        - Publish requests
+      summary: Cancel publish request
+      description: >
+        A project owner can cancel a submitted publish request before a curator
+        reviews it. Optionally limit to specific catalogs with `catalog_ids` in
+        the body; omit the body to cancel all pending requests on the project.
+      operationId: clearProjectPublishReadyPost
+      parameters:
+        - in: path
+          name: sid
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishCatalogIdsRequest"
+      responses:
+        "200":
+          description: Cleared placements
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishClearReadyResponse"
+        "400":
+          description: Bad request
+      security:
+        - ApiKeyAuth: []
+  "/publish-requests/project/{sid}/history":
+    get:
+      tags:
+        - Publish requests
+      summary: Publish request history by project 
+      description: >
+        Returns a history of publish requests for a project.
+      operationId: getProjectPublishHistory
+      parameters:
+        - in: path
+          name: sid
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: History page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishProjectHistoryResponse"
+        "400":
+          description: Bad request
+      security:
+        - ApiKeyAuth: []
+  "/publish-requests/project/{sid}/history/{event_id}":
+    delete:
+      tags:
+        - Publish requests
+      summary: Delete a publish request history event
+      description: >
+        Removes an event from the publish request history by project.
+        If DELETE is not supported, use
+        `POST /publish-requests/project/{sid}/history/{event_id}/delete`.
+      parameters:
+        - in: path
+          name: sid
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: event_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Event removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiStatusResponse"
+        "400":
+          description: Bad request
+      security:
+        - ApiKeyAuth: []
+  "/publish-requests/project/{sid}/history/{event_id}/delete":
+    post:
+      tags:
+        - Publish requests
+      summary: Delete a published history event
+      operationId: deleteProjectPublishHistoryEventPost
+      parameters:
+        - in: path
+          name: sid
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: event_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Event removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiStatusResponse"
+        "400":
+          description: Bad request
+      security:
+        - ApiKeyAuth: []
+  "/publish-requests/{publication_id}":
+    get:
+      tags:
+        - Publish requests
+      summary: Get publish request by ID
+      description: >
+        Returns a publish request details by ID.
+      operationId: getPublishRequestById
+      parameters:
+        - in: path
+          name: publication_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Placement with project and catalog context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishPlacementDetailResponse"
+        "400":
+          description: Access denied or not found
+      security:
+        - ApiKeyAuth: []
   "/versions/{id}":
     get:
       tags:
@@ -4157,6 +4967,379 @@ paths:
       responses:
         "200":
           description: successful operation
+      security:
+        - ApiKeyAuth: []
+  /editor/{id}/translations:
+    get:
+      tags:
+        - Project translations
+      summary: List project translations
+      description: List target-language overlays and the project primary language
+      operationId: listProjectTranslations
+      parameters:
+        - in: path
+          name: id
+          description: Project ID or IDNO
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: successful operation
+      security:
+        - ApiKeyAuth: []
+    post:
+      tags:
+        - Project translations
+      summary: Add a target language
+      description: >-
+        Add a translation language. The project language must already be set
+        and cannot be added as a target.
+      operationId: addProjectTranslation
+      parameters:
+        - in: path
+          name: id
+          description: Project ID or IDNO
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - language
+              properties:
+                language:
+                  type: string
+                  example: es
+      responses:
+        "200":
+          description: successful operation
+        "400":
+          description: Missing project language, invalid language, or already exists
+      security:
+        - ApiKeyAuth: []
+  /editor/{id}/translations/language:
+    post:
+      tags:
+        - Project translations
+      summary: Set project primary language
+      description: >-
+        Set the primary language of the project metadata. Can be changed after
+        translations exist, but cannot be set to a language that already has
+        a translation overlay.
+      operationId: setProjectLanguage
+      parameters:
+        - in: path
+          name: id
+          description: Project ID or IDNO
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - language
+              properties:
+                language:
+                  type: string
+                  example: en
+      responses:
+        "200":
+          description: successful operation
+        "400":
+          description: Invalid language or language is already a target
+      security:
+        - ApiKeyAuth: []
+  /editor/{id}/translations/{language}:
+    get:
+      tags:
+        - Project translations
+      summary: Get translation
+      description: Get the sparse study-metadata overlay for a language
+      operationId: getProjectTranslation
+      parameters:
+        - in: path
+          name: id
+          description: Project ID or IDNO
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: language
+          description: ISO 639 language code
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: successful operation
+        "400":
+          description: Translation not found
+      security:
+        - ApiKeyAuth: []
+    post:
+      tags:
+        - Project translations
+      summary: Save translation
+      description: >-
+        Replace the sparse study-metadata overlay for a language. The payload
+        uses the same keys as project metadata. Only translated scalar strings
+        are stored. Data files, variables, and variable groups are not accepted.
+      operationId: saveProjectTranslation
+      parameters:
+        - in: path
+          name: id
+          description: Project ID or IDNO
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: language
+          description: ISO 639 language code
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                metadata:
+                  type: object
+                  description: Sparse overlay matching project metadata keys
+                  example:
+                    study_desc:
+                      title_statement:
+                        title: Encuesta de Condiciones de Vida 2012
+                fields:
+                  type: array
+                  description: Alternate path/value payload; converted to metadata
+                  items:
+                    type: object
+                    required:
+                      - field_path
+                    properties:
+                      field_path:
+                        type: string
+                        example: /study_desc/title_statement/title
+                      value:
+                        type: string
+      responses:
+        "200":
+          description: successful operation
+        "400":
+          description: Invalid path, empty source, or not study metadata
+      security:
+        - ApiKeyAuth: []
+  /editor/{id}/translations/{language}/export:
+    get:
+      tags:
+        - Project translations
+      summary: Export translated fields as JSON
+      description: >-
+        JSON containing only translated study fields. Untranslated content is
+        omitted. Array indexes stay arrays (not the stored overlay object keys).
+        Filename is {idno}-{language}.json. Default is inline in the browser;
+        pass download=1 to save as a file.
+      operationId: exportProjectTranslation
+      parameters:
+        - in: path
+          name: id
+          description: Project ID or IDNO
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: language
+          description: ISO 639 language code
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: download
+          description: Set to 1 to download as an attachment
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Translated fields JSON
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          description: Translation not found
+      security:
+        - ApiKeyAuth: []
+  /editor/{id}/translations/overlay/source:
+    get:
+      tags:
+        - Project translations
+      summary: Export source overlay
+      description: >-
+        Download or view the original study metadata as an overlay interchange
+        file. language is null; set it to a target language before import.
+        Filename is {idno}-source-overlay.json. Default is inline; pass
+        download=1 to save as a file.
+      operationId: exportProjectTranslationSourceOverlay
+      parameters:
+        - in: path
+          name: id
+          description: Project ID or IDNO
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: download
+          description: Set to 1 to download as an attachment
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Source overlay JSON
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          description: Project not found
+      security:
+        - ApiKeyAuth: []
+  /editor/{id}/translations/overlay:
+    post:
+      tags:
+        - Project translations
+      summary: Import overlay
+      description: >-
+        Import a translation overlay interchange file. The payload must include
+        format=overlay and language. Creates the target language if needed and
+        replaces that overlay. Accepts a JSON body or a multipart file field
+        named file.
+      operationId: importProjectTranslationOverlay
+      parameters:
+        - in: path
+          name: id
+          description: Project ID or IDNO
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - format
+                - language
+              properties:
+                format:
+                  type: string
+                  example: overlay
+                type:
+                  type: string
+                  example: indicator
+                idno:
+                  type: string
+                language:
+                  type: string
+                  example: es
+                source_language:
+                  type: string
+                  example: en
+                metadata:
+                  type: object
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Overlay imported
+        "400":
+          description: Invalid overlay, type/idno mismatch, or validation failed
+      security:
+        - ApiKeyAuth: []
+  /editor/{id}/translations/{language}/overlay:
+    get:
+      tags:
+        - Project translations
+      summary: Export overlay
+      description: >-
+        Download or view the stored translation overlay. This is the interchange
+        format for import. Filename is {idno}-{language}-overlay.json. Default
+        is inline; pass download=1 to save as a file.
+      operationId: exportProjectTranslationOverlay
+      parameters:
+        - in: path
+          name: id
+          description: Project ID or IDNO
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: language
+          description: ISO 639 language code
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: download
+          description: Set to 1 to download as an attachment
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Overlay JSON
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          description: Translation not found
+      security:
+        - ApiKeyAuth: []
+  /editor/{id}/translations/{language}/delete:
+    post:
+      tags:
+        - Project translations
+      summary: Delete a target language
+      description: Delete a translation overlay
+      operationId: deleteProjectTranslation
+      parameters:
+        - in: path
+          name: id
+          description: Project ID or IDNO
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: language
+          description: ISO 639 language code
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: successful operation
+        "400":
+          description: Translation not found
       security:
         - ApiKeyAuth: []
   /catalog-connections:
@@ -5870,32 +7053,400 @@ paths:
                     additionalProperties: true
       security:
         - ApiKeyAuth: []
+  "/validation/{sid}":
+    get:
+      tags:
+        - Validation
+      summary: Schema validation report (alias)
+      description: >
+        Alias of `GET /validation/{sid}/schema`. `{sid}` must be the numeric project ID
+        (these routes do not accept IDNO).
+      operationId: validationSchemaAlias
+      parameters:
+        - $ref: '#/components/parameters/ValidationProjectSid'
+      responses:
+        "200":
+          description: Schema validation report (HTTP 200 even when metadata is invalid)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchemaValidationEnvelope'
+        "400":
+          description: Project not found or request failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - ApiKeyAuth: []
+  "/validation/{sid}/schema":
+    get:
+      tags:
+        - Validation
+      summary: Schema validation report
+      description: >
+        Validate saved project metadata against the JSON Schema for the project type.
+        Returns a structured issue list. HTTP 200 even when `validation.valid` is false.
+        Requires project view access.
+      operationId: validationSchema
+      parameters:
+        - $ref: '#/components/parameters/ValidationProjectSid'
+      responses:
+        "200":
+          description: Schema validation report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchemaValidationEnvelope'
+        "400":
+          description: Project not found or request failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - ApiKeyAuth: []
+  "/validation/{sid}/template":
+    get:
+      tags:
+        - Validation
+      summary: Template rules validation report
+      description: >
+        Validate saved project metadata against the form template's field rules
+        (`required`, `regex`, `min`/`max`, `is_uri`, and so on).
+
+
+        By default uses the template assigned to the project. If none is assigned,
+        uses the default template for the project type (then the first core template),
+        matching the editor. Pass `template_uid` to validate against a different
+        template of the same data type without changing the project assignment.
+
+
+        HTTP 200 even when `validation.valid` is false. `validation.template_uid_source`
+        is `assigned`, `default`, `core`, or `override`. HTTP 400 when an override
+        `template_uid` is unknown or the template type does not match the project.
+      operationId: validationTemplate
+      parameters:
+        - $ref: '#/components/parameters/ValidationProjectSid'
+        - name: template_uid
+          in: query
+          required: false
+          description: >
+            Template UID to validate against. Omit to use the project's assigned
+            template, or the type default if none is assigned.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Template validation report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateValidationEnvelope'
+        "400":
+          description: Override template not found, type mismatch, or project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - ApiKeyAuth: []
+  "/validation/{sid}/variables":
+    get:
+      tags:
+        - Validation
+      summary: Variable schema validation report
+      description: >
+        Validate microdata/survey project variables against the variable JSON Schema.
+        Not available for other project types (HTTP 400). Stops after `limit` issues.
+        `mode=light` only checks empty variable labels via SQL (no full schema decode).
+      operationId: validationVariables
+      parameters:
+        - $ref: '#/components/parameters/ValidationProjectSid'
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of issues to return (default 50, max 1000)
+          schema:
+            type: integer
+            default: 50
+            maximum: 1000
+        - name: mode
+          in: query
+          required: false
+          description: Use `light` for a fast empty-label check only
+          schema:
+            type: string
+            enum:
+              - light
+      responses:
+        "200":
+          description: Variables validation report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VariablesValidationEnvelope'
+        "400":
+          description: Not a microdata project, or project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - ApiKeyAuth: []
+  "/validation/{sid}/translations":
+    get:
+      tags:
+        - Validation
+      summary: Translation overlay validation
+      description: >
+        Check stored translation overlays against the current source metadata.
+        Reports translated paths that are missing from the source, empty in the
+        source, not a text value, or not study metadata. Does not score
+        completeness. Requires project view access.
+      operationId: validationTranslations
+      parameters:
+        - $ref: '#/components/parameters/ValidationProjectSid'
+      responses:
+        "200":
+          description: Translation validation report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  validation:
+                    type: object
+                    properties:
+                      valid:
+                        type: boolean
+                      language:
+                        type: string
+                        nullable: true
+                      issues:
+                        type: array
+                        items:
+                          type: object
+                      translations:
+                        type: array
+                        items:
+                          type: object
+        "400":
+          description: Project not found or request failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - ApiKeyAuth: []
+  "/validation/{sid}/extra_fields":
+    get:
+      tags:
+        - Validation
+      summary: Schema extra fields
+      description: >
+        List metadata fields that are not defined in the project type JSON Schema.
+        Requires project view access.
+      operationId: validationExtraFields
+      parameters:
+        - $ref: '#/components/parameters/ValidationProjectSid'
+      responses:
+        "200":
+          description: Extra fields report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtraFieldsEnvelope'
+        "400":
+          description: Project not found or request failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - ApiKeyAuth: []
+  "/validation/{sid}/template_extra_fields":
+    get:
+      tags:
+        - Validation
+      summary: Template extra fields
+      description: >
+        List metadata fields that are not present in the selected template.
+        Optional `template_uid` overrides the assigned template (same rules as
+        `GET /validation/{sid}/template`, including default-template fallback).
+      operationId: validationTemplateExtraFields
+      parameters:
+        - $ref: '#/components/parameters/ValidationProjectSid'
+        - name: template_uid
+          in: query
+          required: false
+          description: Template UID to compare against. Omit to use the assigned or default template.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Template extra fields report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateExtraFieldsEnvelope'
+        "400":
+          description: Override template not found, type mismatch, or project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - ApiKeyAuth: []
+  "/validation/{sid}/move_to_additional":
+    post:
+      tags:
+        - Validation
+      summary: Move extra fields to additional
+      description: >
+        Move selected metadata paths into the `additional` object via JSON Patch.
+        Requires project edit access. Schema validation is skipped while applying the patch.
+      operationId: validationMoveToAdditional
+      parameters:
+        - $ref: '#/components/parameters/ValidationProjectSid'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidationPathsRequest'
+      responses:
+        "200":
+          description: Fields moved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationMoveFieldsResponse'
+        "400":
+          description: Bad request or insufficient access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - ApiKeyAuth: []
+  "/validation/{sid}/remove_fields":
+    post:
+      tags:
+        - Validation
+      summary: Remove extra fields
+      description: >
+        Remove selected metadata paths via JSON Patch. Requires project edit access.
+        Schema validation is skipped while applying the patch.
+      operationId: validationRemoveFields
+      parameters:
+        - $ref: '#/components/parameters/ValidationProjectSid'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidationPathsRequest'
+      responses:
+        "200":
+          description: Fields removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationRemoveFieldsResponse'
+        "400":
+          description: Bad request or insufficient access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - ApiKeyAuth: []
+  "/validation/{sid}/fix_array_as_object":
+    post:
+      tags:
+        - Validation
+      summary: Fix array-as-object fields
+      description: >
+        Convert objects with numeric keys to arrays at the given JSON Pointer paths.
+        Requires project edit access. Schema validation is skipped while applying the patch.
+      operationId: validationFixArrayAsObject
+      parameters:
+        - $ref: '#/components/parameters/ValidationProjectSid'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidationPathsRequest'
+      responses:
+        "200":
+          description: Conversion applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFixArrayResponse'
+        "400":
+          description: Bad request or insufficient access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - ApiKeyAuth: []
 
 components:
   requestBodies:
     timeseries-db-schema.json:
+      description: >
+        Stored timeseries-db document plus request-only create/update fields
+        (idno, collection_ids, template_uid, overwrite). Request-only fields
+        are not persisted in metadata.
       content:
         application/json:
           schema:
-            $ref: timeseries-db-schema.json
+            allOf:
+              - $ref: timeseries-db-schema.json
+              - $ref: "#/components/schemas/CreateProjectRequestParams"
       required: true
     survey-schema.json:
+      description: >
+        Stored microdata document plus request-only create/update fields
+        (idno, collection_ids, template_uid, overwrite). Request-only fields
+        are not persisted in metadata.
       content:
         application/json:
           schema:
-            $ref: survey-schema.json
+            allOf:
+              - $ref: survey-schema.json
+              - $ref: "#/components/schemas/CreateProjectRequestParams"
       required: true
     video-schema.json:
+      description: >
+        Stored video document plus request-only create/update fields
+        (idno, collection_ids, template_uid, overwrite). Request-only fields
+        are not persisted in metadata.
       content:
         application/json:
           schema:
-            $ref: video-schema.json
+            allOf:
+              - $ref: video-schema.json
+              - $ref: "#/components/schemas/CreateProjectRequestParams"
       required: true
     table-schema.json:
+      description: >
+        Stored table document plus request-only create/update fields
+        (idno, collection_ids, template_uid, overwrite). Request-only fields
+        are not persisted in metadata.
       content:
         application/json:
           schema:
-            $ref: table-schema.json
+            allOf:
+              - $ref: table-schema.json
+              - $ref: "#/components/schemas/CreateProjectRequestParams"
       required: true
     AddProjectsToCollection:
       content:
@@ -5904,34 +7455,64 @@ components:
             $ref: "#/components/schemas/AddProjectsToCollection"
       required: true
     timeseries-schema.json:
+      description: >
+        Stored timeseries document plus request-only create/update fields
+        (idno, collection_ids, template_uid, overwrite). Request-only fields
+        are not persisted in metadata.
       content:
         application/json:
           schema:
-            $ref: timeseries-schema.json
+            allOf:
+              - $ref: timeseries-schema.json
+              - $ref: "#/components/schemas/CreateProjectRequestParams"
       required: true
     geospatial-schema.json:
+      description: >
+        Stored geospatial document plus request-only create/update fields
+        (idno, collection_ids, template_uid, overwrite). Request-only fields
+        are not persisted in metadata.
       content:
         application/json:
           schema:
-            $ref: geospatial-schema.json
+            allOf:
+              - $ref: geospatial-schema.json
+              - $ref: "#/components/schemas/CreateProjectRequestParams"
       required: true
     document-schema.json:
+      description: >
+        Stored document plus request-only create/update fields
+        (idno, collection_ids, template_uid, overwrite). Request-only fields
+        are not persisted in metadata.
       content:
         application/json:
           schema:
-            $ref: document-schema.json
+            allOf:
+              - $ref: document-schema.json
+              - $ref: "#/components/schemas/CreateProjectRequestParams"
       required: true
     image-schema.json:
+      description: >
+        Stored image document plus request-only create/update fields
+        (idno, collection_ids, template_uid, overwrite). Request-only fields
+        are not persisted in metadata.
       content:
         application/json:
           schema:
-            $ref: image-schema.json
+            allOf:
+              - $ref: image-schema.json
+              - $ref: "#/components/schemas/CreateProjectRequestParams"
       required: true
     script-schema.json:
+      description: >
+        Stored script document plus request-only create/update fields
+        (idno, collection_ids, template_uid, overwrite). Request-only fields
+        are not persisted in metadata.
       content:
         application/json:
           schema:
-            $ref: script-schema.json
+            allOf:
+              - $ref: script-schema.json
+              - $ref: "#/components/schemas/CreateProjectRequestParams"
       required: true
     Collection:
       content:
@@ -5969,7 +7550,409 @@ components:
       in: header
       name: X-API-Key
       description: API key for authentication
+  parameters:
+    ValidationProjectSid:
+      name: sid
+      in: path
+      required: true
+      description: Numeric project ID. Custom `/validation/{sid}/...` routes match digits only and do not accept IDNO.
+      schema:
+        type: integer
   schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: failed
+        message:
+          type: string
+    ValidationSuccessStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+    ValidationFailedErrors:
+      type: object
+      properties:
+        status:
+          type: string
+          example: failed
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    ValidationIssue:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Issue class, e.g. validation_error, template_validation_error, array_as_object
+        property:
+          type: string
+        path:
+          type: string
+          description: JSON Pointer path
+        message:
+          type: string
+        label:
+          type: string
+        constraint:
+          type: string
+          nullable: true
+    SchemaValidationReport:
+      type: object
+      properties:
+        schema_uid:
+          type: string
+        valid:
+          type: boolean
+        type:
+          type: string
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationIssue'
+        error:
+          type: string
+          description: Present when the schema file could not be loaded
+    SchemaValidationEnvelope:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        validation:
+          $ref: '#/components/schemas/SchemaValidationReport'
+    TemplateValidationReportItem:
+      type: object
+      properties:
+        field:
+          type: string
+        path:
+          type: string
+        title:
+          type: string
+        label:
+          type: string
+        value: {}
+        rules:
+          type: string
+        rules_applied:
+          type: array
+          items:
+            type: string
+        valid:
+          type: boolean
+        status:
+          type: string
+          enum:
+            - valid
+            - invalid
+        errors:
+          type: array
+          items:
+            type: string
+        error_count:
+          type: integer
+    TemplateValidationReport:
+      type: object
+      properties:
+        template_uid:
+          type: string
+          nullable: true
+        template_uid_source:
+          type: string
+          description: >
+            assigned = project template_uid, default = type default template,
+            core = first core template for the type, override = query param
+          enum:
+            - assigned
+            - default
+            - core
+            - override
+        valid:
+          type: boolean
+          nullable: true
+          description: >
+            true when template rules pass, false when they fail, null when
+            validation was not run (`error` is set)
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationIssue'
+        validation_report:
+          type: array
+          items:
+            $ref: '#/components/schemas/TemplateValidationReportItem'
+        error:
+          type: string
+          description: Present when no usable template could be resolved for the project
+    TemplateValidationEnvelope:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        validation:
+          $ref: '#/components/schemas/TemplateValidationReport'
+    VariablesValidationReport:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationIssue'
+        validated_count:
+          type: integer
+        total_issues:
+          type: integer
+        limit_reached:
+          type: boolean
+    VariablesValidationEnvelope:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        validation:
+          $ref: '#/components/schemas/VariablesValidationReport'
+    ExtraField:
+      type: object
+      properties:
+        field:
+          type: string
+        path:
+          type: string
+        type:
+          type: string
+        value_preview: {}
+    ExtraFieldsEnvelope:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        result:
+          type: object
+          properties:
+            schema_uid:
+              type: string
+            extra_fields:
+              type: array
+              items:
+                $ref: '#/components/schemas/ExtraField'
+            error:
+              type: string
+    TemplateExtraFieldsEnvelope:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        result:
+          type: object
+          properties:
+            template_uid:
+              type: string
+              nullable: true
+            template_uid_source:
+              type: string
+              enum:
+                - assigned
+                - default
+                - core
+                - override
+            extra_fields:
+              type: array
+              items:
+                $ref: '#/components/schemas/ExtraField'
+            error:
+              type: string
+    ValidationPathsRequest:
+      type: object
+      required:
+        - paths
+      properties:
+        paths:
+          type: array
+          description: JSON Pointer paths (e.g. /study_desc/title_statement/idno)
+          items:
+            type: string
+    ValidationMoveFieldsResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        moved_fields:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        errors:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    ValidationRemoveFieldsResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        removed_fields:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        errors:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    ValidationFixArrayResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        fixed_fields:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        errors:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    VariableGroupConcept:
+      type: object
+      properties:
+        concept:
+          type: string
+          example: Age
+        vocab:
+          type: string
+          example: DDI
+        uri:
+          type: string
+          format: uri
+          example: https://example.org
+    VariableGroupStored:
+      type: object
+      description: >
+        Editor storage shape used by GET/POST `/variable_groups/{id}`.
+        Nested tree; membership is `editor_variables.uid` integers.
+      required:
+        - vgid
+      properties:
+        vgid:
+          type: string
+          maxLength: 45
+          example: VG1
+        group_type:
+          type: string
+          enum:
+            - subject
+            - section
+            - multiResp
+            - grid
+            - display
+            - repetition
+            - version
+            - iteration
+            - analysis
+            - pragmatic
+            - record
+            - file
+            - randomized
+            - other
+        label:
+          type: string
+        txt:
+          type: string
+        universe:
+          type: string
+        notes:
+          type: string
+        definition:
+          type: string
+        variables:
+          type: array
+          description: Variable UIDs (not DDI VIDs)
+          items:
+            type: integer
+          example: [1042, 1043]
+        concepts:
+          type: array
+          items:
+            $ref: "#/components/schemas/VariableGroupConcept"
+        variable_groups:
+          type: array
+          description: Nested child groups
+          items:
+            $ref: "#/components/schemas/VariableGroupStored"
+    VariableGroupInterchange:
+      type: object
+      description: >
+        DDI/JSON export-import row (`variable-group-schema.json`).
+        `variables` and `variable_groups` are space-separated VID/VGID
+        strings. Hierarchy is rebuilt on import.
+      required:
+        - vgid
+      properties:
+        vgid:
+          type: string
+          maxLength: 45
+          example: VG1
+        group_type:
+          type: string
+          description: JSON/UI uses `multiResp`; DDI writes `multipleResp`
+          enum:
+            - subject
+            - section
+            - multiResp
+            - grid
+            - display
+            - repetition
+            - version
+            - iteration
+            - analysis
+            - pragmatic
+            - record
+            - file
+            - randomized
+            - other
+        label:
+          type: string
+        txt:
+          type: string
+        universe:
+          type: string
+        notes:
+          type: string
+        definition:
+          type: string
+        variables:
+          type: string
+          description: Space-separated VIDs (DDI `@var`)
+          example: V1 V2 V3
+        variable_groups:
+          type: string
+          description: Space-separated child VGIDs (DDI `@varGrp`)
+          example: VG2 VG5
+        concepts:
+          type: array
+          items:
+            $ref: "#/components/schemas/VariableGroupConcept"
     MetadataChangePatchItem:
       type: object
       description: Single metadata change at a JSON Pointer path
@@ -6151,6 +8134,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TemplateRevisionHistoryEntry"
+    CreateProjectRequestParams:
+      description: >
+        Request-only fields for create/update. These are not stored in the
+        study metadata document. Project idno, collection_ids, and template_uid
+        are defined in project-schema.json. Nested study idno (for example
+        study_desc.title_statement.idno) remains in the type document schema.
+      allOf:
+        - $ref: project-schema.json
+        - $ref: "#/components/schemas/CreateProjectOverwrite"
     CreateProjectOverwrite:
       type: object
       properties:
@@ -6161,6 +8153,11 @@ components:
             If true and a project with the same idno already exists, overwrite its metadata
             in place instead of returning an error. The existing project must be the same type.
             Collection memberships and file attachments are preserved.
+        validate:
+          type: boolean
+          description: >
+            When true on update/patch, validate the stored document against JSON Schema
+            before saving. Create does not schema-validate the request body.
     Template:
       type: object
       properties:
@@ -7338,6 +9335,450 @@ components:
           type: array
           items:
             type: string
+    ApiStatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success, failed]
+        message:
+          type: string
+    NotificationRow:
+      type: object
+      description: Server-rendered inbox row
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          description: Registry type (e.g. `publish.project_ready`, `project.access_granted`)
+        family:
+          type: string
+          enum: [publish, sharing, ownership, collection, template, other]
+        family_label:
+          type: string
+        subject:
+          type: string
+          description: Primary subject line (project, collection, or template title)
+        title:
+          type: string
+        body:
+          type: string
+        href:
+          type: string
+          description: In-app deep link (relative path)
+        action_label:
+          type: string
+          description: Short action label — Ready, Return, Publish, Close, Cancel, etc.
+        actor_label:
+          type: string
+        actor_user_id:
+          type: integer
+          nullable: true
+        read_at:
+          type: integer
+          nullable: true
+          description: Unix timestamp when marked read; null when unread
+        is_unread:
+          type: boolean
+        created:
+          type: integer
+        payload:
+          type: object
+          additionalProperties: true
+    NotificationsListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        unread_count:
+          type: integer
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationRow"
+    NotificationSingleResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        notification:
+          $ref: "#/components/schemas/NotificationRow"
+    NotificationsUnreadCountResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        unread_count:
+          type: integer
+    NotificationMarkReadResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        notification:
+          $ref: "#/components/schemas/NotificationRow"
+        unread_count:
+          type: integer
+    NotificationsMarkAllReadResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        updated:
+          type: integer
+          description: Number of rows marked read
+        unread_count:
+          type: integer
+          enum: [0]
+    PublicationPlacement:
+      type: object
+      description: One project × catalog row from `project_publications`
+      properties:
+        id:
+          type: integer
+          description: Publication placement id
+        sid:
+          type: integer
+        catalog_id:
+          type: integer
+        catalog_type:
+          type: string
+        catalog_title:
+          type: string
+        catalog_url:
+          type: string
+        is_official:
+          type: integer
+          enum: [0, 1]
+        status:
+          type: string
+          nullable: true
+        remote_id:
+          type: string
+          nullable: true
+        remote_url:
+          type: string
+          nullable: true
+        ready_at:
+          type: integer
+          nullable: true
+        ready_by:
+          type: integer
+          nullable: true
+        ready_by_username:
+          type: string
+          nullable: true
+        return_reason:
+          type: string
+          nullable: true
+        options:
+          type: object
+          additionalProperties: true
+        intake:
+          type: object
+          additionalProperties: true
+        is_update:
+          type: integer
+          description: Present on queue rows — 1 when placement already published on catalog
+    PublicationSummary:
+      type: object
+      properties:
+        chip:
+          type: string
+          enum: [none, ready, published]
+        label:
+          type: string
+        ready_catalogs:
+          type: array
+          items:
+            type: string
+        placed_catalogs:
+          type: array
+          items:
+            type: string
+        ready_count:
+          type: integer
+    PublishMarkReadyRequest:
+      type: object
+      required: [requests]
+      properties:
+        requests:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [catalog_id]
+            properties:
+              catalog_id:
+                type: integer
+              options:
+                $ref: "#/components/schemas/PublishOptions"
+    PublishMarkReadyWarning:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [no_curators, only_submitter]
+        catalog_id:
+          type: integer
+        catalog_title:
+          type: string
+        message:
+          type: string
+    PublishMarkReadyResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        publications:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicationPlacement"
+        returned_catalogs:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        summary:
+          $ref: "#/components/schemas/PublicationSummary"
+        study_validation:
+          type: object
+          additionalProperties: true
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublishMarkReadyWarning"
+    PublishProjectPublicationsResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        publications:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicationPlacement"
+        summary:
+          $ref: "#/components/schemas/PublicationSummary"
+    PublicationEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        publication_id:
+          type: integer
+        event:
+          type: string
+        created:
+          type: integer
+          nullable: true
+        catalog_id:
+          type: integer
+          nullable: true
+        catalog_title:
+          type: string
+        catalog_url:
+          type: string
+        is_official:
+          type: integer
+        actor_user_id:
+          type: integer
+          nullable: true
+        actor_username:
+          type: string
+          nullable: true
+        payload:
+          type: object
+          additionalProperties: true
+    PublishProjectHistoryResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicationEvent"
+    PublishQueueResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicationPlacement"
+    PublishQueueHistoryResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicationEvent"
+    PublishCatalogIdsRequest:
+      type: object
+      properties:
+        catalog_ids:
+          type: array
+          items:
+            type: integer
+          description: When omitted or empty, applies to all eligible placements on the project
+    PublishClearReadyResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        cleared_catalog_ids:
+          type: array
+          items:
+            type: integer
+          description: Catalog ids whose pending request was canceled
+        publications:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicationPlacement"
+        returned_catalogs:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        summary:
+          $ref: "#/components/schemas/PublicationSummary"
+    PublishResolveRequest:
+      type: object
+      required: [action, note]
+      properties:
+        action:
+          type: string
+          enum: [published, return, closed, cancel]
+        status:
+          type: string
+          enum: [published, draft]
+          description: Alias for legacy clients; used with `published` action
+        note:
+          type: string
+          maxLength: 5000
+        remote_id:
+          type: string
+          description: Catalog record id when manually marking published
+        remote_url:
+          type: string
+          description: Public catalog URL for the published record
+    PublishResolveResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        action:
+          type: string
+        publication_id:
+          type: integer
+        sid:
+          type: integer
+        catalog_id:
+          type: integer
+        recipient_user_id:
+          type: integer
+        project_title:
+          type: string
+        project_idno:
+          type: string
+        catalog_title:
+          type: string
+        note:
+          type: string
+    PublishResolveBatchRequest:
+      type: object
+      required: [publication_ids, action, note]
+      properties:
+        publication_ids:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: integer
+        action:
+          type: string
+          enum: [published, return, closed, cancel]
+        note:
+          type: string
+          maxLength: 5000
+    PublishResolveBatchResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        action:
+          type: string
+        succeeded_count:
+          type: integer
+        failed_count:
+          type: integer
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              publication_id:
+                type: integer
+              status:
+                type: string
+                enum: [success, failed]
+              message:
+                type: string
+    PublishPlacementDetailResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        publication:
+          $ref: "#/components/schemas/PublicationPlacement"
+        project:
+          type: object
+          additionalProperties: true
+        catalog:
+          type: object
+          additionalProperties: true
     ApiResponse:
       type: object
       properties:

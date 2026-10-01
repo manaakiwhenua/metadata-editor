@@ -1,6 +1,8 @@
 <?php
 
 require(APPPATH.'/libraries/MY_REST_Controller.php');
+require_once(APPPATH.'libraries/Template_uid_conflict_exception.php');
+require_once(APPPATH.'libraries/Template_uid_active_conflict_exception.php');
 
 class Templates extends MY_REST_Controller
 {
@@ -43,6 +45,10 @@ class Templates extends MY_REST_Controller
 	function index_get($uid=null)
 	{
 		try{
+			if ($uid === 'deleted'){
+				return $this->deleted_list_get();
+			}
+
 			if($uid){
 				return $this->template_get($uid);
 			}
@@ -59,6 +65,33 @@ class Templates extends MY_REST_Controller
 				'templates'=>$result
 			);
 						
+			$this->set_response($response, REST_Controller::HTTP_OK);
+		}
+		catch(Exception $e){
+			$error_output=array(
+				'status'=>'failed',
+				'message'=>$e->getMessage()
+			);
+			$this->set_response($error_output, REST_Controller::HTTP_BAD_REQUEST);
+		}
+	}
+
+
+	function deleted_list_get()
+	{
+		try{
+			$this->has_access($resource_='template_manager',$privilege='view');
+
+			$result=$this->Editor_template_model->select_deleted();
+			$custom=isset($result['custom']) && is_array($result['custom']) ? $result['custom'] : array();
+
+			$response=array(
+				'status'=>'success',
+				'total'=>count($custom),
+				'found'=>count($custom),
+				'templates'=>$result
+			);
+
 			$this->set_response($response, REST_Controller::HTTP_OK);
 		}
 		catch(Exception $e){
@@ -120,6 +153,39 @@ class Templates extends MY_REST_Controller
 				
 			if(!$result){
 				throw new Exception("TEMPLATE_NOT_FOUND");
+			}
+
+			$include = $this->input->get('include');
+			$include_parts = array();
+			if ($include !== null && $include !== '') {
+				foreach (explode(',', (string)$include) as $part) {
+					$part = trim($part);
+					if ($part !== '') {
+						$include_parts[] = $part;
+					}
+				}
+			}
+
+			if (in_array('schema_alignment', $include_parts, true)) {
+				$this->load->library('Editor_template_schema_alignment_validator');
+				$template_payload = isset($result['template']) ? $result['template'] : array();
+				if (!is_array($template_payload)) {
+					$template_payload = json_decode((string)$template_payload, true);
+				}
+				if (!is_array($template_payload)) {
+					$template_payload = array();
+				}
+				$data_type = isset($result['data_type']) ? $result['data_type'] : '';
+				$alignment = Editor_template_schema_alignment_validator::collect_enum_alignment_issues(
+					$data_type,
+					$template_payload,
+					$uid
+				);
+				$result['schema_alignment'] = array(
+					'issues' => isset($alignment['issues']) ? $alignment['issues'] : array(),
+					'warnings' => isset($alignment['warnings']) ? $alignment['warnings'] : array(),
+					'issue_count' => count(isset($alignment['issues']) ? $alignment['issues'] : array()),
+				);
 			}
 
 			$this->set_response($result, REST_Controller::HTTP_OK);
@@ -233,10 +299,30 @@ class Templates extends MY_REST_Controller
 
 			$output=array(
 				'status'=>'success',
-				'template'=>$result
+				'template'=>$result,
+				'uid_reassigned'=>!empty($result['uid_reassigned']),
+				'original_uid'=>isset($result['original_uid']) ? $result['original_uid'] : null,
 			);
 
 			$this->set_response($output, REST_Controller::HTTP_OK);			
+		}
+		catch(Template_uid_conflict_exception $e){
+			$error_output=array(
+				'status'=>'failed',
+				'code'=>$e->get_conflict_code(),
+				'message'=>$e->getMessage(),
+				'conflict'=>$e->get_conflict_data(),
+			);
+			$this->set_response($error_output, REST_Controller::HTTP_CONFLICT);
+		}
+		catch(Template_uid_active_conflict_exception $e){
+			$error_output=array(
+				'status'=>'failed',
+				'code'=>$e->get_conflict_code(),
+				'message'=>$e->getMessage(),
+				'conflict'=>$e->get_conflict_data(),
+			);
+			$this->set_response($error_output, REST_Controller::HTTP_CONFLICT);
 		}
 		catch(Exception $e){
 			$error_output=array(
@@ -266,6 +352,10 @@ class Templates extends MY_REST_Controller
 
 			if (!empty($template['template_type']) && $template['template_type']!=='custom'){
 				throw new Exception("Read-only templates cannot be edited. Duplicate the template to customize it.");
+			}
+
+			if (!empty($template['is_deleted'])){
+				throw new Exception("Template is deleted. Restore it before editing.");
 			}
 
 			$options=$this->raw_json_input(); 			
@@ -307,7 +397,11 @@ class Templates extends MY_REST_Controller
 				throw new Exception("Read-only templates cannot be deleted.");
 			}
 
-			$this->editor_acl->user_has_template_access($uid,$permission='delete');
+			if (!empty($template['is_deleted'])){
+				throw new Exception("Template is already deleted.");
+			}
+
+			$this->editor_acl->user_can_manage_template($uid, $this->user);
 			$result=$this->Editor_template_model->delete($uid, $this->user_id);
 
 			$output=array(
@@ -315,6 +409,80 @@ class Templates extends MY_REST_Controller
 			);
 
 			$this->set_response($output, REST_Controller::HTTP_OK);			
+		}
+		catch(Exception $e){
+			$error_output=array(
+				'status'=>'failed',
+				'message'=>$e->getMessage()
+			);
+			$this->set_response($error_output, REST_Controller::HTTP_BAD_REQUEST);
+		}
+	}
+
+
+	function restore_post($uid=null)
+	{
+		try{
+			if (!$uid){
+				throw new Exception("Missing parameter: UID");
+			}
+
+			$template=$this->Editor_template_model->get_template_by_uid($uid);
+
+			if (!$template){
+				throw new Exception("Template not found: ".$uid);
+			}
+
+			if (!empty($template['template_type']) && $template['template_type']!=='custom'){
+				throw new Exception("Read-only templates cannot be restored.");
+			}
+
+			$this->editor_acl->user_can_manage_template($uid, $this->user);
+			$result=$this->Editor_template_model->restore($uid, $this->user_id);
+
+			$output=array(
+				'status'=>'success',
+				'restored'=>$result
+			);
+
+			$this->set_response($output, REST_Controller::HTTP_OK);
+		}
+		catch(Exception $e){
+			$error_output=array(
+				'status'=>'failed',
+				'message'=>$e->getMessage()
+			);
+			$this->set_response($error_output, REST_Controller::HTTP_BAD_REQUEST);
+		}
+	}
+
+
+	function purge_post($uid=null)
+	{
+		try{
+			if (!$uid){
+				throw new Exception("Missing parameter: UID");
+			}
+
+			$template=$this->Editor_template_model->get_template_by_uid($uid);
+
+			if (!$template){
+				throw new Exception("Template not found: ".$uid);
+			}
+
+			if (!empty($template['template_type']) && $template['template_type']!=='custom'){
+				throw new Exception("Read-only templates cannot be permanently deleted.");
+			}
+
+			$this->editor_acl->user_can_manage_template($uid, $this->user);
+			$result=$this->Editor_template_model->purge($uid, $this->user_id);
+
+			$output=array(
+				'status'=>'success',
+				'purged'=>$result
+			);
+
+			$this->set_response($output, REST_Controller::HTTP_OK);
 		}
 		catch(Exception $e){
 			$error_output=array(
@@ -431,10 +599,50 @@ class Templates extends MY_REST_Controller
 					throw new Exception("Missing parameter: template_uid");
 				}
 
+				$share_template=$this->Editor_template_model->get_template_by_uid($option['template_uid']);
+				if ($share_template && !empty($share_template['is_deleted'])){
+					throw new Exception("Template is deleted. Restore it before sharing.");
+				}
+
 				$this->editor_acl->user_has_template_access($option['template_uid'],$permission='admin',$this->user);	
 			}
 
+			$this->load->helper('notification');
+			$this->load->model('Template_acl_model');
+			$pending=array();
+			foreach($options as $option){
+				$template_id=$this->Editor_template_model->get_id_by_uid($option['template_uid']);
+				$previous=null;
+				if ($template_id){
+					$previous=notification_first_permission(
+						$this->Template_acl_model->get_user_permissions($template_id, $option['user_id'])
+					);
+				}
+				$pending[]=array(
+					'user_id'=>(int)$option['user_id'],
+					'previous'=>$previous,
+					'permissions'=>isset($option['permissions']) ? $option['permissions'] : 'view',
+					'template_uid'=>$option['template_uid'],
+					'template_id'=>$template_id ? (int)$template_id : 0,
+				);
+			}
+
 			$result=$this->Editor_template_model->share_template($options, $this->user_id);
+
+			$this->load->library('Notification_service');
+			foreach($pending as $item){
+				$this->notification_service->notify_permission_change(
+					'template',
+					$item['user_id'],
+					$item['previous'],
+					$item['permissions'],
+					array(
+						'template_uid'=>$item['template_uid'],
+						'template_id'=>$item['template_id'],
+					),
+					$this->user_id
+				);
+			}
 
 			$output=array(
 				'status'=>'success',
@@ -490,7 +698,30 @@ class Templates extends MY_REST_Controller
 			}
 
 			$this->editor_acl->user_has_template_access($options['template_uid'],$permission='admin',$this->user);
+			$this->load->helper('notification');
+			$this->load->model('Template_acl_model');
+			$template_id=$this->Editor_template_model->get_id_by_uid($options['template_uid']);
+			$previous=null;
+			if ($template_id){
+				$previous=notification_first_permission(
+					$this->Template_acl_model->get_user_permissions($template_id, $options['user_id'])
+				);
+			}
 			$result=$this->Editor_template_model->unshare_template($options['template_uid'], $options['user_id']);
+			if ($previous !== null){
+				$this->load->library('Notification_service');
+				$this->notification_service->notify_permission_change(
+					'template',
+					(int)$options['user_id'],
+					$previous,
+					null,
+					array(
+						'template_uid'=>$options['template_uid'],
+						'template_id'=>$template_id ? (int)$template_id : 0,
+					),
+					$this->user_id
+				);
+			}
 
 			$output=array(
 				'status'=>'success',
@@ -564,10 +795,11 @@ class Templates extends MY_REST_Controller
 				throw new Exception("Missing parameter for `UID`");
 			}
 			
-			$result=$this->Editor_template_model->check_uid_exists($uid);
+			$status=$this->Editor_template_model->get_uid_conflict_status($uid);
 			$response=array(
 				'status'=>'success',
-				'found'=>$result
+				'found'=>$status['exists'],
+				'uid_status'=>$status['status'],
 			);
 						
 			$this->set_response($response, REST_Controller::HTTP_OK);
@@ -602,8 +834,20 @@ class Templates extends MY_REST_Controller
 			if (!isset($options['new_uid'])){
 				throw new Exception("Missing parameter for `new_uid`");
 			}
-			
-			$result=$this->Editor_template_model->replace_uid($options['old_uid'], $options['new_uid']);
+
+			$old_uid=$options['old_uid'];
+			$template=$this->Editor_template_model->get_template_by_uid($old_uid);
+
+			if (!$template){
+				throw new Exception("Template not found: ".$old_uid);
+			}
+
+			if (!empty($template['template_type']) && $template['template_type']!=='custom'){
+				throw new Exception("Read-only templates cannot have their UID changed.");
+			}
+
+			$this->editor_acl->user_can_manage_template($old_uid, $this->user);
+			$result=$this->Editor_template_model->replace_uid($old_uid, $options['new_uid']);
 
 			$response=array(
 				'status'=>'success',
@@ -669,5 +913,6 @@ class Templates extends MY_REST_Controller
 			$this->set_response($error_output, REST_Controller::HTTP_BAD_REQUEST);
 		}
 	}
-	
+
+
 }

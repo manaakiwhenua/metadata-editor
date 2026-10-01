@@ -119,6 +119,111 @@ class MY_Form_validation extends CI_Form_validation {
         $this->set_message('is_uri', t('The {field} field must contain a valid URL.'));
         return FALSE;
     }
+
+    /**
+     * Complete calendar date in YYYY-MM-DD.
+     *
+     * @param string $str
+     * @return bool
+     */
+    function iso_date($str)
+    {
+        if ($str === null || $str === '') {
+            return TRUE;
+        }
+        if (!class_exists('Project_validation', false)) {
+            $this->CI->load->library('Project_validation');
+        }
+        if (Project_validation::is_iso_date($str)) {
+            return TRUE;
+        }
+        $this->set_message('iso_date', t('The {field} field must be a date in YYYY-MM-DD format.'));
+        return FALSE;
+    }
+
+    /**
+     * ISO 8601 date allowing YYYY, YYYY-MM, or YYYY-MM-DD.
+     *
+     * @param string $str
+     * @return bool
+     */
+    function iso_date_partial($str)
+    {
+        if ($str === null || $str === '') {
+            return TRUE;
+        }
+        if (!class_exists('Project_validation', false)) {
+            $this->CI->load->library('Project_validation');
+        }
+        if (Project_validation::is_iso_date_partial($str)) {
+            return TRUE;
+        }
+        $this->set_message('iso_date_partial', t('The {field} field must be a date in YYYY, YYYY-MM, or YYYY-MM-DD format.'));
+        return FALSE;
+    }
+
+    /**
+     * Four-digit year YYYY.
+     *
+     * @param string $str
+     * @return bool
+     */
+    function iso_year($str)
+    {
+        if ($str === null || $str === '') {
+            return TRUE;
+        }
+        if (!class_exists('Project_validation', false)) {
+            $this->CI->load->library('Project_validation');
+        }
+        if (Project_validation::is_iso_year($str)) {
+            return TRUE;
+        }
+        $this->set_message('iso_year', t('The {field} field must be a year in YYYY format.'));
+        return FALSE;
+    }
+
+    /**
+     * Year and month YYYY-MM.
+     *
+     * @param string $str
+     * @return bool
+     */
+    function iso_year_month($str)
+    {
+        if ($str === null || $str === '') {
+            return TRUE;
+        }
+        if (!class_exists('Project_validation', false)) {
+            $this->CI->load->library('Project_validation');
+        }
+        if (Project_validation::is_iso_year_month($str)) {
+            return TRUE;
+        }
+        $this->set_message('iso_year_month', t('The {field} field must be a year and month in YYYY-MM format.'));
+        return FALSE;
+    }
+
+    /**
+     * ISO 8601 date and time.
+     *
+     * @param string $str
+     * @return bool
+     */
+    function iso_datetime($str)
+    {
+        if ($str === null || $str === '') {
+            return TRUE;
+        }
+        if (!class_exists('Project_validation', false)) {
+            $this->CI->load->library('Project_validation');
+        }
+        if (Project_validation::is_iso_datetime($str)) {
+            return TRUE;
+        }
+        $this->set_message('iso_datetime', t('The {field} field must be a date and time in ISO 8601 format.'));
+        return FALSE;
+    }
 	
 	function set_error($message,$field=NULL)
 	{
@@ -201,13 +306,20 @@ class MY_Form_validation extends CI_Form_validation {
     //check if the email address exists in db
 	function check_user_email_exists($email)
 	{
-		$user_data=$this->CI->ion_auth->get_user_by_email($email);
+		$this->CI->config->load('auth');
+		$this->CI->load->library('Oidc_user_resolver');
+		$status = $this->CI->oidc_user_resolver->check_registration_email($email);
 
-		if ($user_data)
-		{
+		if ($status === Oidc_user_resolver::REGISTRATION_EMAIL_AMBIGUOUS) {
+			$this->set_message('check_user_email_exists', t('login_ambiguous_email'));
+			return FALSE;
+		}
+
+		if ($status === Oidc_user_resolver::REGISTRATION_EMAIL_TAKEN) {
 			$this->set_message('check_user_email_exists', t('callback_email_exists'));
 			return FALSE;
 		}
+
 		return TRUE;
     }
     

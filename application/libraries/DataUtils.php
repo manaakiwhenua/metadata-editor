@@ -26,6 +26,20 @@ class DataUtils
 		$this->DataApiUrl = $this->ci->config->item('data_api_url', 'editor');
 	}
 
+	/**
+	 * Default Guzzle HTTP client options for FastAPI job polling.
+	 *
+	 * @return array
+	 */
+	private function fastapi_http_client_options()
+	{
+		return array(
+			'connect_timeout' => 10,
+			'timeout' => 60,
+			'http_errors' => false,
+		);
+	}
+
 
 	/**
 	 * 
@@ -104,24 +118,44 @@ class DataUtils
 		return $response;
 	}
 
-	public function get_file_name_labels($datafile_path)
+	/**
+	 * Call FastAPI /name-labels.
+	 *
+	 * @param string $datafile_path Absolute path to data file
+	 * @param array $options Optional: expected_columns (array), include_file_info (bool),
+	 *                       include_comparison (bool), columns_only (bool)
+	 * @return array
+	 */
+	public function get_file_name_labels($datafile_path, $options = array())
 	{
 		$client = new Client([
 			'base_uri' => $this->DataApiUrl.'name-labels'
 		]);
-		
-		$request_body=[
-			"file_path"=> realpath($datafile_path)
-		];
-			
+
+		$resolved = realpath($datafile_path);
+		$request_body = array(
+			'file_path' => $resolved ? $resolved : $datafile_path,
+		);
+
+		if (!empty($options['expected_columns']) && is_array($options['expected_columns'])) {
+			$request_body['expected_columns'] = array_values($options['expected_columns']);
+		}
+		if (!empty($options['include_file_info'])) {
+			$request_body['include_file_info'] = true;
+		}
+		if (!empty($options['include_comparison'])) {
+			$request_body['include_comparison'] = true;
+		}
+		if (!empty($options['columns_only'])) {
+			$request_body['columns_only'] = true;
+		}
+
 		$api_response = $client->request('POST', '', [
-			'json' => 
-				$request_body
-			,
+			'json' => $request_body,
 			['debug' => false]
 		]);
 
-		$response=json_decode($api_response->getBody()->getContents(),true);
+		$response = json_decode($api_response->getBody()->getContents(), true);
 		return $response;
 	}
 
@@ -224,14 +258,14 @@ class DataUtils
 	public function get_job_status($job_id)
 	{
 		$request_url = $this->DataApiUrl . 'jobs/' . $job_id;
-		$client = new Client([
-			'base_uri' => $request_url
-		]);
+		$client = new Client(array_merge(
+			array('base_uri' => $request_url),
+			$this->fastapi_http_client_options()
+		));
 
-		$api_response = $client->request('GET', '', [
+		$api_response = $client->request('GET', '', array(
 			'debug' => false,
-			'http_errors' => false
-		]);
+		));
 
 		$status_code = $api_response->getStatusCode();
 		$body_raw = $api_response->getBody()->getContents();
