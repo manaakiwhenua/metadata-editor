@@ -184,7 +184,7 @@
                                 "required": true,
                                 "rules": {
                                     "required": true,
-                                    "regex": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
+                                    "iso_datetime": true
                                 },
                                 "help_text": "Date the dataset was created, in ISO 8601 format (YYYY-MM-DD). Date of creation differs from the temporal coverage. For example, a dataset might have been created in February 2009 (2009-02-15) but the data was collected during the year 2008 (temporal coverage from 2008-01-01 to 2008-12-31)",
                                 "display_type": "text",
@@ -278,7 +278,7 @@
                                         "required": true,
                                         "rules": {
                                             "required": true,
-                                            "regex": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
+                                            "iso_datetime": true
                                         },
                                         "is_required": true
                                     },
@@ -310,7 +310,7 @@
                                 "help_text": "The date the dataset was first published or made publicly available, in ISO 8601 format (YYYY-MM-DD).",
                                 "display_type": "text",
                                 "rules": {
-                                    "regex": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
+                                    "iso_date_partial": true
                                 }
                             },
                             {
@@ -326,8 +326,8 @@
                                         "type": "string",
                                         "prop_key": "optional_additional_metadata.relatedResources.resource",
                                         "required": true,
-                                        "rules":{
-                                            "required":true
+                                        "rules": {
+                                            "required": true
                                         },
                                         "help_text": "A description of the relationship to the related resource.",
                                         "display_type": "text"
@@ -338,8 +338,8 @@
                                         "type": "string",
                                         "prop_key": "optional_additional_metadata.relatedResources.relationType",
                                         "required": true,
-                                        "rules":{
-                                            "required":true
+                                        "rules": {
+                                            "required": true
                                         },
                                         "help_text": "The nature of the relationship between the dataset and the related resource.",
                                         "display_type": "dropdown-custom",
@@ -428,7 +428,7 @@
                                         "help_text": "Start of the temporal coverage period, in ISO 8601 format (YYYY-MM-DD).",
                                         "display_type": "text",
                                         "rules": {
-                                            "regex": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
+                                            "iso_date_partial": true
                                         }
                                     },
                                     {
@@ -439,7 +439,7 @@
                                         "help_text": "End of the temporal coverage period, in ISO 8601 format (YYYY-MM-DD). Omit if ongoing.",
                                         "display_type": "text",
                                         "rules": {
-                                            "regex": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01])([Tt]([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?([Zz]|[+-]([01]\\d|2[0-3]):?[0-5]\\d)?)?)?)?$"
+                                            "iso_date_partial": true
                                         }
                                     },
                                     {
