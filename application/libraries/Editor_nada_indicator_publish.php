@@ -48,6 +48,11 @@ class Editor_nada_indicator_publish {
 			: '';
 		$has_published_data = is_array($binding) && !empty($binding['has_published_data']);
 
+		if (!$has_published_data && $binding !== null) {
+			$this->ci->load->model('Indicator_dsd_model');
+			$has_published_data = $this->ci->Indicator_dsd_model->sync_published_data_tracking_from_duckdb($sid);
+		}
+
 		return array(
 			'bound' => $binding !== null,
 			'data_structure_reference' => $reference,
@@ -429,11 +434,6 @@ class Editor_nada_indicator_publish {
 	 */
 	private function get_connection($user_id, $catalog_connection_id)
 	{
-		$conn = $this->ci->Catalog_connections_model->get_connection($user_id, $catalog_connection_id);
-		if (!$conn) {
-			throw new Exception('Target catalog was not found');
-		}
-
-		return $conn;
+		return $this->ci->Catalog_connections_model->require_connection($user_id, $catalog_connection_id);
 	}
 }

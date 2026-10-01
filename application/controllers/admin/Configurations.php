@@ -97,6 +97,18 @@ class Configurations extends MY_Controller {
 		$settings['grant_editor_default'] = default_editor_role_enabled();
 		$settings['project_sharing_enabled'] = project_sharing_enabled();
 		$settings['metadata_assessment_enabled'] = metadata_assessment_enabled();
+		$this->load->helper('notification');
+		$settings['notifications_retention_days'] = notification_retention_days();
+		$settings['issues_enabled'] = site_feature_enabled('issues');
+		$settings['data_structures_enabled'] = site_feature_enabled('data_structures');
+		$settings['schemas_enabled'] = site_feature_enabled('schemas');
+		$settings['tags_enabled'] = site_feature_enabled('tags');
+
+		$this->load->library('Schema_registry');
+		$settings['registry_schemas'] = $this->schema_registry->list_schemas(array('status' => 'active'));
+		$enabled_uids = enabled_project_schema_uids();
+		$settings['enabled_project_schemas_all'] = ($enabled_uids === null);
+		$settings['enabled_project_schema_uids'] = $enabled_uids !== null ? $enabled_uids : array();
 
 		// Add editor config values (read-only, from config/editor.php)
 		$this->config->load('editor');
@@ -167,8 +179,62 @@ class Configurations extends MY_Controller {
 		// Metadata assessment toggle
 		$options['metadata_assessment_enabled'] = $this->input->post('metadata_assessment_enabled') === '1' ? '1' : '0';
 
+		$raw_limit = $this->input->post('metadata_assessment_monthly_limit');
+		$options['metadata_assessment_monthly_limit'] = is_numeric($raw_limit)
+			? (string) max(0, (int) $raw_limit)
+			: '200';
+
+		$raw_retention = $this->input->post('notifications_retention_days');
+		$retention_days = is_numeric($raw_retention) ? (int) $raw_retention : 30;
+		if ($retention_days < 1) {
+			$retention_days = 1;
+		}
+		if ($retention_days > 365) {
+			$retention_days = 365;
+		}
+		$options['notifications_retention_days'] = (string) $retention_days;
+
+		// Site feature toggles
+		$options['issues_enabled'] = $this->input->post('issues_enabled') === '1' ? '1' : '0';
+		$options['data_structures_enabled'] = $this->input->post('data_structures_enabled') === '1' ? '1' : '0';
+		$options['schemas_enabled'] = $this->input->post('schemas_enabled') === '1' ? '1' : '0';
+		$options['tags_enabled'] = $this->input->post('tags_enabled') === '1' ? '1' : '0';
+
+		// Enabled project schemas (empty = all)
+		$all_schemas = $this->input->post('enabled_project_schemas_all') === '1';
+		if ($all_schemas) {
+			$options['enabled_project_schemas'] = '';
+		} else {
+			$schema_uids = $this->input->post('enabled_project_schema');
+			$uids = array();
+			if (is_array($schema_uids)) {
+				foreach ($schema_uids as $uid) {
+					$uid = trim($this->security->xss_clean((string) $uid));
+					if ($uid !== '') {
+						$uids[] = $uid;
+					}
+				}
+			}
+			$options['enabled_project_schemas'] = json_encode(array_values(array_unique($uids)));
+		}
+
 		// Remove nested-array keys so the generic loop below doesn't try to process them
-		unset($post['lang_enabled'], $post['lang_code'], $post['submit'], $post['grant_editor_default'], $post['project_sharing'], $post['metadata_assessment_enabled']);
+		unset(
+			$post['lang_enabled'],
+			$post['lang_code'],
+			$post['submit'],
+			$post['grant_editor_default'],
+			$post['project_sharing'],
+			$post['metadata_assessment_enabled'],
+			$post['metadata_assessment_monthly_limit'],
+			$post['notifications_retention_days'],
+			$post['issues_enabled'],
+			$post['data_structures_enabled'],
+			$post['schemas_enabled'],
+			$post['tags_enabled'],
+			$post['enabled_project_schemas_all'],
+			$post['enabled_project_schema']
+		);
 
 		foreach($post as $key=>$value)
 		{
@@ -234,33 +300,7 @@ class Configurations extends MY_Controller {
 	*/
 	function _init_default_configs()
 	{
-		//get a list of configurations key/values
-		$config_defaults=APPPATH.'/config/config.defaults.php';
-		
-		if (file_exists($config_defaults))
-		{
-				include $config_defaults;
-		}
-		else
-		{
-			return FALSE;
-		}
-		
-		if (is_array($config) && count($config) >0)
-		{
-			//load settings from db
-			$settings=$this->Configurations_model->get_config_array();
-			
-			foreach($config as $key=>$value)
-			{
-				//Config not found in db
-				if (!array_key_exists($key,$settings))
-				{
-					//add configuration to db
-					$this->Configurations_model->add($key, $value);
-				}				
-			}
-		}
+		$this->site_configurations->seed_missing_defaults();
 	}
 	
 	/**

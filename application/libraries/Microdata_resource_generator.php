@@ -21,6 +21,7 @@ class Microdata_resource_generator
 		$this->ci->load->library('Datafile_export');
 		$this->ci->load->library('Datafile_export_zip');
 		$this->ci->load->library('Microdata_resource_mapper');
+		$this->ci->load->library('Data_dictionary_csv');
 	}
 
 	/**
@@ -59,6 +60,7 @@ class Microdata_resource_generator
 		$user_id = isset($options['user_id']) ? (int) $options['user_id'] : null;
 		$refresh_description = !empty($options['refresh_description']);
 		$max_wait = isset($options['max_wait_seconds']) ? (int) $options['max_wait_seconds'] : 900;
+		$file_modes = isset($options['file_modes']) && is_array($options['file_modes']) ? $options['file_modes'] : array();
 
 		$all_datafiles = $this->ci->Editor_datafile_model->select_all($sid);
 		if (empty($all_datafiles)) {
@@ -114,15 +116,30 @@ class Microdata_resource_generator
 
 		$exported_files = array();
 		foreach ($selected as $fid => $datafile) {
-			$exported_files[] = $this->export_datafile_to_tmp(
-				$sid,
-				$fid,
-				$datafile,
-				$export_format,
-				$export_version,
-				$tmp_folder,
-				$max_wait
-			);
+			$mode = $this->resolve_file_export_mode($sid, $fid, $datafile, $export_format, $file_modes);
+			if ($mode === 'original') {
+				$exported = $this->copy_original_to_tmp(
+					$sid,
+					$fid,
+					$datafile,
+					$export_format,
+					$tmp_folder
+				);
+			} else {
+				$exported = $this->export_datafile_to_tmp(
+					$sid,
+					$fid,
+					$datafile,
+					$export_format,
+					$export_version,
+					$tmp_folder,
+					$max_wait
+				);
+			}
+			if ($export_format === 'csv') {
+				$exported = $this->attach_dictionary_csv_export($sid, $fid, $datafile, $tmp_folder, $exported);
+			}
+			$exported_files[] = $exported;
 		}
 
 		$bundle_type = $use_zip ? 'zip' : 'single';
@@ -138,6 +155,12 @@ class Microdata_resource_generator
 					'full' => $exp['path'],
 					'entry' => $exp['zip_entry_name'],
 				);
+				if ($export_format === 'csv' && !empty($exp['dictionary_path']) && !empty($exp['dictionary_zip_entry'])) {
+					$files_to_add[] = array(
+						'full' => $exp['dictionary_path'],
+						'entry' => $exp['dictionary_zip_entry'],
+					);
+				}
 			}
 			$zip_filename = $this->ci->datafile_export_zip->compute_zip_filename($sid, $files_to_add, array(
 				'export_format' => $export_format,
@@ -180,9 +203,10 @@ class Microdata_resource_generator
 			$link_rows[] = $this->ci->Editor_resource_datafile_model->build_generated_link_row(
 				$sid,
 				$exp['file_id'],
-				$export_format,
-				$export_version,
-				$exp['zip_entry_name']
+				$exp['export_format'],
+				isset($exp['export_version']) ? $exp['export_version'] : $export_version,
+				$exp['zip_entry_name'],
+				isset($exp['source_mode']) ? $exp['source_mode'] : 'generated'
 			);
 		}
 
@@ -221,6 +245,100 @@ class Microdata_resource_generator
 			'links' => $this->ci->Editor_resource_datafile_model->get_by_resource($sid, $new_resource_id),
 			'filename' => $artifact_basename,
 			'documentation_path' => $dest_path,
+		);
+	}
+
+	/**
+	 * @param int $sid
+	 * @param string $file_id
+	 * @param array $datafile
+	 * @param string $export_format
+	 * @param array $file_modes
+	 * @return string original|generate
+	 */
+	private function resolve_file_export_mode($sid, $file_id, array $datafile, $export_format, array $file_modes)
+	{
+		$export_format = strtolower(trim((string) $export_format));
+		if (in_array($export_format, array('json', 'xpt'), true)) {
+			return 'generate';
+		}
+
+		$requested = isset($file_modes[$file_id]) ? strtolower(trim((string) $file_modes[$file_id])) : 'generate';
+		if ($requested !== 'original') {
+			return 'generate';
+		}
+
+		if ($export_format === 'csv') {
+			return $this->ci->Editor_datafile_model->get_file_csv_path($sid, $file_id) ? 'original' : 'generate';
+		}
+
+		$source_path = $this->ci->Editor_datafile_model->get_source_physical_path($sid, $file_id);
+		if (!$source_path) {
+			throw new Exception('Original source file not available for data file: ' . $file_id);
+		}
+
+		$ext = strtolower(pathinfo($source_path, PATHINFO_EXTENSION));
+		if ($ext !== $export_format) {
+			throw new Exception(
+				'Original source for ' . $file_id . ' is .' . $ext . '; cannot use as .' . $export_format
+			);
+		}
+
+		return 'original';
+	}
+
+	/**
+	 * Copy uploaded source or working CSV into tmp for bundling.
+	 *
+	 * @param int $sid
+	 * @param string $file_id
+	 * @param array $datafile
+	 * @param string $export_format
+	 * @param string $tmp_folder_real
+	 * @return array
+	 */
+	private function copy_original_to_tmp($sid, $file_id, array $datafile, $export_format, $tmp_folder_real)
+	{
+		$export_format = strtolower(trim((string) $export_format));
+		$source_path = null;
+		$file_export_version = null;
+
+		if ($export_format === 'csv') {
+			$source_path = $this->ci->Editor_datafile_model->get_file_csv_path($sid, $file_id);
+			if (!$source_path || !is_file($source_path)) {
+				throw new Exception('CSV not found for data file: ' . $file_id);
+			}
+		} else {
+			$source_path = $this->ci->Editor_datafile_model->get_source_physical_path($sid, $file_id);
+			if (!$source_path || !is_file($source_path)) {
+				throw new Exception('Original source file not found for data file: ' . $file_id);
+			}
+			if ($export_format === 'dta') {
+				$release = isset($datafile['source_format_version']) ? $datafile['source_format_version'] : null;
+				$mapped = $this->ci->Editor_datafile_model->stata_version_from_release($release);
+				if ($mapped !== null) {
+					$file_export_version = (string) $mapped;
+				} elseif ($release !== null && $release !== '') {
+					$file_export_version = (string) $release;
+				}
+			}
+		}
+
+		$zip_entry_name = $this->ci->microdata_resource_mapper->zip_entry_name_for_datafile($datafile, $export_format);
+		$dest_path = rtrim($tmp_folder_real, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $zip_entry_name;
+
+		if (!@copy($source_path, $dest_path)) {
+			throw new Exception('Failed to copy original file for data file: ' . $file_id);
+		}
+
+		return array(
+			'file_id' => (string) $file_id,
+			'path' => $dest_path,
+			'zip_entry_name' => $zip_entry_name,
+			'source_mode' => 'original',
+			'export_format' => $export_format,
+			'export_version' => $file_export_version,
+			'job_id' => null,
 		);
 	}
 
@@ -296,8 +414,33 @@ class Microdata_resource_generator
 			'file_id' => (string) $file_id,
 			'path' => $path,
 			'zip_entry_name' => $this->ci->microdata_resource_mapper->zip_entry_name_for_datafile($datafile, $export_format),
+			'source_mode' => 'generated',
+			'export_format' => strtolower((string) $export_format),
+			'export_version' => ($export_format === 'dta' && $export_version !== null && $export_version !== '')
+				? (string) (int) $export_version
+				: null,
 			'job_id' => $job_id,
 		);
+	}
+
+	/**
+	 * Write companion dictionary CSV for a data file export (CSV bundles only).
+	 *
+	 * @param int $sid
+	 * @param string $file_id
+	 * @param array $datafile
+	 * @param string $tmp_folder
+	 * @param array $exported
+	 * @return array
+	 */
+	private function attach_dictionary_csv_export($sid, $file_id, array $datafile, $tmp_folder, array $exported)
+	{
+		$dict_name = $this->ci->data_dictionary_csv->dictionary_filename_for_datafile($datafile);
+		$dict_path = rtrim($tmp_folder, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $dict_name;
+		$this->ci->data_dictionary_csv->export_csv_to_path($sid, $file_id, $dict_path);
+		$exported['dictionary_path'] = $dict_path;
+		$exported['dictionary_zip_entry'] = $dict_name;
+		return $exported;
 	}
 
 	/**
@@ -310,6 +453,9 @@ class Microdata_resource_generator
 		foreach ($exported_files as $exp) {
 			if (!empty($exp['path']) && is_file($exp['path'])) {
 				@unlink($exp['path']);
+			}
+			if (!empty($exp['dictionary_path']) && is_file($exp['dictionary_path'])) {
+				@unlink($exp['dictionary_path']);
 			}
 		}
 		if ($zip_basename !== null) {

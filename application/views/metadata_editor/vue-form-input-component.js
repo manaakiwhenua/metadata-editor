@@ -4,7 +4,6 @@ Vue.component("form-input", {
   data: function () {
     return {};
   },
-  mounted: function () {},
   computed: {
     isFieldReadOnly() {
       if (!this.$store.getters.getUserHasEditAccess) {
@@ -49,12 +48,7 @@ Vue.component("form-input", {
       set: function (value) {
         let list = [];
         _.forEach(value, (code) => {
-          let enumCode = this.findEnumByCode(code);
-          if (enumCode) {
-            list.push(enumCode.label + " [" + enumCode.code + "]");
-          } else {
-            list.push(code);
-          }
+          list.push(this.storeEnumValue(code));
         });
         this.local = list;
       },
@@ -66,7 +60,8 @@ Vue.component("form-input", {
           return this.local;
         }
         
-        const enumItem = this.field.enum.find(
+        const enumList = this.dropdownEnumList;
+        const enumItem = enumList.find(
           (code) => code.code === this.getEnumCodeFromLabel(this.local)
         );
 
@@ -75,40 +70,7 @@ Vue.component("form-input", {
         return enumItem || this.local;
       },
       set: function (value) {
-
-        let enum_store_column = this.field.enum_store_column;
-
-        if (!enum_store_column) {
-          enum_store_column = "both";
-        }
-
-        //if enum_store_column is both, store the code and label
-        if (enum_store_column == "both") {
-          let code = this.findEnumByCode(value);
-
-          if (code) {
-            this.local = code.label + " [" + code.code + "]";
-          } else {
-            this.local = value;
-          }
-        }
-        else if (enum_store_column == "code") {
-          let code = this.findEnumByCode(value);
-          if (code) {
-            this.local = code.code;
-          } else {
-            this.local = value;
-          }
-        }
-        else if (enum_store_column == "label") {
-          let code = this.findEnumByCode(value);
-          if (code) {
-            this.local = code.label;
-          } else {
-            this.local = value;
-          }
-        }
-        
+        this.local = this.storeEnumValue(value);
       },
     },
     formTextFieldStyle() {
@@ -122,6 +84,30 @@ Vue.component("form-input", {
     },
     isRequired() {
       return !!(this.field && (this.field.is_required || this.field.required));
+    },
+    fieldUsesGlobalScalarEnum: function () {
+      return (
+        typeof fieldUsesGlobalScalarCodelist === "function" &&
+        fieldUsesGlobalScalarCodelist(this.field)
+      );
+    },
+    arrayTableEnums: function () {
+      if (!this.field || this.field.type !== "array") {
+        return this.field && this.field.enum ? this.field.enum : [];
+      }
+      if (
+        typeof fieldVocabularySourceGlobal === "function" &&
+        fieldVocabularySourceGlobal(this.field)
+      ) {
+        return [];
+      }
+      return this.field.enum || [];
+    },
+    dropdownEnumList: function () {
+      if (this.fieldUsesGlobalScalarEnum) {
+        return [];
+      }
+      return Array.isArray(this.field.enum) ? this.field.enum : [];
     },
   },
   template: `
@@ -159,19 +145,37 @@ Vue.component("form-input", {
                         <table-grid-component 
                             v-model="local" 
                             :columns="field.props"
-                            :enums="field.enum" 
+                            :enums="arrayTableEnums" 
                             :field="field"
                             class="border elevation-1"
                             >
                         </table-grid-component>
                     </div>
                 </div>
-                <div v-else-if="field.type=='simple_array'" >
-                    <div class="d-flex align-center flex-nowrap">
-                        <label :for="'field-' + normalizeClassID(field.key)">{{field.title}}</label>
-                        <field-issues v-if="projectId && field.key" :field-path="field.key" :project-id="projectId"></field-issues>
+                <div v-else-if="field.type=='coordinate_pairs'">
+                    <div class="form-field form-field-coordinate-pairs">
+                        <div class="d-flex align-center flex-nowrap">
+                            <label :for="'field-' + normalizeClassID(field.key)">{{field.title}}</label>
+                            <span v-if="field.help_text" class="small ml-1" role="button" data-toggle="collapse" :data-target="'#field-toggle-' + normalizeClassID(field.key)" aria-label="Help"><i class="far fa-question-circle"></i></span>
+                            <field-issues v-if="projectId && field.key" :field-path="field.key" :project-id="projectId"></field-issues>
+                        </div>
+                        <small :id="'field-toggle-' + normalizeClassID(field.key)" class="collapse help-text form-text text-muted mb-2">{{field.help_text}}</small>
+                        <editor-coordinate-pairs-field
+                            :value="local"
+                            @input="update($event)"
+                            :field="field"
+                        ></editor-coordinate-pairs-field>
                     </div>
-                    <div v-if="fieldDisplayType(field)=='text' ||fieldDisplayType(field)=='textarea' " >
+                </div>
+                <div v-else-if="field.type=='simple_array'" >
+                    <div class="form-field form-field-table">
+                        <div class="d-flex align-center flex-nowrap">
+                            <label :for="'field-' + normalizeClassID(field.key)">{{field.title}}</label>
+                            <span v-if="field.help_text" class="small ml-1" role="button" data-toggle="collapse" :data-target="'#field-toggle-' + normalizeClassID(field.key)" aria-label="Help"><i class="far fa-question-circle"></i></span>
+                            <field-issues v-if="projectId && field.key" :field-path="field.key" :project-id="projectId"></field-issues>
+                        </div>
+                        <small :id="'field-toggle-' + normalizeClassID(field.key)" class="collapse help-text form-text text-muted mb-2">{{field.help_text}}</small>
+                    <div v-if="fieldDisplayType(field)=='text' || fieldDisplayType(field)=='textarea' || fieldDisplayType(field)=='number' || fieldDisplayType(field)=='integer' || fieldDisplayType(field)=='date' " >
                         <repeated-field
                                 v-model=" local"
                                 :field="field"                            
@@ -181,7 +185,7 @@ Vue.component("form-input", {
                     <div v-else-if="fieldDisplayType(field)=='dropdown' || fieldDisplayType(field)=='dropdown-custom'">
                         <v-combobox
                             v-model="fieldEnumByCodeMultiple"
-                            :items="field.enum"
+                            :items="dropdownEnumList"
                             item-text="label"
                             item-value="code"
                             :return-object="false"
@@ -198,7 +202,14 @@ Vue.component("form-input", {
                         </v-combobox>
                         
                     </div>
-                                    
+                    <div v-else>
+                        <repeated-field
+                                v-model=" local"
+                                :field="field"
+                            >
+                        </repeated-field>
+                    </div>
+                    </div>
                 </div>
 
                 <div  v-else-if="fieldDisplayType(field)=='text'">                            
@@ -323,8 +334,8 @@ Vue.component("form-input", {
                             <label :for="'field-' + normalizeClassID(field.key)">{{field.title}}
                                 <span v-if="isRequired" class="required-label"> * </span>
                             </label>
+                            <span class="small ml-1" v-if="field.help_text" role="button" data-toggle="collapse" :data-target="'#field-toggle-' + normalizeClassID(field.key)" aria-label="Help"><i class="far fa-question-circle"></i></span>
                         </div>
-                        <span class="small" v-if="field.help_text" role="button" data-toggle="collapse" :data-target="'#field-toggle-' + normalizeClassID(field.key)" ><i class="far fa-question-circle"></i></span>
                         <small :id="'field-toggle-' + normalizeClassID(field.key)" class="collapse help-text form-text text-muted mb-2">{{field.help_text}}</small>
                         
                         <validation-provider 
@@ -338,9 +349,19 @@ Vue.component("form-input", {
                             <span v-if="errors[0]" class="field-error">{{errors[0]}}</span>
                         </validation-provider>
                         
+                        <global-registry-scalar-field
+                            v-if="fieldUsesGlobalScalarEnum"
+                            :value="local"
+                            @input="local = $event"
+                            :field="field"
+                            :project-id="projectId"
+                            :disabled="isFieldReadOnly"
+                            :allow-custom="true"
+                        ></global-registry-scalar-field>
                         <v-combobox
+                            v-else
                             v-model="fieldEnumByCode"
-                            :items="field.enum"
+                            :items="dropdownEnumList"
                             item-text="label"
                             item-value="code"
                             :return-object="false"
@@ -364,8 +385,8 @@ Vue.component("form-input", {
                             <label :for="'field-' + normalizeClassID(field.key)">{{field.title}}
                                 <span v-if="isRequired" class="required-label"> * </span>
                             </label>
+                            <span class="small ml-1" v-if="field.help_text" role="button" data-toggle="collapse" :data-target="'#field-toggle-' + normalizeClassID(field.key)" aria-label="Help"><i class="far fa-question-circle"></i></span>
                         </div>
-                        <span class="small" v-if="field.help_text" role="button" data-toggle="collapse" :data-target="'#field-toggle-' + normalizeClassID(field.key)" ><i class="far fa-question-circle"></i></span>
                         <small :id="'field-toggle-' + normalizeClassID(field.key)" class="collapse help-text form-text text-muted mb-2">{{field.help_text}}</small>                        
                         
                         <validation-provider 
@@ -376,9 +397,19 @@ Vue.component("form-input", {
                             :name="field.title"
                             >
                             <input type="hidden" v-model="local" />
+                            <global-registry-scalar-field
+                                v-if="fieldUsesGlobalScalarEnum"
+                                :value="local"
+                                @input="local = $event"
+                                :field="field"
+                                :project-id="projectId"
+                                :disabled="isFieldReadOnly"
+                                :allow-custom="false"
+                            ></global-registry-scalar-field>
                             <v-select
+                                v-else
                                 v-model="fieldEnumByCode"
-                                :items="field.enum"  
+                                :items="dropdownEnumList"  
                                 item-text="label"
                                 item-value="code"                            
                                 label=""
@@ -440,7 +471,33 @@ Vue.component("form-input", {
             </div>  `,
   methods: {
     findEnumByCode: function (code) {
-      return _.find(this.field.enum, { code: code });
+      if (code && typeof code === "object") {
+        if (Object.prototype.hasOwnProperty.call(code, "code")) {
+          code = code.code;
+        } else if (Object.prototype.hasOwnProperty.call(code, "value")) {
+          code = code.value;
+        }
+      }
+
+      var enumList = this.dropdownEnumList;
+      return _.find(enumList, { code: code });
+    },
+    storeEnumValue: function (value) {
+      var enumItem = this.findEnumByCode(value);
+      if (typeof formatScalarEnumStoredValue === "function") {
+        return formatScalarEnumStoredValue(this.field, enumItem, value);
+      }
+      if (!enumItem) {
+        return value;
+      }
+      var mode = this.field.enum_store_column || "both";
+      if (mode === "code") {
+        return enumItem.code;
+      }
+      if (mode === "label") {
+        return enumItem.label;
+      }
+      return enumItem.label + " [" + enumItem.code + "]";
     },
     getEnumCodeFromLabel: function (label) {
       //code is enclosed in [] e.g. label [code]
@@ -479,35 +536,13 @@ Vue.component("form-input", {
       return field.type;
     },
     /**
-     * Get validation rules including data type check
-     * @param {Object} field - The field object
-     * @returns {String} Combined validation rules string
+     * Template rules plus required/data_type, as a VeeValidate object.
      */
     getValidationRules(field) {
-      let rules = field.rules || '';
-
-      if (field.is_required || field.required) {
-        rules = rules ? `${rules}|required` : 'required';
+      if (typeof FieldValidationRulesUtil !== 'undefined') {
+        return FieldValidationRulesUtil.normalize(field);
       }
-      
-      // Determine the field type for validation
-      const displayType = this.fieldDisplayType(field);
-      let validationType = null;
-      
-      // Add data type validation for simple field types
-      const simpleTypes = ['text', 'string', 'textarea', 'number', 'integer'];
-      if (simpleTypes.includes(field.type)) {
-        validationType = field.type;
-      }
-      // Skip data type validation for dropdown fields - they have enum validation
-      // and v-model may contain enum objects for display purposes
-      
-      if (validationType) {
-        const typeRule = `data_type:${validationType}`;
-        rules = rules ? `${rules}|${typeRule}` : typeRule;
-      }
-      
-      return rules;
+      return field && field.rules ? field.rules : {};
     },
   },
 });

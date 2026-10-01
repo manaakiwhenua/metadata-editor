@@ -19,6 +19,9 @@ Vue.component('repeated-field', {
             }
         
             return value;
+        },
+        isDateDisplay(){
+            return this.field && this.field.display_type === 'date';
         }
     },
     methods:{
@@ -35,9 +38,16 @@ Vue.component('repeated-field', {
         },
         update: function (index, value)
         {
-            /*if (Array.isArray(this.local[index])){
-                this.local[index] = {};
-            }*/
+            if (this.field && (this.field.display_type === 'number' || this.field.display_type === 'integer')) {
+                if (value === '' || value === null) {
+                    value = '';
+                } else {
+                    const num = Number(value);
+                    if (!Number.isNaN(num)) {
+                        value = num;
+                    }
+                }
+            }
 
             this.local[index] = value;
             this.$emit('input', JSON.parse(JSON.stringify(this.local)));            
@@ -52,6 +62,13 @@ Vue.component('repeated-field', {
         remove: function (index){
             this.local.splice(index,1);
             this.$emit('input', JSON.parse(JSON.stringify(this.local)));
+        },
+        getValidationRules: function(field)
+        {
+            if (typeof FieldValidationRulesUtil !== 'undefined') {
+                return FieldValidationRulesUtil.normalize(field);
+            }
+            return field && field.rules ? field.rules : {};
         }
     },  
     template: `
@@ -65,12 +82,20 @@ Vue.component('repeated-field', {
                     <div>
 
                     <validation-provider 
-                            :rules="field.rules" 
+                            :rules="getValidationRules(field)" 
                             :name="field.name"
                             v-slot="{ errors }"                                
                             >
                         
-                        <input type="text"
+                        <editor-date-field
+                            v-if="isDateDisplay"
+                            :value="local[index]"
+                            :field="field"
+                            @input="update(index, $event)"
+                        ></editor-date-field>
+                        <input v-else
+                            :type="(field && (field.display_type === 'number' || field.display_type === 'integer')) ? 'number' : 'text'"
+                            step="any"
                             :value="local[index]"
                             @input="update(index,$event.target.value)"
                             class="form-control form-control-sm"

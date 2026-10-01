@@ -43,7 +43,6 @@ class Project_duplicate
 			'nation' => $project_info['nation'],
 			'year_start' => $project_info['year_start'],
 			'year_end' => $project_info['year_end'],
-			'published' => 0,
 			'created' => $now,
 			'changed' => $now,
 			'varcount' => $project_info['varcount'],
@@ -60,6 +59,10 @@ class Project_duplicate
 			'version_notes' => null,
 			'metadata' => $project_info['metadata'],
 		);
+
+		if ($this->ci->db->field_exists('language', 'editor_projects') && array_key_exists('language', $project_info)) {
+			$row['language'] = $project_info['language'];
+		}
 
 		$new_sid = $this->ci->Editor_model->create_project($project_info['type'], $row);
 		if (!$new_sid) {

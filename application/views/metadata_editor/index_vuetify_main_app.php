@@ -140,11 +140,15 @@
             echo $this->load->view("editor_common/global-site-header-component.js", null, true);
             echo $this->load->view("metadata_editor/vue-project-export-json-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-template-validation-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-field-validation-rules-util.js",null,true);
+            echo $this->load->view("metadata_editor/vue-template-defaults-util.js",null,true);
             echo $this->load->view("metadata_editor/vue-template-apply-defaults-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-toast-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-login-component.js",null,true);
             echo $this->load->view("metadata_editor/fields/vue-field-date.js",null,true);
+            echo $this->load->view("metadata_editor/vue-bounding-box-util.js",null,true);
             echo $this->load->view("metadata_editor/fields/vue-field-bounding-box.js",null,true);
+            echo $this->load->view("metadata_editor/fields/vue-field-coordinate-pairs.js",null,true);
 
             echo $this->load->view("metadata_editor/vue-spreadmetadata-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-form-main-component.js",null,true);
@@ -154,6 +158,7 @@
             
             echo $this->load->view("metadata_editor/vue-files-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-resource-dctype-utils.js",null,true);
+            echo $this->load->view("metadata_editor/vue-editor-project-modules-util.js",null,true);
             echo $this->load->view("metadata_editor/vue-external-resources-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-external-resources-edit-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-resumable-chunk-uploader.js",null,true);
@@ -191,6 +196,10 @@
 
             //nested
             echo $this->load->view("metadata_editor/vue-nested-section-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-global-field-enum-util.js",null,true);
+            echo $this->load->view("metadata_editor/vue-dialog-enum-selection-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-global-registry-scalar-field-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-table-grid-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-form-input-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-nested-array-component.js",null,true);
 
@@ -201,16 +210,17 @@
 
             echo $this->load->view("metadata_editor/vue-import-options-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-publish-options-component.js",null,true);
+            echo $this->load->view("editor_common/vue-history-event-detail-dialog.js", null, true);
+            echo $this->load->view("metadata_editor/vue-submit-for-publishing-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-publish-hub-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-sdmx-csv-export-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-project-package-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-external-resources-import-component.js",null,true);
-            echo $this->load->view("metadata_editor/vue-configure-catalog-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-summary-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-summary-files-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-summary-sharing-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-thumbnail-component.js",null,true);
 
-            echo $this->load->view("metadata_editor/vue-table-grid-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-nested-section-subsection-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-repeated-field-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-form-section-component.js",null,true);
@@ -220,7 +230,6 @@
             echo $this->load->view("metadata_editor/vue-dialog-weight-variable-selection-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-dialog-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-dialog-datafile-replace-component.js",null,true);
-            echo $this->load->view("metadata_editor/vue-dialog-enum-selection-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-geospatial-feature-component.js",null,true);
 
             echo $this->load->view("metadata_editor/vue-page-preview-component.js",null,true);
@@ -236,6 +245,9 @@
             echo $this->load->view("metadata_editor/vue-issue-create-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-issue-edit-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-project-issues-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-project-translation-languages-util.js",null,true);
+            echo $this->load->view("metadata_editor/vue-project-translations-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-project-translation-edit-component.js",null,true);
 
             echo $this->load->view("project/vue-project-share-component.js", null, true);
             echo $this->load->view("project/vue-collection-share-component.js", null, true);
@@ -256,6 +268,7 @@
             echo $this->load->view("metadata_editor/vue-summary-templates-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-json-edit-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-validation-report-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-import-report-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-geospatial-features-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-geospatial-feature-edit-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-geospatial-feature-import-component.js",null,true);
@@ -264,6 +277,7 @@
             echo $this->load->view("metadata_editor/vue-geospatial-feature-description-component.js",null,true);
 
             echo $this->load->view("metadata_editor/vue-indicator-dsd-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-global-codelist-codes-grid-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-indicator-dsd-global-codelist-preview-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-indicator-dsd-edit-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-indicator-dsd-import-component.js",null,true);
@@ -299,10 +313,10 @@
         //Define route components
         const main = {props:['element_id'],template: '<div><form-main/></div>' }
         const Home = { template: '<div><summary-component/> </div>' }
-        const PublishProject = { template: '<div><publish-options/> </div>' }
+        const PublishProject = { template: '<div><publish-hub/></div>' }
+        const CatalogPublications = { template: '<div><publish-hub/></div>' }
         const ProjectPackage = { template: '<div><project-package/> </div>' }
         const ProjectPdf = { template: '<div><generate-pdf/> </div>' }
-        const ConfigureCatalog = { template: '<div><configure-catalog/> </div>' }
         const ImportOptions = { template: '<div><import-options/> </div>' }
         const _main = {props: ['active_section'],template: '<div><study-metadata/></div>' }
         const Datafiles ={template: '<div><datafiles/></div>'}
@@ -311,7 +325,17 @@
         const DatafileExplorer = {props: ['file_id'],template: '<div><data-explorer-host :file_id="file_id" /></div>' }
         const DatafileImport = {template: '<div><datafile-import/></div>' }
         const Variables ={props: ['file_id'],template: '<div><variables/></div>'}
-        const VariableGroups ={template: '<div><variable-groups /> </div>'}
+        const VariableGroups ={
+            template: '<div><variable-groups ref="variableGroups" /></div>',
+            beforeRouteLeave: function (to, from, next) {
+                var child = this.$refs.variableGroups;
+                if (child && typeof child.showUnsavedMessage === 'function' && !child.showUnsavedMessage()){
+                    next(false);
+                    return;
+                }
+                next();
+            }
+        }
         //const ResourcesComp ={props: ['index'],template: '<div><external-resources /></div>'}
         const ResourcesComp =VueExternalResources;
         const FileManager ={props: ['index'],template: '<div><file-manager /></div>'}
@@ -335,19 +359,30 @@
         const AdminMetadataHistory ={template: '<div><admin-metadata-history/></div>'}
         const SdmxCsvExport = {template: '<div><sdmx-csv-export-options/></div>'}
         const ValidationReport ={template: '<div><validation-report/></div>'}
+        const ImportReport ={template: '<div><import-report/></div>'}
         
         const AdminMetadataEdit= VueAdminMetadataEdit;
         //const MetadataTypeEditComp=VueMetadataTypeEdit;
         const MetadataTypesComp =VueMetadataTypes;
 
+        function translationsRouteGuard(to, from, next) {
+            if (typeof projectTranslationsUiEnabled === 'function' && projectTranslationsUiEnabled(project_type)) {
+                next();
+                return;
+            }
+            next('/');
+        }
+
         //routes
         const routes = [
             { path: '/', component: Home },
             { path: '/page-preview', component: PagePreview },
-            { path: '/publish', component: PublishProject },
+            { path: '/publish', component: PublishProject, name: 'publish' },
+            { path: '/publications', redirect: function (to) { return { path: '/publish', query: Object.assign({}, to.query, { tab: 'queue' }) }; } },
+            { path: '/publish-ready', redirect: function (to) { return { path: '/publish', query: Object.assign({}, to.query, { tab: 'queue' }) }; } },
+            { path: '/publish-request', redirect: function (to) { return { path: '/publish', query: Object.assign({}, to.query, { tab: 'queue' }) }; } },
             { path: '/project-package', component: ProjectPackage },
             { path: '/generate-pdf', component: ProjectPdf },            
-            { path: '/configure-catalog', component: ConfigureCatalog },
             { path: '/import', component: ImportOptions },
             { path: '/study/:element_id', component: main, name: 'study',props: true },
             { path: '/datafile/:file_id', component: DatafileEdit, props:true, name: 'datafile-edit' },
@@ -377,12 +412,15 @@
             { path: '/indicator-dsd-import', redirect: { path: '/data-explorer/INDICATOR_DATA', query: { tab: 'import' } } },
             { path: '/indicator-dsd-chart', component: IndicatorDsdChart, name: 'indicator-dsd-chart', props: true },
             { path: '/indicator-dsd-overview', component: IndicatorDsdOverview, name: 'indicator-dsd-overview', props: true },
+            { path: '/translations', component: { template: '<project-translations/>' }, name: 'project-translations', beforeEnter: translationsRouteGuard },
+            { path: '/translations/:language', component: { props: ['language'], template: '<project-translation-edit :language="language"/>' }, props: true, name: 'project-translation-edit', beforeEnter: translationsRouteGuard },
             { path: '/issues', component: { template: '<project-issues :project-id="$root.dataset_id" :can-edit="$root.UserHasEditAccess"/>' }, name: 'issues' },
             { path: '/issues/create', component: VueIssueCreate, name: 'issue-create' },
             { path: '/issues/:issueId', component: VueIssueEdit, props: true, name: 'issue-edit' },
             { path: '/change-log', component: ProjectHistory },
             { path: '/sdmx-csv-export', component: SdmxCsvExport },
             { path: '/validation-report', component: ValidationReport, name: 'validation-report', props: true },
+            { path: '/import-report', component: ImportReport, name: 'import-report' },
             { path: '/metadata-types', component: MetadataTypesComp, name:'metadata-types', props: true },
             { path: '/metadata-types/:type_id/change-log', component: AdminMetadataHistory, name:'admin-metadata-change-log', props: true },
             //{ path: '/metadata-types/:type_id', component: MetadataTypeEditComp, name:'metadata-type', props: true }
@@ -400,16 +438,33 @@
 
             console.log("route path",route_path);
 
-            if (!store.state.template_structure_valid && to.path !== '/' && to.path !== '/page-preview') {
+            // On refresh, template is not loaded yet — do not strip the hash route.
+            if (!store.state.app_bootstrap_complete) {
+                next();
+                return;
+            }
+
+            if (!store.state.template_structure_valid && to.path !== '/' && to.path !== '/page-preview' && to.path !== '/import-report' && to.path !== '/publications' && to.path !== '/publish' && to.path !== '/publish-ready' && to.path !== '/publish-request') {
                 next({ path: '/', replace: true });
                 return;
             }
-            
-            if (!store.state.treeActiveNode){
-                console.log("no active node");
-                if (store.getters.getTemplateItemByKey(route_path)){
-                    store.commit('tree_active_node_path',route_path);
+
+            if (store.state.project_type === 'geospatial' && typeof EditorProjectModulesUtil !== 'undefined') {
+                var templateRoot = EditorProjectModulesUtil.getTemplateRootFromFormTemplate(store.state.formTemplate);
+                if (to.path.startsWith('/geospatial-features') && templateRoot
+                    && !EditorProjectModulesUtil.isModuleVisible(templateRoot, 'feature_catalogue')) {
+                    next({ path: '/', replace: true });
+                    return;
                 }
+                if (to.path.startsWith('/geospatial-gallery') && templateRoot
+                    && !EditorProjectModulesUtil.isModuleVisible(templateRoot, 'geospatial_gallery')) {
+                    next({ path: '/', replace: true });
+                    return;
+                }
+            }
+
+            if (to.path.startsWith('/study/')) {
+                store.dispatch('syncActiveNodeFromRoute', to);
             }
 
             next();
@@ -424,8 +479,8 @@
                 metadata_idno:'',//study idno
                 project_id:project_sid,
                 formData: project_metadata,
-                formTemplate:form_template,
-                formTemplateParts:form_template_parts,
+                formTemplate: {},
+                formTemplateParts: {},
                 templates:[],//list of templates available                
                 treeActiveNode:null,
                 treeItems:[],
@@ -443,7 +498,9 @@
                 project_isloading:false,
                 project_is_locked:false,
                 project_version_info:null,
-                template_structure_valid: (typeof template_structure_valid !== 'undefined' ? template_structure_valid : true),
+                template_structure_valid: false,
+                template_isloading: false,
+                app_bootstrap_complete: false,
                 variables_loaded:false,
                 variables_isloading:false,
                 variables_active_tab:"documentation",
@@ -457,7 +514,7 @@
                     "variable.var_qstn_postqtxt",
                     "variable.var_forward",
                     "variable.var_backward",                    
-                    "variable.var_qstn_ivuinstr",
+                    "variable.var_qstn_ivulnstr",
                     "variable.var_universe",
                     "variable.var_txt",
                     "variable.var_codinstr",
@@ -475,7 +532,7 @@
                     "variable.var_qstn_postqtxt",
                     "variable.var_forward",
                     "variable.var_backward",                    
-                    "variable.var_qstn_ivuinstr",
+                    "variable.var_qstn_ivulnstr",
                     "variable.var_universe",
                     "variable.var_txt",
                     "variable.var_codinstr",
@@ -601,6 +658,12 @@
                                         found=true;
                                     }
                                 }
+                                if (!found && items[i].props && Array.isArray(items[i].props)){
+                                    item=findTemplateByItemKey(items[i].props,key);
+                                    if (item){
+                                        found=true;
+                                    }
+                                }
                             }
                             i++;                        
                         }
@@ -611,7 +674,7 @@
                         return null;
                     }
                     let items=store.state.formTemplate.template.items;
-                    let item=findTemplateByItemKey(items,route_path);
+                    let item=findTemplateByItemKey(items, key);
 
                     return item;
                 },
@@ -632,23 +695,49 @@
                 }
             },
             actions: {               
+                syncActiveNodeFromRoute: function(context, route) {
+                    if (!route || !route.path || route.path.indexOf('/study/') !== 0) {
+                        return;
+                    }
+                    if (!store.state.template_structure_valid) {
+                        return;
+                    }
+                    var nodeKey = route.params && route.params.element_id
+                        ? route.params.element_id
+                        : route.path.replace(/^\/study\/?/, '').split('/').filter(Boolean)[0];
+                    if (!nodeKey) {
+                        return;
+                    }
+                    var item = context.getters.getTemplateItemByKey(nodeKey);
+                    if (item) {
+                        context.commit('tree_active_node_path', nodeKey);
+                    }
+                },
                 async initData({commit},options) {
                     store.state.project_isloading=true;
-                    await store.dispatch('loadTemplatesList',{});
-                    await store.dispatch('loadProject',{dataset_id:options.dataset_id});
-                    await store.dispatch('loadDataFiles',{dataset_id:options.dataset_id});
-                    await store.dispatch('loadExternalResources',{dataset_id:options.dataset_id});
-                    await store.dispatch('loadVariableGroups',{dataset_id:options.dataset_id});
-                    await store.dispatch('loadMetadataTypesList',{});
-                    await store.dispatch('fetchOpenIssuesSummary', { projectId: store.state.project_id });
-                    
-                    // Load geospatial features for geospatial projects
-                    if (store.state.project_type === 'geospatial') {
-                        await store.dispatch('loadGeospatialFeatures',{dataset_id:options.dataset_id});
+                    store.state.template_isloading=true;
+                    try {
+                        await store.dispatch('loadProjectTemplate', {
+                            template_uid: (typeof project_template_uid !== 'undefined') ? project_template_uid : ''
+                        });
+                        await store.dispatch('loadTemplatesList',{});
+                        await store.dispatch('loadProject',{dataset_id:options.dataset_id});
+                        await store.dispatch('loadDataFiles',{dataset_id:options.dataset_id});
+                        await store.dispatch('loadExternalResources',{dataset_id:options.dataset_id});
+                        await store.dispatch('loadVariableGroups',{dataset_id:options.dataset_id});
+                        await store.dispatch('loadMetadataTypesList',{});
+                        await store.dispatch('fetchOpenIssuesSummary', { projectId: store.state.project_id });
+
+                        // Load geospatial features for geospatial projects
+                        if (store.state.project_type === 'geospatial') {
+                            await store.dispatch('loadGeospatialFeatures',{dataset_id:options.dataset_id});
+                        }
+
+                        store.state.variables_loaded=true;
+                    } finally {
+                        store.state.template_isloading=false;
+                        store.state.project_isloading=false;
                     }
-                    
-                    store.state.variables_loaded=true;
-                    store.state.project_isloading=false;
                 },
                 async initTreeItems({commit},options) {               
                     if (editorTemplateHasItems(store.state.formTemplate)) {
@@ -668,22 +757,39 @@
                         console.log(error);
                     });
                 },
-                async loadTemplateByUID({commit},options) {                    
-                    let url=CI.base_url + '/api/templates/'+options.template_uid;
-                    return axios
-                    .get(url)
-                    .then(function (response) {                        
-                        if (response.data.template){
-                            store.state.formTemplate=response.data;
-                            store.state.template_structure_valid = editorTemplateHasItems(response.data);
-                        }else{
-                            console.log("error load template", response.data);
-                            alert("error loading template");
-                        }
-                    })
-                    .catch(function (error) {
-                        console.log(error);
+                async loadProjectTemplate({dispatch}, options) {
+                    return dispatch('loadTemplateByUID', {
+                        template_uid: options.template_uid || ''
                     });
+                },
+                async loadTemplateByUID({commit},options) {
+                    const template_uid = options.template_uid || '';
+                    if (!template_uid) {
+                        store.state.formTemplate = {};
+                        store.state.template_structure_valid = false;
+                        return false;
+                    }
+
+                    const url = CI.base_url + '/api/templates/' + template_uid;
+                    try {
+                        const response = await axios.get(url);
+                        if (response.data && response.data.template) {
+                            store.state.formTemplate = response.data;
+                            store.state.template_structure_valid = editorTemplateHasItems(response.data);
+                            return true;
+                        }
+
+                        store.state.formTemplate = {};
+                        store.state.template_structure_valid = false;
+                        console.log("error load template", response.data);
+                        alert("error loading template");
+                        return false;
+                    } catch (error) {
+                        store.state.formTemplate = {};
+                        store.state.template_structure_valid = false;
+                        console.log(error);
+                        throw error;
+                    }
                 },
                 fetchOpenIssuesSummary: function({ commit, state }, options) {
                     var projectId = (options && options.projectId) || state.project_id;
@@ -1075,6 +1181,75 @@
             message: 'Value must be a URL e.g. http://example.com'
         });
 
+        function isEmptyValidationValue(value) {
+            return value === null || value === undefined || value === '';
+        }
+
+        VeeValidate.extend('iso_date', {
+            validate(value) {
+                if (isEmptyValidationValue(value)) {
+                    return true;
+                }
+                if (typeof FieldValidationRulesUtil !== 'undefined') {
+                    return FieldValidationRulesUtil.isIsoDate(String(value));
+                }
+                return true;
+            },
+            message: 'The {_field_} field must be a date in YYYY-MM-DD format.'
+        });
+
+        VeeValidate.extend('iso_date_partial', {
+            validate(value) {
+                if (isEmptyValidationValue(value)) {
+                    return true;
+                }
+                if (typeof FieldValidationRulesUtil !== 'undefined') {
+                    return FieldValidationRulesUtil.isIsoDatePartial(String(value));
+                }
+                return true;
+            },
+            message: 'The {_field_} field must be a date in YYYY, YYYY-MM, or YYYY-MM-DD format.'
+        });
+
+        VeeValidate.extend('iso_year', {
+            validate(value) {
+                if (isEmptyValidationValue(value)) {
+                    return true;
+                }
+                if (typeof FieldValidationRulesUtil !== 'undefined') {
+                    return FieldValidationRulesUtil.isIsoYear(String(value));
+                }
+                return true;
+            },
+            message: 'The {_field_} field must be a year in YYYY format.'
+        });
+
+        VeeValidate.extend('iso_year_month', {
+            validate(value) {
+                if (isEmptyValidationValue(value)) {
+                    return true;
+                }
+                if (typeof FieldValidationRulesUtil !== 'undefined') {
+                    return FieldValidationRulesUtil.isIsoYearMonth(String(value));
+                }
+                return true;
+            },
+            message: 'The {_field_} field must be a year and month in YYYY-MM format.'
+        });
+
+        VeeValidate.extend('iso_datetime', {
+            validate(value) {
+                if (isEmptyValidationValue(value)) {
+                    return true;
+                }
+                if (typeof FieldValidationRulesUtil !== 'undefined') {
+                    return FieldValidationRulesUtil.isIsoDateTime(String(value));
+                }
+                return true;
+            },
+            message: 'The {_field_} field must be a date and time in ISO 8601 format.'
+        });
+
         //ignore validation if a required field is empty ('',null or undefined)
         VeeValidate.extend('required', {
             validate (value) {
@@ -1089,10 +1264,15 @@
 
         // Data type validation: checks for type mismatch (e.g., array/object where string expected)
         VeeValidate.extend('data_type', {
-            validate(value, [fieldType]) {
+            params: ['fieldType'],
+            validate(value, params) {
+                let fieldType = params;
+                if (Array.isArray(params)) {
+                    fieldType = params[0];
+                } else if (params && typeof params === 'object') {
+                    fieldType = params.fieldType;
+                }
 
-                // fieldType comes from field.type passed as parameter
-                
                 // Skip data_type validation for dropdown fields - they have their own validation through enum selection
                 // and the v-model may be an enum object for display purposes
                 if (fieldType === 'dropdown' || fieldType === 'dropdown-custom') {

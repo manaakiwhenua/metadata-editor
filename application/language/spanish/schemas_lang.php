@@ -18,7 +18,8 @@ $lang['edit_schema']="Editar esquema";
 $lang['schema_created']="Esquema creado exitosamente.";
 $lang['schema_updated']="Esquema actualizado exitosamente.";
 $lang['schema_deleted']="Esquema eliminado exitosamente.";
-$lang['delete_schema_confirm']="¿Está seguro de que desea eliminar este esquema?";
+$lang['delete_schema_confirm']="¿Eliminar el esquema \"{title}\"? Se eliminarán todas las plantillas de este esquema.";
+$lang['schema_delete_in_use_by_projects']="Este esquema está en uso por uno o más proyectos. Elimine o borre esos proyectos antes de poder eliminar el esquema.";
 $lang['schema_not_found']="Esquema no encontrado.";
 $lang['failed_to_load_schema']="Error al cargar el esquema.";
 $lang['core_schema_edit_forbidden']="Los esquemas núcleo no se pueden editar.";
@@ -104,6 +105,12 @@ $lang['regenerate_template_confirm']="¿Regenerar la plantilla para este esquema
 $lang['schema_template_regenerated']="Plantilla de esquema regenerada exitosamente.";
 $lang['regenerate_template_failed']="Error al regenerar plantilla.";
 $lang['generated_template_locked']="Las plantillas generadas son de solo lectura. Duplique la plantilla para personalizarla.";
+
+// Reserved root properties (custom schemas)
+$lang['schema_has_issues']="El esquema tiene problemas. Ábralo para ver el informe de validación.";
+$lang['reserved_root_properties_report_title']="Propiedades de nivel raíz reservadas detectadas";
+$lang['reserved_root_properties_report_intro']="Estas propiedades de nivel raíz no se pueden guardar en los metadatos del proyecto:";
+$lang['reserved_root_properties_report_fix']="Anídelas bajo un agrupamiento de objeto y luego reemplace el archivo de esquema principal.";
 
 // Miscellaneous
 $lang['not_implemented']="Aún no implementado.";

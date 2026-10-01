@@ -3,6 +3,7 @@
 use JsonMachine\Items;
 use JsonMachine\JsonDecoder\ExtJsonDecoder;
 use JsonMachine\JsonDecoder\DecodingError;
+use JsonMachine\JsonDecoder\PassThruDecoder;
 
 
 /**
@@ -23,6 +24,9 @@ use JsonMachine\JsonDecoder\DecodingError;
  */
 class ImportJsonMetadata
 {
+    const SKIP_DETAIL_LIMIT = 50;
+
+    private $import_stats = array();
 
 	/**
 	 * Constructor
@@ -41,7 +45,46 @@ class ImportJsonMetadata
         
         // Threshold for using streaming parser (10MB)
         $this->streaming_threshold = 5 * 1024 * 1024;
+        $this->import_min_memory_bytes = 1024 * 1024 * 1024;
+        $this->reset_import_stats();
 	}
+
+    public function reset_import_stats()
+    {
+        $this->import_stats = array(
+            'data_files_seen' => 0,
+            'data_files_imported' => 0,
+            'data_files_skipped' => 0,
+            'data_files_skipped_detail' => array(),
+            'variables_seen' => 0,
+            'variables_imported' => 0,
+            'variables_skipped' => 0,
+            'variables_skipped_detail' => array(),
+            'variable_groups' => false,
+            'geospatial' => null,
+        );
+    }
+
+    public function get_import_stats()
+    {
+        return $this->import_stats;
+    }
+
+    private function record_skip($kind, $detail)
+    {
+        $count_key = $kind . '_skipped';
+        $detail_key = $kind . '_skipped_detail';
+        if (!isset($this->import_stats[$count_key])) {
+            $this->import_stats[$count_key] = 0;
+        }
+        $this->import_stats[$count_key]++;
+        if (!isset($this->import_stats[$detail_key]) || !is_array($this->import_stats[$detail_key])) {
+            $this->import_stats[$detail_key] = array();
+        }
+        if (count($this->import_stats[$detail_key]) < self::SKIP_DETAIL_LIMIT) {
+            $this->import_stats[$detail_key][] = $detail;
+        }
+    }
     
     /**
      * 
@@ -58,6 +101,9 @@ class ImportJsonMetadata
      */
     function import($sid,$file_path,$validate=true,$options=array())
     {
+        $this->reset_import_stats();
+        $this->ensure_import_php_limits();
+
         // Validate file exists
         if (!file_exists($file_path)){
             throw new Exception("File not found: " . $file_path);
@@ -99,6 +145,14 @@ class ImportJsonMetadata
     {
         $type = $this->detect_project_type($json_file_path, $options);
         $canonical_type = $this->ci->Editor_model->resolve_canonical_type($type) ?: $type;
+
+        if (isset($options['type']) && !empty($options['type'])) {
+            $canonical_options_type = $this->ci->Editor_model->resolve_canonical_type($options['type']) ?: $options['type'];
+            if ($canonical_options_type) {
+                $canonical_type = $canonical_options_type;
+                $type = $options['type'];
+            }
+        }
         
         // microdata and geospatial always use streaming
         $is_microdata = ($canonical_type === 'microdata' || $canonical_type === 'survey');
@@ -164,6 +218,79 @@ class ImportJsonMetadata
     }
 
 
+    /**
+     * Read top-level JSON object fields while skipping large subtrees without decoding them.
+     *
+     * ExtJsonDecoder decodes each property value in full; skipping assignment after decode
+     * still exhausts memory on keys such as "variables". PassThruDecoder yields raw JSON
+     * fragments so excluded keys are never decoded into PHP structures.
+     *
+     * @param string $json_file_path
+     * @param string[] $exclude_keys Top-level keys to skip (e.g. variables, data_files)
+     * @return array
+     */
+    private function extract_root_metadata_excluding_keys($json_file_path, array $exclude_keys)
+    {
+        if (!file_exists($json_file_path)) {
+            throw new Exception("File not found: " . $json_file_path);
+        }
+
+        $exclude_lookup = array_flip($exclude_keys);
+        $json_data = array();
+
+        $items = Items::fromFile($json_file_path, array(
+            'decoder' => new PassThruDecoder(),
+        ));
+
+        foreach ($items as $raw_key => $raw_value) {
+            $key = json_decode($raw_key, true);
+            if (!is_string($key) || $key === '' || isset($exclude_lookup[$key])) {
+                continue;
+            }
+
+            $decoded = json_decode($raw_value, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new Exception("Invalid JSON for key '{$key}': " . json_last_error_msg());
+            }
+
+            $json_data[$key] = $decoded;
+        }
+
+        return $json_data;
+    }
+
+
+    /**
+     * Raise PHP limits for large metadata imports (matches Data API import limits).
+     */
+    private function ensure_import_php_limits()
+    {
+        set_time_limit(0);
+
+        $current = ini_get('memory_limit');
+        if ($current === '-1') {
+            return;
+        }
+
+        $bytes = 0;
+        if (preg_match('/^(\d+)([KMG])?$/i', trim((string) $current), $m)) {
+            $bytes = (int) $m[1];
+            $unit = isset($m[2]) ? strtoupper($m[2]) : '';
+            if ($unit === 'K') {
+                $bytes *= 1024;
+            } elseif ($unit === 'M') {
+                $bytes *= 1024 * 1024;
+            } elseif ($unit === 'G') {
+                $bytes *= 1024 * 1024 * 1024;
+            }
+        }
+
+        if ($bytes > 0 && $bytes < $this->import_min_memory_bytes) {
+            ini_set('memory_limit', '1024M');
+        }
+    }
+
+
     
     /**
      * 
@@ -186,23 +313,12 @@ class ImportJsonMetadata
      */
     private function import_microdata_streaming($sid,$json_file_path,$validate=true,$options=array())
     {
-        // Extract metadata using json-machine, but exclude large arrays
-        // Use iterator_to_array but then remove large arrays before processing
-        $json_data = array();
-        
         try {
-            $items = Items::fromFile($json_file_path, [
-                'decoder' => new ExtJsonDecoder(true)
-            ]);
-            
-            // Convert iterator to array
-            $json_data = iterator_to_array($items, true);
-            
-            // Remove large arrays
-            unset($json_data['variables']);
-            unset($json_data['data_files']);
-            unset($json_data['variable_groups']);
-            
+            $json_data = $this->extract_root_metadata_excluding_keys($json_file_path, array(
+                'variables',
+                'data_files',
+                'variable_groups',
+            ));
         } catch (Exception $e) {
             log_message('error', 'Failed to extract metadata using json-machine: ' . $e->getMessage());
             throw new Exception("Failed to extract metadata from JSON file: " . $e->getMessage());
@@ -241,12 +357,21 @@ class ImportJsonMetadata
         
         // Import project metadata first
         $this->import_project_metadata($type, $sid, $json_data, $validate);
+        unset($json_data);
+
+        if (function_exists('gc_collect_cycles')) {
+            gc_collect_cycles();
+        }
         
         // Stream process data_files array
         $file_id_mappings = $this->stream_process_datafiles($sid, $json_file_path, $validate);
         
         // Stream process variables array in batches
         $this->stream_process_variables($sid, $json_file_path, $file_id_mappings, $validate);
+
+        $this->stream_process_variable_groups($sid, $json_file_path);
+
+        $this->ci->Editor_variable_model->ensure_unique_vids($sid);
         
         return true;
     }
@@ -266,23 +391,11 @@ class ImportJsonMetadata
      * 
      */
     private function import_geospatial_streaming($sid,$json_file_path,$validate=true,$options=array())
-    {        
-        // Extract metadata using json-machine, but exclude feature_catalogue
-        $json_data = array();
-        $root_feature_catalogue = null;
-        
+    {
         try {
-            $items = Items::fromFile($json_file_path, [
-                'decoder' => new ExtJsonDecoder(true)
-            ]);
-            
-            // Convert iterator to array
-            $json_data = iterator_to_array($items, true);
-            
-            // Handle feature_catalogue
-            if (isset($json_data['feature_catalogue'])) {
-                $root_feature_catalogue = $json_data['feature_catalogue'];
-            }            
+            $json_data = $this->extract_root_metadata_excluding_keys($json_file_path, array(
+                'feature_catalogue',
+            ));
         } catch (Exception $e) {
             log_message('error', 'Failed to extract metadata using json-machine: ' . $e->getMessage());
             throw new Exception("Failed to extract metadata from JSON file: " . $e->getMessage());
@@ -325,19 +438,6 @@ class ImportJsonMetadata
             isset($json_data['description']['identificationInfo'][0])
         ){
             $json_data['description']['identificationInfo'] = $json_data['description']['identificationInfo'][0];
-        }
-        
-        // Handle feature_catalogue at root level - move to description if needed
-        if (!isset($json_data['description']['feature_catalogue']) && $root_feature_catalogue !== null) {
-            if (!isset($json_data['description'])) {
-                $json_data['description'] = array();
-            }
-            // Copy feature_catalogue data except featureType (we'll process it separately)
-            $feature_catalogue_data = $root_feature_catalogue;
-            if (isset($feature_catalogue_data['featureType'])) {
-                unset($feature_catalogue_data['featureType']);
-            }
-            $json_data['description']['feature_catalogue'] = $feature_catalogue_data;
         }
         
         // Import project metadata first
@@ -500,6 +600,7 @@ class ImportJsonMetadata
         $file_id_mappings = null;
         $project_type = null;
         $canonical_project_type = null;
+        $pending_variable_groups = null;
 
         try {
             while (($line = fgets($handle)) !== false) {
@@ -570,6 +671,9 @@ class ImportJsonMetadata
                             
                             // Import project metadata first
                             $project_data_for_import = $project_data_merged;
+                            if (array_key_exists('variable_groups', $project_data_merged)) {
+                                $pending_variable_groups = $project_data_merged['variable_groups'];
+                            }
                             unset($project_data_for_import['data_files']);
                             unset($project_data_for_import['variables']);
                             unset($project_data_for_import['variable_groups']);
@@ -631,6 +735,14 @@ class ImportJsonMetadata
             }
             // Clear batch
             $variable_batch = array();
+        }
+
+        if ($is_microdata_project && $pending_variable_groups !== null) {
+            $this->ci->Editor_variable_groups_model->import_from_interchange($sid, $pending_variable_groups);
+        }
+
+        if ($is_microdata_project) {
+            $this->ci->Editor_variable_model->ensure_unique_vids($sid);
         }
 
         // For non-survey/microdata projects, process project metadata
@@ -751,7 +863,8 @@ class ImportJsonMetadata
             unset($json_data['variables']);
         }
 
-        if (isset($json_data['variable_groups'])){
+        $has_variable_groups=array_key_exists('variable_groups',$json_data);
+        if ($has_variable_groups){
             $variable_groups=$json_data['variable_groups'];
             unset($json_data['variable_groups']);
         }
@@ -764,8 +877,12 @@ class ImportJsonMetadata
         //import variable metadata
         $this->import_variable_metadata($sid,$variables, $file_id_mappings, $validate);
 
-        //import variable groups
-        //$this->import_variable_groups($sid,$variable_groups, $validate);
+        if ($has_variable_groups){
+            $this->ci->Editor_variable_groups_model->import_from_interchange($sid,$variable_groups);
+            $this->import_stats['variable_groups'] = true;
+        }
+
+        $this->ci->Editor_variable_model->ensure_unique_vids($sid);
     }
     
     /**
@@ -815,6 +932,8 @@ class ImportJsonMetadata
         if (!empty($variable_batch)) {
             $this->import_variable_metadata($sid, $variable_batch, $file_id_mappings, $validate);
         }
+
+        $this->ci->Editor_variable_model->ensure_unique_vids($sid);
     }
 
     /**
@@ -869,17 +988,17 @@ class ImportJsonMetadata
     {
         require_once(APPPATH.'../vendor/autoload.php');
         
-        $batch_size = 500;
+        $batch_size = 200;
         $variable_batch = array();
         $batch_count = 0;
         $total_variables = 0;
         
         try {
             // Stream process variables array using JSON Pointer
-            $items = Items::fromFile($json_file_path, [
+            $items = Items::fromFile($json_file_path, array(
                 'decoder' => new ExtJsonDecoder(true),
-                'pointer' => '/variables'
-            ]);
+                'pointer' => '/variables',
+            ));
             
             foreach ($items as $variable) {
                 $variable_batch[] = $variable;
@@ -925,6 +1044,34 @@ class ImportJsonMetadata
             // If variables array doesn't exist, that's okay (some projects may not have variables)
             log_message('debug', 'No variables array found or error reading: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Stream variable_groups from JSON after variables are imported (VID -> UID).
+     * Missing key leaves existing groups unchanged.
+     */
+    private function stream_process_variable_groups($sid, $json_file_path)
+    {
+        require_once(APPPATH.'../vendor/autoload.php');
+
+        $groups = array();
+
+        try {
+            $items = Items::fromFile($json_file_path, array(
+                'decoder' => new ExtJsonDecoder(true),
+                'pointer' => '/variable_groups',
+            ));
+
+            foreach ($items as $group) {
+                $groups[] = $group;
+            }
+        } catch (Exception $e) {
+            log_message('debug', 'No variable_groups array found or error reading: ' . $e->getMessage());
+            return;
+        }
+
+        $this->ci->Editor_variable_groups_model->import_from_interchange($sid, $groups);
+        $this->import_stats['variable_groups'] = true;
     }
     
     /**
@@ -978,6 +1125,7 @@ class ImportJsonMetadata
             
             try {
                 $result = $this->import_feature_catalogue($sid, $feature_types, $user_id, $validate);
+                $this->import_stats['geospatial'] = $result;
                 log_message('info', "Geospatial feature catalogue import completed: " . json_encode($result));
             } catch (Exception $e) {
                 log_message('error', "Error importing feature catalogue: " . $e->getMessage());
@@ -1054,14 +1202,18 @@ class ImportJsonMetadata
 
         foreach($datafiles as $df_idx => $datafile)
         {
+            $this->import_stats['data_files_seen']++;
+
             // Validate required fields
             if (!isset($datafile['file_name'])){
                 log_message('error', "Datafile missing 'file_name' field. Skipping datafile.");
+                $this->record_skip('data_files', 'Missing file_name');
                 continue;
             }
 
             if (!isset($datafile['file_id'])){
                 log_message('error', "Datafile missing 'file_id' field. Skipping datafile: " . $datafile['file_name']);
+                $this->record_skip('data_files', 'Missing file_id: ' . $datafile['file_name']);
                 continue;
             }
 
@@ -1077,6 +1229,7 @@ class ImportJsonMetadata
                 }            
     
                 $this->ci->Editor_datafile_model->update($file_info['id'],$datafile);
+                $this->import_stats['data_files_imported']++;
             }
             else{
                 $file_id=$this->ci->Editor_datafile_model->generate_fileid($sid);
@@ -1088,6 +1241,7 @@ class ImportJsonMetadata
                 }
                 
                 $this->ci->Editor_datafile_model->insert($sid,$datafile);
+                $this->import_stats['data_files_imported']++;
             }
         }
         
@@ -1138,15 +1292,21 @@ class ImportJsonMetadata
         }
         
         foreach($variables as $var_idx => $variable){
+            $this->import_stats['variables_seen']++;
+
             // Validate variable has required fid field
             if (!isset($variable['fid'])){
-                log_message('error', "Variable missing 'fid' field. Skipping variable: " . (isset($variable['name']) ? $variable['name'] : 'unknown'));
+                $var_label = isset($variable['name']) ? $variable['name'] : 'unknown';
+                log_message('error', "Variable missing 'fid' field. Skipping variable: " . $var_label);
+                $this->record_skip('variables', 'Missing fid: ' . $var_label);
                 continue;
             }
 
             // Check if file_id mapping exists
             if (!isset($file_id_mappings[$variable['fid']])){
-                log_message('error', "File ID mapping not found for fid: " . $variable['fid'] . ". Skipping variable: " . (isset($variable['name']) ? $variable['name'] : 'unknown'));
+                $var_label = isset($variable['name']) ? $variable['name'] : 'unknown';
+                log_message('error', "File ID mapping not found for fid: " . $variable['fid'] . ". Skipping variable: " . $var_label);
+                $this->record_skip('variables', 'Unmapped fid ' . $variable['fid'] . ': ' . $var_label);
                 continue;
             }
 
@@ -1218,6 +1378,7 @@ class ImportJsonMetadata
                 //if not exists, insert
                 $this->ci->Editor_variable_model->insert($sid,$variable);
             }
+            $this->import_stats['variables_imported']++;
         }
     }
 
@@ -1273,6 +1434,7 @@ class ImportJsonMetadata
         $source_file_id = isset($datafile['file_id']) ? $datafile['file_id'] : $file_id;
         $file_id_mapping = array($source_file_id => $file_id);
         $this->import_variable_metadata($sid, $variables, $file_id_mapping, $validate);
+        $this->ci->Editor_variable_model->ensure_unique_vids($sid);
 
         $updated = $this->ci->Editor_datafile_model->data_file_by_id($sid, $file_id);
         return array(

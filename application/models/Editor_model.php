@@ -19,6 +19,10 @@ use Swaggest\JsonDiff\JsonMergePatch;
  */
 class Editor_model extends CI_Model {
 
+	const PROJECT_STATUS_DRAFT = 'draft';
+	const PROJECT_STATUS_COMPLETE = 'complete';
+	const PROJECT_STATUS_ARCHIVED = 'archived';
+
 	private $storage_path='datafiles/editor';
 	private $tmp_storage_path='datafiles/editor';
 	/** @var string|null Cached absolute storage root */
@@ -36,7 +40,7 @@ class Editor_model extends CI_Model {
 		'nation',
 		'year_start',
 		'year_end',
-		'published',
+		'status',
 		'created',
 		'changed',
 		'varcount',
@@ -46,6 +50,49 @@ class Editor_model extends CI_Model {
 		"thumbnail",
 		"attributes",
 		);
+
+	/**
+	 * @return bool
+	 */
+	public function editor_projects_has_status_column()
+	{
+		static $cached = null;
+		if ($cached === null) {
+			$cached = $this->db->field_exists('status', 'editor_projects');
+		}
+		return $cached;
+	}
+
+	/**
+	 * @param array|null $fields
+	 * @return array
+	 */
+	public function resolve_listing_fields($fields = null)
+	{
+		if ($fields === null) {
+			$fields = $this->listing_fields;
+		}
+		if ($this->editor_projects_has_status_column()) {
+			return $fields;
+		}
+		return array_values(array_filter($fields, function ($field) {
+			return $field !== 'status';
+		}));
+	}
+
+	/**
+	 * @param object|false $query
+	 * @return array|false
+	 */
+	private function row_array_or_false($query)
+	{
+		if ($query === false) {
+			$error = $this->db->error();
+			log_message('error', 'editor_projects query failed: ' . (isset($error['message']) ? $error['message'] : 'unknown'));
+			return false;
+		}
+		return $query->row_array();
+	}
 	
 
 	private $encoded_fields=array(
@@ -256,7 +303,7 @@ class Editor_model extends CI_Model {
 	 * 
 	 * 
 	 */
-	function get_list_all($dataset_type=null,$published=1)
+	function get_list_all($dataset_type=null,$status=null)
 	{
 		$this->db->select('id,idno,type');
 		
@@ -264,11 +311,31 @@ class Editor_model extends CI_Model {
 			$this->db->where('type',$dataset_type);
 		}
 
-		if(!empty($published)){
-			$this->db->where('published',$published);
+		if(!empty($status) && $this->editor_projects_has_status_column()){
+			$this->db->where('status',$status);
 		}
 		
 		return $this->db->get("editor_projects")->result_array();
+	}
+
+	/**
+	 * @return array
+	 */
+	public static function project_statuses()
+	{
+		$CI =& get_instance();
+		$CI->load->helper('project_status');
+		return editor_project_statuses();
+	}
+
+	/**
+	 * @param mixed $value
+	 * @return string
+	 */
+	public function normalize_project_status($value)
+	{
+		$this->load->helper('project_status');
+		return normalize_editor_project_status($value);
 	}
 
 	
@@ -299,26 +366,30 @@ class Editor_model extends CI_Model {
 
 
 	/**
-	 * Get list of table columns that should be excluded from metadata column
-	 * 
+	 * Get list of table/app fields that must not appear as root keys in the
+	 * stored metadata document (and therefore must not be root schema properties).
+	 *
 	 * @return array List of field names to exclude
 	 */
-	private function get_metadata_excluded_fields()
+	public function get_metadata_excluded_fields()
 	{
 		return array(
 			'id', 'idno', 'type', 'pid',
 			'title', 'abbreviation', 'authoring_entity', 'nation', 
 			'year_start', 'year_end', 'study_idno',
 			'metafile', 'dirpath', 'thumbnail',
-			'varcount', 'published', 'is_shared', 'is_locked',
+			'varcount', 'status', 'is_shared', 'is_locked',
 			'created', 'changed', 'created_by', 'changed_by',
 			'created_utc', 'changed_utc',
 			'schema', 'schema_version',
 			'user_id',
 			'template_uid', 'version_number', 'version_created', 
 			'version_created_by', 'version_notes',
+			'language',
 			'attributes', 'metadata', 			
-			'partial_update', 'template_uid' 
+			'partial_update', 'template_uid',
+			// API request-only keys (not study metadata)
+			'collection_ids', 'overwrite', 'validate', 'sid'
 		);
 	}
 
@@ -376,6 +447,11 @@ class Editor_model extends CI_Model {
 		
 		if($survey){
 			$survey=$this->decode_encoded_fields($survey);
+		}
+
+		if ($survey && isset($survey['type']) && $survey['type'] === 'geospatial' && !empty($survey['metadata']) && is_array($survey['metadata'])) {
+			$this->load->library('Metadata_helper');
+			$survey['metadata'] = $this->metadata_helper->prepare_geospatial_metadata_for_editor($survey['metadata']);
 		}
 
 		if (!is_array($survey['metadata']) || empty($survey['metadata'])){
@@ -436,11 +512,18 @@ class Editor_model extends CI_Model {
 	//get project basic info
     function get_basic_info($sid)
     {
-		$this->db->select("id,pid,idno,study_idno,type,study_idno,title,abbreviation,nation,year_start,year_end,published,created,changed, template_uid, is_locked, version_number, version_created, version_created_by, version_created");
+		$select = "id,pid,idno,study_idno,type,study_idno,title,abbreviation,nation,year_start,year_end";
+		if ($this->editor_projects_has_status_column()) {
+			$select .= ",status";
+		}
+		$select .= ",created,changed, template_uid, is_locked, version_number, version_created, version_created_by, version_created";
+		if ($this->db->field_exists('language', 'editor_projects')) {
+			$select .= ",language";
+		}
+		$this->db->select($select);
 		$this->db->where("id",$sid);
 		
-		$survey=$this->db->get("editor_projects")->row_array();
-        return $survey;
+		return $this->row_array_or_false($this->db->get("editor_projects"));
 	}
 
 	/**
@@ -508,6 +591,16 @@ class Editor_model extends CI_Model {
 			// Filter out table-level fields from metadata before encoding
 			$metadata_only = $this->filter_metadata_fields($options['metadata']);
 			$options['metadata']=$this->encode_metadata($metadata_only);
+		}
+
+		if (array_key_exists('status', $options) && $options['status'] !== null && $options['status'] !== '') {
+			if ($this->editor_projects_has_status_column()) {
+				$options['status'] = $this->normalize_project_status($options['status']);
+			} else {
+				unset($options['status']);
+			}
+		} else {
+			unset($options['status']);
 		}
 
 		$this->db->insert('editor_projects',$options);
@@ -597,6 +690,10 @@ class Editor_model extends CI_Model {
 		}
 
 		if ($validate){
+			if ($type === 'geospatial') {
+				$this->load->library('Metadata_helper');
+				$options = $this->metadata_helper->normalize_geospatial_metadata_for_schema($options);
+			}
 			$this->validate_schema($type,$options);
 		}
 
@@ -640,6 +737,10 @@ class Editor_model extends CI_Model {
 
 		// Filter out table-level fields from metadata before encoding
 		$metadata_only = $this->filter_metadata_fields($options);
+		if ($type === 'geospatial') {
+			$this->load->library('Metadata_helper');
+			$metadata_only = $this->metadata_helper->normalize_geospatial_metadata_for_schema($metadata_only);
+		}
 		$db_options['metadata'] = $this->encode_metadata($metadata_only);
 
 		$options = $db_options;
@@ -878,6 +979,11 @@ class Editor_model extends CI_Model {
 			$this->load->library('Project_validation');
 			$data = Project_validation::strip_application_managed_metadata_for_schema($data);
 		}
+
+		if ($schema_type === 'geospatial') {
+			$this->load->library('Metadata_helper');
+			$data = $this->metadata_helper->normalize_geospatial_metadata_for_schema($data);
+		}
 		
 		// Get schema file path using schema registry (handles aliases and custom schemas)
 		try {
@@ -903,10 +1009,11 @@ class Editor_model extends CI_Model {
 		if ($validator->isValid()) {
 			return true;
 		} else {			
-			/*foreach ($validator->getErrors() as $error) {
-				echo sprintf("[%s] %s\n", $error['property'], $error['message']);
-			}*/
-			throw new ValidationException("SCHEMA_VALIDATION_FAILED [{$schema_type}]: ", $validator->getErrors());
+			$this->load->library('Project_validation');
+			throw new ValidationException(
+				"SCHEMA_VALIDATION_FAILED [{$schema_type}]: ",
+				Project_validation::filter_redundant_json_schema_errors($validator->getErrors())
+			);
 		}
 	}
 
@@ -1593,46 +1700,13 @@ class Editor_model extends CI_Model {
 	 */
 	function importDDI($sid, $parseOnly=false, $options=array())
 	{
-		//temporary folder
-		$temp_upload_folder='datafiles/tmp';
-			
-		if (!file_exists($temp_upload_folder)){
-			@mkdir($temp_upload_folder, 0777, true);
-		}
-		
-		if (!file_exists($temp_upload_folder)){
-			show_error('DATAFILES-TEMP-FOLDER-NOT-SET');
+		$this->load->model('Editor_resource_model');
+		$uploaded_ddi_path = $this->Editor_resource_model->upload_temporary_file('xml', 'file', null);
+
+		if (!file_exists($uploaded_ddi_path)) {
+			throw new Exception("Failed to upload file");
 		}
 
-		//upload class configurations for DDI
-		$config['upload_path'] 	 = $temp_upload_folder;
-		$config['overwrite'] 	 = FALSE;
-		$config['encrypt_name']	 = TRUE;
-		$config['allowed_types'] = 'xml';
-
-		$this->load->library('upload', $config);
-
-		//name of the field for file upload
-		$file_field_name='file';
-		
-		//process uploaded ddi file
-		$ddi_upload_result=$this->upload->do_upload($file_field_name);
-
-		$uploaded_ddi_path=NULL;
-
-		//ddi upload failed
-		if (!$ddi_upload_result){
-			$error = $this->upload->display_errors();
-			throw new Exception($error);
-		}
-		else //successful upload
-		{
-			//get uploaded file information
-			$uploaded_ddi_path = $this->upload->data();
-			$uploaded_ddi_path=$uploaded_ddi_path['full_path'];
-		}
-
-		// Use centralized import method
 		return $this->import_ddi_from_path($sid, $uploaded_ddi_path, $parseOnly, $options);
 	}
 
@@ -1649,6 +1723,10 @@ class Editor_model extends CI_Model {
 	 */
 	function import_ddi_from_path($sid, $ddi_file_path, $parseOnly=false, $options=array())
 	{
+		if (!is_string($ddi_file_path) || $ddi_file_path === '' || !file_exists($ddi_file_path)) {
+			throw new Exception("DDI file not found");
+		}
+
 		$parser_params=array(
 			'file_type'=>'survey',
 			'file_path'=>$ddi_file_path
@@ -1814,10 +1892,13 @@ class Editor_model extends CI_Model {
 			return $output;
 		}
 
-		/*
-        //import variable groups
-        $this->create_update_variable_groups($sid,$parser->get_variable_groups());
-		*/
+		$this->load->model('Editor_variable_groups_model');
+		$groups=$parser->get_variable_groups();
+		$this->Editor_variable_groups_model->import_from_interchange($sid, is_array($groups) ? $groups : array());
+
+		// After groups resolve DDI vids to UIDs, remint reused codebook IDs
+		// so export/publish stay unique per study (NADA UNIQUE(vid, sid)).
+		$this->Editor_variable_model->ensure_unique_vids($sid);
 	
 		return $output;
 		
@@ -1948,7 +2029,8 @@ class Editor_model extends CI_Model {
         $pdf_path=$this->get_pdf_path($sid);
 
 		$this->pdf_report->initialize($sid, $options);
-		$this->pdf_report->generate($pdf_path);		
+		$this->pdf_report->generate($pdf_path);
+
 		return $pdf_path;
 	}
 

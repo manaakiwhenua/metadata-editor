@@ -124,9 +124,14 @@ CREATE TABLE `users` (
   `last_login` int NOT NULL,
   `active` tinyint(3) DEFAULT NULL,
   `authtype` varchar(40) DEFAULT NULL,
+  `identity_issuer` varchar(255) DEFAULT NULL,
+  `identity_namespace` varchar(255) NOT NULL DEFAULT '',
+  `identity_subject` varchar(255) DEFAULT NULL,
+  `identity_subject_claim` varchar(64) DEFAULT NULL,
   `otp_code` varchar(45) DEFAULT NULL,
   `otp_expiry` int DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_users_federated_identity` (`identity_issuer`,`identity_namespace`,`identity_subject`)
 ) AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -393,13 +398,88 @@ CREATE TABLE `user_roles` (
 
 
 
+-- Publish targets (NADA or other). Not ME collections.
+-- Secrets live in editor_catalog_credentials (per user). type is varchar, not ENUM.
 CREATE TABLE `editor_catalogs` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `title` varchar(200) DEFAULT NULL,
+  `uid` varchar(100) NOT NULL,
+  `title` varchar(200) NOT NULL,
+  `type` varchar(50) NOT NULL DEFAULT 'nada',
+  `is_official` tinyint(1) NOT NULL DEFAULT 0,
   `url` varchar(500) DEFAULT NULL,
-  `api_key` varchar(200) DEFAULT NULL,
-  `user_id` int DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  `url_normalized` varchar(500) DEFAULT NULL,
+  `created` int DEFAULT NULL,
+  `changed` int DEFAULT NULL,
+  `created_by` int DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unq_editor_catalogs_uid` (`uid`),
+  KEY `idx_editor_catalogs_is_official` (`is_official`),
+  KEY `idx_editor_catalogs_url_normalized` (`url_normalized`)
+) AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `editor_catalog_credentials` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `catalog_id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `api_key` varchar(200) NOT NULL,
+  `created` int DEFAULT NULL,
+  `changed` int DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unq_editor_catalog_credentials_catalog_user` (`catalog_id`,`user_id`),
+  KEY `idx_editor_catalog_credentials_user` (`user_id`),
+  CONSTRAINT `fk_editor_catalog_credentials_catalog` FOREIGN KEY (`catalog_id`) REFERENCES `editor_catalogs` (`id`) ON DELETE CASCADE
+) AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `catalog_curators` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `catalog_id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `created` int DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unq_catalog_curators_catalog_user` (`catalog_id`,`user_id`),
+  KEY `idx_catalog_curators_user` (`user_id`),
+  CONSTRAINT `fk_catalog_curators_catalog` FOREIGN KEY (`catalog_id`) REFERENCES `editor_catalogs` (`id`) ON DELETE CASCADE
+) AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `project_publications` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `sid` int NOT NULL,
+  `catalog_id` int NOT NULL,
+  `status` varchar(30) DEFAULT NULL,
+  `request` varchar(30) DEFAULT NULL,
+  `remote_id` varchar(255) DEFAULT NULL,
+  `remote_url` varchar(500) DEFAULT NULL,
+  `source` varchar(30) DEFAULT NULL,
+  `options` json DEFAULT NULL,
+  `intake` json DEFAULT NULL,
+  `ready_at` int DEFAULT NULL,
+  `ready_by` int DEFAULT NULL,
+  `request_note` text,
+  `return_reason` text,
+  `requested_by` int DEFAULT NULL,
+  `requested_at` int DEFAULT NULL,
+  `updated_by` int DEFAULT NULL,
+  `updated_at` int DEFAULT NULL,
+  `created` int DEFAULT NULL,
+  `changed` int DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unq_project_publications_sid_catalog` (`sid`,`catalog_id`),
+  KEY `idx_project_publications_catalog` (`catalog_id`),
+  KEY `idx_project_publications_request` (`request`),
+  KEY `idx_project_publications_ready_at` (`ready_at`),
+  CONSTRAINT `fk_project_publications_catalog` FOREIGN KEY (`catalog_id`) REFERENCES `editor_catalogs` (`id`) ON DELETE CASCADE
+) AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `project_publication_events` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `publication_id` int NOT NULL,
+  `event` varchar(50) NOT NULL,
+  `actor_user_id` int DEFAULT NULL,
+  `payload` json DEFAULT NULL,
+  `created` int DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_project_publication_events_publication` (`publication_id`),
+  CONSTRAINT `fk_project_publication_events_publication` FOREIGN KEY (`publication_id`) REFERENCES `project_publications` (`id`) ON DELETE CASCADE
 ) AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4;
 
 
@@ -420,12 +500,20 @@ CREATE TABLE `editor_data_files` (
   `wght` int DEFAULT NULL,
   `file_physical_name` varchar(500) DEFAULT NULL,
   `store_data` int DEFAULT NULL,
+  `source_format` varchar(10) DEFAULT NULL COMMENT 'csv|dta|sav — format of the uploaded source file',
+  `source_format_version` varchar(50) DEFAULT NULL COMMENT 'Stata/SPSS file format version (e.g. 14, 118)',
+  `source_upload_filename` varchar(500) DEFAULT NULL COMMENT 'Original client filename at upload (before sanitize)',
+  `source_status` varchar(20) NOT NULL DEFAULT 'unknown' COMMENT 'present|missing|not_applicable|unknown',
+  `source_attached_at` int DEFAULT NULL COMMENT 'Unix time when source file was uploaded or attached',
+  `source_attached_by` int DEFAULT NULL COMMENT 'User id who uploaded or attached the source file',
   `created` int DEFAULT NULL,
   `changed` int DEFAULT NULL,
   `created_by` int DEFAULT NULL,
   `changed_by` int DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `id_UNIQUE` (`id`)
+  UNIQUE KEY `id_UNIQUE` (`id`),
+  KEY `idx_edf_source_status` (`source_status`),
+  KEY `idx_edf_source_format` (`source_format`)
 ) AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4;
 
 
@@ -433,7 +521,7 @@ CREATE TABLE `editor_data_files` (
 CREATE TABLE `editor_projects` (
   `id` int NOT NULL AUTO_INCREMENT,
   `idno` varchar(200) DEFAULT NULL,
-  `type` varchar(15) DEFAULT NULL,
+  `type` varchar(100) DEFAULT NULL,
   `title` varchar(255) NOT NULL DEFAULT '',
   `abbreviation` varchar(45) DEFAULT NULL,
   `authoring_entity` text ,
@@ -443,7 +531,7 @@ CREATE TABLE `editor_projects` (
   `metafile` varchar(255) DEFAULT NULL,
   `dirpath` varchar(255) DEFAULT NULL,
   `varcount` int DEFAULT NULL,
-  `published` tinyint DEFAULT NULL,
+  `status` varchar(20) DEFAULT NULL,
   `created` int DEFAULT NULL,
   `changed` int DEFAULT NULL,
   `created_by` int DEFAULT NULL,
@@ -460,8 +548,10 @@ CREATE TABLE `editor_projects` (
   `version_created_by` int DEFAULT NULL,
   `version_notes` varchar(500) DEFAULT NULL,
   `attributes` json DEFAULT NULL,
+  `language` varchar(10) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unq_idno` (`idno`,`version_number`),
+  KEY `idx_editor_projects_status` (`status`),
   FULLTEXT KEY `ft_projects` (`title`)
 ) AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4;
 
@@ -506,6 +596,8 @@ CREATE TABLE `editor_resource_data_files` (
   `link_type` varchar(20) DEFAULT NULL,
   `data_file_changed` int DEFAULT NULL,
   `source_csv_mtime` int DEFAULT NULL,
+  `source_mode` varchar(20) DEFAULT NULL COMMENT 'original|generated',
+  `source_physical_mtime` int DEFAULT NULL COMMENT 'Unix mtime when original was used',
   `generated_at` int DEFAULT NULL,
   `created` int DEFAULT NULL,
   `created_by` int DEFAULT NULL,
@@ -541,8 +633,8 @@ CREATE INDEX idx_sid_fid_name ON editor_variables (sid, fid, name);
 
 CREATE TABLE `editor_templates` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `uid` varchar(45) DEFAULT NULL,
-  `data_type` varchar(45) NOT NULL,
+  `uid` varchar(100) DEFAULT NULL,
+  `data_type` varchar(100) NOT NULL,
   `lang` varchar(45) DEFAULT NULL,
   `template_type` varchar(20) NOT NULL DEFAULT 'custom',
   `name` varchar(100) NOT NULL,
@@ -569,7 +661,7 @@ CREATE TABLE `editor_templates` (
 
 CREATE TABLE `editor_templates_default` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `data_type` varchar(30) NOT NULL,
+  `data_type` varchar(100) NOT NULL,
   `template_uid` varchar(255) NOT NULL,  
   PRIMARY KEY (`id`)
 ) DEFAULT CHARSET=utf8mb4;
@@ -577,7 +669,17 @@ CREATE TABLE `editor_templates_default` (
 
 insert into `editor_templates_default` (data_type, template_uid)
 values
+('microdata','microdata-system-en'),
+('indicator','timeseries-system-en'),
+('indicator-db','timeseries-db-system-en'),
+('script','script-system-en'),
+('geospatial','geospatial-system-en'),
+('document','document-system-en'),
+('table','table-system-en'),
+('image','image-system-en'),
+('video','video-system-en'),
 ('resource','resource-system-en'),
+('admin_meta','system-core-admin-meta'),
 ('custom','custom-system-en');
 
 
@@ -647,7 +749,8 @@ CREATE TABLE `editor_variable_groups` (
   `id` int NOT NULL AUTO_INCREMENT,
   `sid` int DEFAULT NULL,
   `metadata` MEDIUMTEXT,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uidx_editor_variable_groups_sid` (`sid`)
 ) AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4;
 
 
@@ -757,11 +860,14 @@ CREATE TABLE `admin_metadata_projects` (
 ) DEFAULT CHARSET=utf8mb4;
 
 
--- collection indexes
+-- collection indexes (ACL inheritance / project-via-collection access)
 CREATE INDEX idx_eca_user_collection ON editor_collection_acl(user_id, collection_id);
 CREATE INDEX idx_ecpa_user_collection ON editor_collection_project_acl(user_id, collection_id);
 CREATE INDEX idx_collections_created_by ON editor_collections(created_by);
 CREATE INDEX idx_collection_id ON editor_collection_projects(collection_id);
+CREATE INDEX idx_ecp_sid ON editor_collection_projects(sid);
+CREATE INDEX idx_ecp_collection_sid ON editor_collection_projects(collection_id, sid);
+CREATE INDEX idx_ect_child_parent ON editor_collections_tree(child_id, parent_id, depth);
 
 
 CREATE TABLE `metadata_schemas` (
@@ -792,7 +898,7 @@ INSERT INTO metadata_schemas
    schema_files,metadata_options,alias,created)
 VALUES
   ('microdata','Microdata (DDI 2.5)','IHSN','Microdata schema based on DDI CodeBook 2.5',
-   1,'active','', 'microdata-schema.json',
+   1,'active','', 'survey-schema.json',
    '["ddi-schema.json", "datacite-schema.json", "provenance-schema.json", "datafile-schema.json", "variable-schema.json", "variable-group-schema.json"]',
    '{"core_fields":{"idno":"study_desc.title_statement.idno","title":"study_desc.title_statement.title"},"derived_fields":{"countries":"study_desc.study_info.nation[*].name","year_start":"study_desc.study_info.coll_dates[0].start","year_end":"study_desc.study_info.coll_dates[0].end"}}',
    'survey',
@@ -817,7 +923,7 @@ VALUES
    UNIX_TIMESTAMP()),
   ('video','Video','IHSN','Video schema based on Dublin Core',
    1,'active','', 'video-schema.json',
-   '[]',
+   '["provenance-schema.json"]',
    '{"core_fields":{"idno":"video_description.idno","title":"video_description.title"}}',
    '',
    UNIX_TIMESTAMP()),
@@ -841,7 +947,7 @@ VALUES
    UNIX_TIMESTAMP()),
   ('image','Image','IHSN','Image schema based on DCMI and IPTC',
    1,'active','', 'image-schema.json',
-   '["dcmi-schema.json","iptc-pmd-schema.json","iptc-phovidmdshared-schema.json"]',
+   '["dcmi-schema.json","iptc-pmd-schema.json","iptc-phovidmdshared-schema.json","provenance-schema.json"]',
    '{"core_fields":{"idno":"image_description.idno","title":"image_description.dcmi.title"}}',
    '',
    UNIX_TIMESTAMP()),
@@ -1015,6 +1121,21 @@ CREATE TABLE `codelist_items_labels` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+CREATE TABLE `editor_templates_codelists` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `template_id` int NOT NULL COMMENT 'FK -> editor_templates.id',
+  `field_path` varchar(500) NOT NULL COMMENT 'prop_key or dotted field key',
+  `codelist_id` bigint NOT NULL COMMENT 'FK -> codelists.id',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_template_field` (`template_id`, `field_path`),
+  KEY `idx_codelist_id` (`codelist_id`),
+  CONSTRAINT `fk_editor_templates_codelists_template`
+    FOREIGN KEY (`template_id`) REFERENCES `editor_templates` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_editor_templates_codelists_codelist`
+    FOREIGN KEY (`codelist_id`) REFERENCES `codelists` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
 -- Global data structure registry + project binding (upgrades: install/schema.mysql-update-1.3.sql)
 CREATE TABLE `data_structures` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -1117,6 +1238,38 @@ CREATE TABLE `project_issues` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+CREATE TABLE `project_translations` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `sid` int NOT NULL,
+  `language` varchar(10) NOT NULL,
+  `metadata` json DEFAULT NULL,
+  `created` int NOT NULL,
+  `created_by` int DEFAULT NULL,
+  `changed` int NOT NULL,
+  `changed_by` int DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_project_translation_lang` (`sid`,`language`),
+  CONSTRAINT `fk_project_translations_project` FOREIGN KEY (`sid`) REFERENCES `editor_projects` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- Global in-app inbox (one row per recipient per event; read_at NULL = unread)
+CREATE TABLE `user_notifications` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL COMMENT 'recipient',
+  `type` varchar(64) NOT NULL COMMENT 'e.g. publish.project_ready, project.access_granted',
+  `payload` json DEFAULT NULL COMMENT 'snapshots + deep-link data (sid, titles, href fields)',
+  `actor_user_id` int DEFAULT NULL COMMENT 'who triggered the event',
+  `read_at` int DEFAULT NULL COMMENT 'unix time; NULL = unread',
+  `email_sent_at` int DEFAULT NULL COMMENT 'unix time when digest included this row; Phase B',
+  `created` int NOT NULL COMMENT 'unix time',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_created` (`user_id`, `created`),
+  KEY `idx_user_unread` (`user_id`, `read_at`),
+  KEY `idx_user_type` (`user_id`, `type`),
+  KEY `idx_actor` (`actor_user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- CodeIgniter migration ledger (fresh installs: schema already includes all migration SQL;
 -- bump version when adding application/migrations/*.php)
 CREATE TABLE `migrations` (
@@ -1124,4 +1277,4 @@ CREATE TABLE `migrations` (
   PRIMARY KEY (`version`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO `migrations` (`version`) VALUES (20260703000002);
+INSERT INTO `migrations` (`version`) VALUES (20260909224300);

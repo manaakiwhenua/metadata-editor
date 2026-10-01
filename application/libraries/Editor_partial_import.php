@@ -353,10 +353,12 @@ class Editor_partial_import
 		}
 
 
-		/*
-        //import variable groups
-        $this->create_update_variable_groups($sid,$parser->get_variable_groups());
-		*/
+		if (in_array('variable_groups', $import_options)){
+			$groups=$parser->get_variable_groups();
+			$this->ci->Editor_variable_groups_model->import_from_interchange($sid, is_array($groups) ? $groups : array());
+		}
+
+		$this->ci->Editor_variable_model->ensure_unique_vids($sid);
 
 		$result=array();
 		if (!empty($variable_warnings)){
@@ -388,7 +390,10 @@ class Editor_partial_import
 			$variable_db['var_qstn_preqtxt']=$variable_import['var_qstn_preqtxt'];
 			$variable_db['var_qstn_qstnlit']=$variable_import['var_qstn_qstnlit'];
 			$variable_db['var_qstn_postqtxt']=$variable_import['var_qstn_postqtxt'];
-			$variable_db['var_qstn_ivuinstr']=$variable_import['var_qstn_ivuinstr'];
+			$variable_db['var_qstn_ivulnstr'] = $variable_import['var_qstn_ivulnstr']
+				?? $variable_import['var_qstn_ivuinstr']
+				?? ($variable_db['var_qstn_ivulnstr'] ?? '');
+			unset($variable_db['var_qstn_ivuinstr']);
 		}
 
 		//variable documentation - everything except questions, categories, and labl
