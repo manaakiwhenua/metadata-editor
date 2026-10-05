@@ -17,7 +17,8 @@
         "nelexa/zip": "^3.3",
         "swaggest/json-diff": "^3.11",
         "halaxa/json-machine": "^1.2",
-        "league/html-to-markdown": "^5.1"
+        "league/html-to-markdown": "^5.1",
+        "symfony/yaml": "^5.4"
     },
     "config": {
         "platform": {
