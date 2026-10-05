@@ -1,0 +1,783 @@
+# Runtime field mapping for the WBME DataCite writer.
+#
+# This file contains mapping configuration only. Validation, export blockers,
+# warnings, user messages, decision history, and JSON/XML serialization are
+# implemented or documented separately.
+#
+# HOW TO READ THIS FILE
+# ---------------------
+# - `source` is one WBME metadata path. `sources` supplies several named inputs
+#   to one transformation. Paths use WBME/Adbar dot notation; `$` and `[]` are
+#   deliberately not used.
+#
+# - `target` identifies one DataCite destination; `targets` identifies several.
+#   Each destination contains `property`, the DataCite metadata property used by
+#   the writer, and `json_path`, its complete DataCite REST API JSON path.
+#
+# - The JSON serializer supplies the surrounding `data` object and the fixed
+#   JSON:API member `data.type: dois`. Mapped metadata is written below
+#   `data.attributes` using the paths recorded in each destination.
+#
+# - Without `mode`, the transformed value sets the target property.
+#   `mode: append` adds the transformed item or items to an existing DataCite
+#   collection instead of replacing that collection. Empty results add nothing.
+#
+# - `filter` retains only source collection entries whose named fields exactly
+#   match the configured WBME values before the transformation runs.
+#
+# - `parameters` passes fixed mapping choices to the named transformation.
+#
+# - `field_mappings` exposes the leaf-level work performed by a structured
+#   transformation. Its `source` is relative to the rule-level source object;
+#   `@value` means the current scalar value or current collection item.
+#
+# - A leaf `sources` object supplies several relative values to one operation.
+#   `value` supplies a generated constant rather than a WBME value;
+#   `value_from_parameter` and `value_from_default` copy named configured values.
+#
+# - `target_json` is the complete JSON destination. `[]` identifies one member
+#   of an output collection. A leaf `transform` names a small value conversion.
+#
+# - `value_map` explicitly lists a controlled-value conversion.
+#   `when_source_present` and `when_any_source_present` conditionally emit
+#   generated output only when the named relative source value exists.
+#
+# - `applies_to` identifies a conditional output branch produced by the parent
+#   transformation, such as RelatedIdentifier versus RelatedItem.
+#
+# - `defaults` contains reusable values. A parameter ending in `_default`
+#   names the corresponding entry in `defaults`.
+#
+# - `constants` writes fixed DataCite values that do not depend on source data.
+#
+# - A missing or empty optional source produces no target value. Required-field
+#   checks and the resulting user messages are handled outside this file.
+#
+# - Mapping rules are evaluated in the order shown.
+#
+# TRANSFORMATIONS
+# ---------------
+# Transformations are names from an allow-listed PHP transformer registry. They
+# are not executable expressions in this YAML.
+#
+# - copy_value: copy one source value without changing it.
+#
+# - copy_values: copy all non-empty values from a source collection.
+#
+# - normalize_doi_identifier: recognise a bare DOI, `doi:` value, or DOI URL and
+#   return the canonical DOI string for the DataCite API `doi` property.
+#
+# - main_title: create the primary DataCite title entry from one text value.
+#
+# - alternative_titles: create AlternativeTitle entries for all supplied values.
+#
+# - creator_agent: turn all filtered agent rows into DataCite Creators, mapping
+#   name, person/organisation type, ORCID and affiliation where supplied.
+#
+# - contributor_agent: turn all filtered agent rows into DataCite Contributors
+#   and apply the configured DataCite contributor type.
+#
+# - funding_reference: turn all filtered funder rows into FundingReferences,
+#   using the agent name as the DataCite funder name.
+#
+# - publisher: create the DataCite publisher value from the WBME publisher name.
+#
+# - year_from_date: extract the four-digit year from the supplied publication
+#   date for DataCite publicationYear.
+#
+# - datacite_date: create a DataCite Date with the configured date type while
+#   preserving the date precision supplied by WBME.
+#
+# - updated_dates: create an Updated Date for each modification row and carry
+#   the associated dataset version in the DataCite date information.
+#
+# - single_language: emit a language only when WBME contains exactly one
+#   non-empty language; omit the property when none or several are supplied.
+#
+# - description: create a DataCite Description with the configured type and
+#   default language.
+#
+# - prefixed_description: create a Description after prepending the configured
+#   label, such as `Audience:` or `Provenance:`.
+#
+# - subjects: turn every non-empty keyword into a DataCite Subject.
+#
+# - related_resources: normalise the WBME relation type and map each row as a
+#   RelatedIdentifier, RelatedItem, or both, depending on whether URI and/or
+#   descriptive resource text is present.
+#
+# - temporal_coverage: combine available start/end values into the agreed
+#   DataCite temporal Date representation and add supplied free-text coverage as
+#   a Description; retain supported reduced precision and open-ended coverage.
+#
+# - geographic_elements: create GeoLocations from bounding-box coordinates and
+#   geographic descriptions. Geohashes are not converted to DataCite geometry.
+#
+# - rights_holder_contributor: create a RightsHolder Contributor from the source
+#   organisation or person name.
+#
+# - access_rights: normalise the WBME access-right code and combine it with any
+#   access-right description in a DataCite Rights entry.
+#
+# - licence_rights: combine the licence text and/or URI into one DataCite Rights
+#   entry without creating an empty entry when neither value is present.
+#
+# Leaf transformations used inside `field_mappings`:
+# - wbme_agent_type_to_datacite_name_type: apply the adjacent value_map;
+#   `person` becomes `Personal` and `organisation` becomes `Organizational`.
+#
+# - normalise_orcid: trim the value, verify the ORCID pattern and retain its
+#   canonical `https://orcid.org/...` URI form.
+#
+# - prepend_configured_prefix: prepend the rule's `prefix` parameter to text.
+#
+# - normalize_related_identifier: canonicalise a DOI; retain other supported
+#   identifier or URI values without changing their meaning.
+#
+# - classify_related_identifier_type: identify the corresponding DataCite 4.7
+#   relatedIdentifierType, such as DOI, Handle or URL.
+#
+# - wbme_relation_type_to_datacite: apply the adjacent WBME-to-DataCite
+#   relation-type value map.
+#
+# - make_iso8601_interval: join start and end with `/` when both exist; when one
+#   endpoint is absent, emit the available value; preserve supplied precision.
+#
+# - prefix_temporal_coverage: prepend `Temporal coverage:` to the supplied text.
+#
+# - compose_access_rights_statement: map the WBME access-right code to its
+#   configured label and append `: ` plus the description when one is supplied.
+
+profile:
+  id: bsi-core-to-datacite-4.7
+  version: "0.4.0"
+  source:
+    system: WBME
+    template: BSI Core
+  target:
+    schema: DataCite
+    schema_version: "4.7"
+    json_representation: DataCite REST API JSON:API
+  path_notation: .
+
+defaults:
+  metadata_language: en
+
+constants:
+  # DataCite's broad resource category is always Dataset for this BSI profile.
+  - target:
+      property: types.resourceTypeGeneral
+      json_path: data.attributes.types.resourceTypeGeneral
+    value: Dataset
+
+mappings:
+  # Copy the more specific WBME resource type into the DataCite Types object.
+  # The current BSI Core template permits only the value `Dataset`.
+  - id: resource_type
+    source: required_metadata.resourceType
+    target:
+      property: types.resourceType
+      json_path: data.attributes.types.resourceType
+    transform: copy_value
+
+  # Convert the BSI resource identifier into the canonical DOI identifier that
+  # identifies the DataCite record's dataset.
+  - id: primary_identifier
+    source: optional_additional_metadata.resourceIdentifier
+    target:
+      property: doi
+      json_path: data.attributes.doi
+    transform: normalize_doi_identifier
+
+  # Add the required BSI title as the primary DataCite title.
+  - id: main_title
+    source: required_metadata.title
+    target:
+      property: titles
+      json_path: data.attributes.titles
+    mode: append
+    transform: main_title
+    field_mappings:
+      - source: "@value"
+        target_json: data.attributes.titles[].title
+
+  # Add every BSI alternative title as a DataCite AlternativeTitle.
+  - id: alternative_titles
+    source: optional_additional_metadata.alternativeTitle
+    target:
+      property: titles
+      json_path: data.attributes.titles
+    mode: append
+    transform: alternative_titles
+    field_mappings:
+      - source: "@value"
+        target_json: data.attributes.titles[].title
+      - value: AlternativeTitle
+        target_json: data.attributes.titles[].titleType
+
+  # Select agents whose WBME role is `author` and add them as DataCite Creators.
+  # The transform also normalises WBME person/organisation codes and ORCIDs.
+  - id: creators
+    source: required_metadata.agents
+    filter:
+      role: author
+    target:
+      property: creators
+      json_path: data.attributes.creators
+    mode: append
+    transform: creator_agent
+    field_mappings:
+      - source: name
+        target_json: data.attributes.creators[].name
+      - source: agentType
+        target_json: data.attributes.creators[].nameType
+        transform: wbme_agent_type_to_datacite_name_type
+        value_map:
+          person: Personal
+          organisation: Organizational
+      - source: orcid
+        target_json: data.attributes.creators[].nameIdentifiers[].nameIdentifier
+        transform: normalise_orcid
+      - value: ORCID
+        when_source_present: orcid
+        target_json: data.attributes.creators[].nameIdentifiers[].nameIdentifierScheme
+      - value: https://orcid.org
+        when_source_present: orcid
+        target_json: data.attributes.creators[].nameIdentifiers[].schemeUri
+      - source: affiliation
+        target_json: data.attributes.creators[].affiliation[].name
+
+  # Select agents whose role is `custodian` and add them as DataManager
+  # Contributors; this expresses custodianship using the closest DataCite role.
+  - id: custodians
+    source: required_metadata.agents
+    filter:
+      role: custodian
+    target:
+      property: contributors
+      json_path: data.attributes.contributors
+    mode: append
+    transform: contributor_agent
+    parameters:
+      contributor_type: DataManager
+    field_mappings:
+      - source: name
+        target_json: data.attributes.contributors[].name
+      - source: agentType
+        target_json: data.attributes.contributors[].nameType
+        transform: wbme_agent_type_to_datacite_name_type
+        value_map:
+          person: Personal
+          organisation: Organizational
+      - source: orcid
+        target_json: data.attributes.contributors[].nameIdentifiers[].nameIdentifier
+        transform: normalise_orcid
+      - value: ORCID
+        when_source_present: orcid
+        target_json: data.attributes.contributors[].nameIdentifiers[].nameIdentifierScheme
+      - value: https://orcid.org
+        when_source_present: orcid
+        target_json: data.attributes.contributors[].nameIdentifiers[].schemeUri
+      - source: affiliation
+        target_json: data.attributes.contributors[].affiliation[].name
+      - value_from_parameter: contributor_type
+        target_json: data.attributes.contributors[].contributorType
+
+  # Select `pointOfContact` agents and add them as ContactPerson Contributors.
+  - id: points_of_contact
+    source: required_metadata.agents
+    filter:
+      role: pointOfContact
+    target:
+      property: contributors
+      json_path: data.attributes.contributors
+    mode: append
+    transform: contributor_agent
+    parameters:
+      contributor_type: ContactPerson
+    field_mappings:
+      - source: name
+        target_json: data.attributes.contributors[].name
+      - source: agentType
+        target_json: data.attributes.contributors[].nameType
+        transform: wbme_agent_type_to_datacite_name_type
+        value_map:
+          person: Personal
+          organisation: Organizational
+      - source: orcid
+        target_json: data.attributes.contributors[].nameIdentifiers[].nameIdentifier
+        transform: normalise_orcid
+      - value: ORCID
+        when_source_present: orcid
+        target_json: data.attributes.contributors[].nameIdentifiers[].nameIdentifierScheme
+      - value: https://orcid.org
+        when_source_present: orcid
+        target_json: data.attributes.contributors[].nameIdentifiers[].schemeUri
+      - source: affiliation
+        target_json: data.attributes.contributors[].affiliation[].name
+      - value_from_parameter: contributor_type
+        target_json: data.attributes.contributors[].contributorType
+
+  # Select `dataCollector` agents and add them as DataCollector Contributors.
+  - id: data_collectors
+    source: required_metadata.agents
+    filter:
+      role: dataCollector
+    target:
+      property: contributors
+      json_path: data.attributes.contributors
+    mode: append
+    transform: contributor_agent
+    parameters:
+      contributor_type: DataCollector
+    field_mappings:
+      - source: name
+        target_json: data.attributes.contributors[].name
+      - source: agentType
+        target_json: data.attributes.contributors[].nameType
+        transform: wbme_agent_type_to_datacite_name_type
+        value_map:
+          person: Personal
+          organisation: Organizational
+      - source: orcid
+        target_json: data.attributes.contributors[].nameIdentifiers[].nameIdentifier
+        transform: normalise_orcid
+      - value: ORCID
+        when_source_present: orcid
+        target_json: data.attributes.contributors[].nameIdentifiers[].nameIdentifierScheme
+      - value: https://orcid.org
+        when_source_present: orcid
+        target_json: data.attributes.contributors[].nameIdentifiers[].schemeUri
+      - source: affiliation
+        target_json: data.attributes.contributors[].affiliation[].name
+      - value_from_parameter: contributor_type
+        target_json: data.attributes.contributors[].contributorType
+
+  # Select generic `contributor` agents and add them as Other Contributors.
+  - id: other_contributors
+    source: required_metadata.agents
+    filter:
+      role: contributor
+    target:
+      property: contributors
+      json_path: data.attributes.contributors
+    mode: append
+    transform: contributor_agent
+    parameters:
+      contributor_type: Other
+    field_mappings:
+      - source: name
+        target_json: data.attributes.contributors[].name
+      - source: agentType
+        target_json: data.attributes.contributors[].nameType
+        transform: wbme_agent_type_to_datacite_name_type
+        value_map:
+          person: Personal
+          organisation: Organizational
+      - source: orcid
+        target_json: data.attributes.contributors[].nameIdentifiers[].nameIdentifier
+        transform: normalise_orcid
+      - value: ORCID
+        when_source_present: orcid
+        target_json: data.attributes.contributors[].nameIdentifiers[].nameIdentifierScheme
+      - value: https://orcid.org
+        when_source_present: orcid
+        target_json: data.attributes.contributors[].nameIdentifiers[].schemeUri
+      - source: affiliation
+        target_json: data.attributes.contributors[].affiliation[].name
+      - value_from_parameter: contributor_type
+        target_json: data.attributes.contributors[].contributorType
+
+  # Select `funder` agents and add their names as DataCite FundingReferences.
+  - id: funders
+    source: required_metadata.agents
+    filter:
+      role: funder
+    target:
+      property: fundingReferences
+      json_path: data.attributes.fundingReferences
+    mode: append
+    transform: funding_reference
+    field_mappings:
+      - source: name
+        target_json: data.attributes.fundingReferences[].funderName
+
+  # Map the required BSI publisher name to the DataCite publisher property.
+  - id: publisher
+    source: required_metadata.publisher
+    target:
+      property: publisher
+      json_path: data.attributes.publisher
+    transform: publisher
+    field_mappings:
+      - source: "@value"
+        target_json: data.attributes.publisher.name
+
+  # Derive DataCite publicationYear from the year component of datePublished.
+  - id: publication_year
+    source: optional_additional_metadata.datePublished
+    target:
+      property: publicationYear
+      json_path: data.attributes.publicationYear
+    transform: year_from_date
+
+  # Also preserve the complete datePublished value as a DataCite Issued Date.
+  - id: issued_date
+    source: optional_additional_metadata.datePublished
+    target:
+      property: dates
+      json_path: data.attributes.dates
+    mode: append
+    transform: datacite_date
+    parameters:
+      date_type: Issued
+    field_mappings:
+      - source: "@value"
+        target_json: data.attributes.dates[].date
+      - value_from_parameter: date_type
+        target_json: data.attributes.dates[].dateType
+
+  # Add BSI dateCreated as a DataCite Created Date, preserving its precision.
+  - id: created_date
+    source: required_metadata.dateCreated
+    target:
+      property: dates
+      json_path: data.attributes.dates
+    mode: append
+    transform: datacite_date
+    parameters:
+      date_type: Created
+    field_mappings:
+      - source: "@value"
+        target_json: data.attributes.dates[].date
+      - value_from_parameter: date_type
+        target_json: data.attributes.dates[].dateType
+
+  # Add every dateModified row as an Updated Date and retain the version paired
+  # with that date as DataCite date information.
+  - id: modification_dates
+    source: optional_additional_metadata.dateModified
+    target:
+      property: dates
+      json_path: data.attributes.dates
+    mode: append
+    transform: updated_dates
+    field_mappings:
+      - source: date
+        target_json: data.attributes.dates[].date
+      - value: Updated
+        target_json: data.attributes.dates[].dateType
+      - source: version
+        target_json: data.attributes.dates[].dateInformation
+
+  # Map the BSI language only when there is one value. DataCite has one language
+  # property, so multiple BSI languages are omitted and reported outside YAML.
+  - id: language
+    source: optional_additional_metadata.language
+    target:
+      property: language
+      json_path: data.attributes.language
+    transform: single_language
+
+  # Add the required BSI description as the DataCite Abstract description.
+  - id: abstract
+    source: required_metadata.description
+    target:
+      property: descriptions
+      json_path: data.attributes.descriptions
+    mode: append
+    transform: description
+    parameters:
+      description_type: Abstract
+      language_default: metadata_language
+    field_mappings:
+      - source: "@value"
+        target_json: data.attributes.descriptions[].description
+      - value_from_parameter: description_type
+        target_json: data.attributes.descriptions[].descriptionType
+      - value_from_default: metadata_language
+        target_json: data.attributes.descriptions[].lang
+
+  # Preserve audience information in an Other Description prefixed `Audience:`.
+  - id: audience
+    source: optional_additional_metadata.audience
+    target:
+      property: descriptions
+      json_path: data.attributes.descriptions
+    mode: append
+    transform: prefixed_description
+    parameters:
+      description_type: Other
+      prefix: "Audience:"
+      language_default: metadata_language
+    field_mappings:
+      - source: "@value"
+        target_json: data.attributes.descriptions[].description
+        transform: prepend_configured_prefix
+      - value_from_parameter: description_type
+        target_json: data.attributes.descriptions[].descriptionType
+      - value_from_default: metadata_language
+        target_json: data.attributes.descriptions[].lang
+
+  # Preserve provenance in an Other Description prefixed `Provenance:`.
+  - id: provenance
+    source: optional_additional_metadata.provenance
+    target:
+      property: descriptions
+      json_path: data.attributes.descriptions
+    mode: append
+    transform: prefixed_description
+    parameters:
+      description_type: Other
+      prefix: "Provenance:"
+      language_default: metadata_language
+    field_mappings:
+      - source: "@value"
+        target_json: data.attributes.descriptions[].description
+        transform: prepend_configured_prefix
+      - value_from_parameter: description_type
+        target_json: data.attributes.descriptions[].descriptionType
+      - value_from_default: metadata_language
+        target_json: data.attributes.descriptions[].lang
+
+  # Preserve general comments in an Other Description prefixed `Comments:`.
+  - id: comments
+    source: optional_additional_metadata.comments
+    target:
+      property: descriptions
+      json_path: data.attributes.descriptions
+    mode: append
+    transform: prefixed_description
+    parameters:
+      description_type: Other
+      prefix: "Comments:"
+      language_default: metadata_language
+    field_mappings:
+      - source: "@value"
+        target_json: data.attributes.descriptions[].description
+        transform: prepend_configured_prefix
+      - value_from_parameter: description_type
+        target_json: data.attributes.descriptions[].descriptionType
+      - value_from_default: metadata_language
+        target_json: data.attributes.descriptions[].lang
+
+  # Add every BSI keyword as an individual DataCite Subject.
+  - id: keywords
+    source: required_metadata.keywords
+    target:
+      property: subjects
+      json_path: data.attributes.subjects
+    mode: append
+    transform: subjects
+    field_mappings:
+      - source: "@value"
+        target_json: data.attributes.subjects[].subject
+
+  # Add every listed BSI data format to the DataCite formats collection.
+  - id: formats
+    source: optional_additional_metadata.dataFormat
+    target:
+      property: formats
+      json_path: data.attributes.formats
+    mode: append
+    transform: copy_values
+    field_mappings:
+      - source: "@value"
+        target_json: data.attributes.formats[]
+
+  # Copy the current BSI dataset version to DataCite version.
+  - id: dataset_version
+    source: optional_additional_metadata.datasetVersion
+    target:
+      property: version
+      json_path: data.attributes.version
+    transform: copy_value
+
+  # Map each related-resource row according to the available content: URI only
+  # becomes a RelatedIdentifier; text only becomes a RelatedItem; both produces
+  # both structures, with the identifier repeated in the RelatedItem.
+  - id: related_resources
+    source: optional_additional_metadata.relatedResources
+    targets:
+      - property: relatedIdentifiers
+        json_path: data.attributes.relatedIdentifiers
+      - property: relatedItems
+        json_path: data.attributes.relatedItems
+    mode: append
+    transform: related_resources
+    field_mappings:
+      - source: uri
+        applies_to: relatedIdentifiers
+        target_json: data.attributes.relatedIdentifiers[].relatedIdentifier
+        transform: normalize_related_identifier
+      - source: uri
+        applies_to: relatedIdentifiers
+        target_json: data.attributes.relatedIdentifiers[].relatedIdentifierType
+        transform: classify_related_identifier_type
+      - source: relationType
+        applies_to: relatedIdentifiers
+        target_json: data.attributes.relatedIdentifiers[].relationType
+        transform: wbme_relation_type_to_datacite
+        value_map:
+          isDerivedFrom: IsDerivedFrom
+          isPartOf: IsPartOf
+          hasPart: HasPart
+          isDocumentedBy: IsDocumentedBy
+          isDescribedBy: IsDescribedBy
+          references: References
+          cites: Cites
+          isVersionOf: IsVersionOf
+          isNewVersionOf: IsNewVersionOf
+          requires: Requires
+          other: Other
+      - source: relationTypeInformation
+        applies_to: relatedIdentifiers
+        target_json: data.attributes.relatedIdentifiers[].relationTypeInformation
+      - source: resource
+        applies_to: relatedItems
+        target_json: data.attributes.relatedItems[].titles[].title
+      - value: Other
+        applies_to: relatedItems
+        target_json: data.attributes.relatedItems[].relatedItemType
+      - source: relationType
+        applies_to: relatedItems
+        target_json: data.attributes.relatedItems[].relationType
+        transform: wbme_relation_type_to_datacite
+        value_map:
+          isDerivedFrom: IsDerivedFrom
+          isPartOf: IsPartOf
+          hasPart: HasPart
+          isDocumentedBy: IsDocumentedBy
+          isDescribedBy: IsDescribedBy
+          references: References
+          cites: Cites
+          isVersionOf: IsVersionOf
+          isNewVersionOf: IsNewVersionOf
+          requires: Requires
+          other: Other
+      - source: relationTypeInformation
+        applies_to: relatedItems
+        target_json: data.attributes.relatedItems[].relationTypeInformation
+      - source: uri
+        applies_to: relatedItems
+        when_source_present: uri
+        target_json: data.attributes.relatedItems[].relatedItemIdentifier.relatedItemIdentifier
+        transform: normalize_related_identifier
+      - source: uri
+        applies_to: relatedItems
+        when_source_present: uri
+        target_json: data.attributes.relatedItems[].relatedItemIdentifier.relatedItemIdentifierType
+        transform: classify_related_identifier_type
+
+  # Map structured start/end temporal coverage to DataCite Dates and preserve a
+  # supplied temporal description in the DataCite descriptions collection.
+  - id: temporal_coverage
+    source: optional_additional_metadata.temporalCoverage
+    targets:
+      - property: dates
+        json_path: data.attributes.dates
+      - property: descriptions
+        json_path: data.attributes.descriptions
+    mode: append
+    transform: temporal_coverage
+    parameters:
+      language_default: metadata_language
+    field_mappings:
+      - sources:
+          start: start
+          end: end
+        target_json: data.attributes.dates[].date
+        transform: make_iso8601_interval
+      - value: Coverage
+        when_any_source_present:
+          - start
+          - end
+        target_json: data.attributes.dates[].dateType
+      - source: description
+        target_json: data.attributes.descriptions[].description
+        transform: prefix_temporal_coverage
+      - value: Other
+        when_source_present: description
+        target_json: data.attributes.descriptions[].descriptionType
+      - value_from_default: metadata_language
+        when_source_present: description
+        target_json: data.attributes.descriptions[].lang
+
+  # Convert each geographic element's bounding box and/or place description to
+  # a DataCite GeoLocation. The transformer does not convert geohash values.
+  - id: geographic_coverage
+    source: optional_additional_metadata.geographicCoverage.geographicElement
+    target:
+      property: geoLocations
+      json_path: data.attributes.geoLocations
+    mode: append
+    transform: geographic_elements
+    field_mappings:
+      - source: geographicDescription
+        target_json: data.attributes.geoLocations[].geoLocationPlace
+      - source: geographicBoundingBox.westBoundLongitude
+        target_json: data.attributes.geoLocations[].geoLocationBox.westBoundLongitude
+      - source: geographicBoundingBox.eastBoundLongitude
+        target_json: data.attributes.geoLocations[].geoLocationBox.eastBoundLongitude
+      - source: geographicBoundingBox.southBoundLatitude
+        target_json: data.attributes.geoLocations[].geoLocationBox.southBoundLatitude
+      - source: geographicBoundingBox.northBoundLatitude
+        target_json: data.attributes.geoLocations[].geoLocationBox.northBoundLatitude
+
+  # Add the BSI rights-holder name as a DataCite RightsHolder Contributor.
+  - id: rights_holder
+    source: optional_additional_metadata.rightsHolder
+    target:
+      property: contributors
+      json_path: data.attributes.contributors
+    mode: append
+    transform: rights_holder_contributor
+    parameters:
+      contributor_type: RightsHolder
+    field_mappings:
+      - source: "@value"
+        target_json: data.attributes.contributors[].name
+      - value_from_parameter: contributor_type
+        target_json: data.attributes.contributors[].contributorType
+
+  # Convert the BSI access-right type and optional explanation into a DataCite
+  # Rights entry, including normalisation of WBME's stored access-right code.
+  - id: access_rights
+    source: optional_additional_metadata.accessRights
+    target:
+      property: rightsList
+      json_path: data.attributes.rightsList
+    mode: append
+    transform: access_rights
+    parameters:
+      access_type_labels:
+        open: Open
+        restricted: Restricted
+        embargoed: Embargoed
+        internal: Internal
+        accessByAgreement: ByAgreement
+        other: Other
+      description_separator: ": "
+    field_mappings:
+      - sources:
+          type: accessRightsType
+          description: accessRightsDescription
+        target_json: data.attributes.rightsList[].rights
+        transform: compose_access_rights_statement
+
+  # Combine the BSI licence wording and licence URI into one DataCite Rights
+  # entry; either source may be used when the other is absent.
+  - id: licence
+    sources:
+      details: optional_additional_metadata.licenseDetails
+      uri: optional_additional_metadata.licenseURI
+    target:
+      property: rightsList
+      json_path: data.attributes.rightsList
+    mode: append
+    transform: licence_rights
+    field_mappings:
+      - source: details
+        target_json: data.attributes.rightsList[].rights
+      - source: uri
+        target_json: data.attributes.rightsList[].rightsUri
