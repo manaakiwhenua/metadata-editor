@@ -3,8 +3,8 @@
 use League\HTMLToMarkdown\HtmlConverter;
 use League\HTMLToMarkdown\Converter\TableConverter;
 
-require_once 'application/libraries/IProject_export_writer.php';
-require_once 'application/libraries/Metadata_provenance.php';
+require_once 'application/libraries/Custom_export_types/IProject_export_writer.php';
+require_once 'application/libraries/Custom_export_types/Metadata_provenance.php';
 
 class Project_markdown_writer implements IProject_export_writer
 {
@@ -17,12 +17,12 @@ class Project_markdown_writer implements IProject_export_writer
 		$this->ci->load->library('Html_report');
 	}
 
-	public function export_type()
+	public function export_type(): string
 	{
 		return "markdown";
 	}
 
-	public function file_extension()
+	public function file_extension(): string
 	{
 		return "md";
 	}
@@ -34,10 +34,10 @@ class Project_markdown_writer implements IProject_export_writer
 	 * @param int $project_id - Project ID
 	 * @param array $options - Options
 	 * @param string|null $output_file - Optional output file path
-	 * @return string - Absolute file path of the generated Markdown file
+	 * @return void
 	 * 
 	 */
-	public function generate($project_id, $output_file, $options = array())
+	public function generate($project_id, $output_file, $options = array()): void
 	{
 
 		$header_level_for_field_label = 5; // Some nested fields have label classes instead of html headers.
@@ -64,8 +64,6 @@ class Project_markdown_writer implements IProject_export_writer
 		}
 
 		file_put_contents($output_file, $markdown . PHP_EOL);
-
-		return $output_file;
 	}
 
 	private function convert_field_label_to_header(string $html, int $header_level_for_field_label)
