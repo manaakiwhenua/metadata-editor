@@ -1,6 +1,6 @@
 <?php
 
-final class Datacite_date_transformers
+final class Date_transformers
 {
     static function year_from_date($date)
     {

@@ -1,4 +1,4 @@
-# Runtime field mapping for the WBME DataCite writer.
+# Runtime field mapping for the DataCite writer.
 #
 # This file contains mapping configuration only. Validation, export blockers,
 # warnings, user messages, decision history, and JSON/XML serialization are
@@ -6,9 +6,8 @@
 #
 # HOW TO READ THIS FILE
 # ---------------------
-# - `source` is one WBME metadata path. `sources` supplies several named inputs
-#   to one transformation. Paths use WBME/Adbar dot notation; `$` and `[]` are
-#   deliberately not used.
+# - `source` is one metadata path. `sources` supplies several named inputs
+#   to one transformation. Paths use dot notation.
 #
 # - `target` identifies one DataCite destination; `targets` identifies several.
 #   Each destination contains `property`, the DataCite metadata property used by
@@ -23,7 +22,7 @@
 #   collection instead of replacing that collection. Empty results add nothing.
 #
 # - `filter` retains only source collection entries whose named fields exactly
-#   match the configured WBME values before the transformation runs.
+#   match the configured values before the transformation runs.
 #
 # - `parameters` passes fixed mapping choices to the named transformation.
 #
@@ -32,7 +31,7 @@
 #   `@value` means the current scalar value or current collection item.
 #
 # - A leaf `sources` object supplies several relative values to one operation.
-#   `value` supplies a generated constant rather than a WBME value;
+#   `value` supplies a generated constant rather than a value;
 #   `value_from_parameter` and `value_from_default` copy named configured values.
 #
 # - `target_json` is the complete JSON destination. `[]` identifies one member
@@ -80,18 +79,18 @@
 # - funding_reference: turn all filtered funder rows into FundingReferences,
 #   using the agent name as the DataCite funder name.
 #
-# - publisher: create the DataCite publisher value from the WBME publisher name.
+# - publisher: create the DataCite publisher value from the supplied publisher name.
 #
 # - year_from_date: extract the four-digit year from the supplied publication
 #   date for DataCite publicationYear.
 #
 # - datacite_date: create a DataCite Date with the configured date type while
-#   preserving the date precision supplied by WBME.
+#   preserving the date precision supplied.
 #
 # - updated_dates: create an Updated Date for each modification row and carry
 #   the associated dataset version in the DataCite date information.
 #
-# - single_language: emit a language only when WBME contains exactly one
+# - single_language: emit a language only when BSI Core contains exactly one
 #   non-empty language; omit the property when none or several are supplied.
 #
 # - description: create a DataCite Description with the configured type and
@@ -102,7 +101,7 @@
 #
 # - subjects: turn every non-empty keyword into a DataCite Subject.
 #
-# - related_resources: normalise the WBME relation type and map each row as a
+# - related_resources: normalise the relation type and map each row as a
 #   RelatedIdentifier, RelatedItem, or both, depending on whether URI and/or
 #   descriptive resource text is present.
 #
@@ -116,14 +115,14 @@
 # - rights_holder_contributor: create a RightsHolder Contributor from the source
 #   organisation or person name.
 #
-# - access_rights: normalise the WBME access-right code and combine it with any
+# - access_rights: normalise the access-right code and combine it with any
 #   access-right description in a DataCite Rights entry.
 #
 # - licence_rights: combine the licence text and/or URI into one DataCite Rights
 #   entry without creating an empty entry when neither value is present.
 #
 # Leaf transformations used inside `field_mappings`:
-# - wbme_agent_type_to_datacite_name_type: apply the adjacent value_map;
+# - agent_type_to_datacite_name_type: apply the adjacent value_map;
 #   `person` becomes `Personal` and `organisation` becomes `Organizational`.
 #
 # - normalise_orcid: trim the value, verify the ORCID pattern and retain its
@@ -137,7 +136,7 @@
 # - classify_related_identifier_type: identify the corresponding DataCite 4.7
 #   relatedIdentifierType, such as DOI, Handle or URL.
 #
-# - wbme_relation_type_to_datacite: apply the adjacent WBME-to-DataCite
+# - relation_type_to_datacite: apply the adjacent BSI Core-to-DataCite
 #   relation-type value map.
 #
 # - make_iso8601_interval: join start and end with `/` when both exist; when one
@@ -145,14 +144,14 @@
 #
 # - prefix_temporal_coverage: prepend `Temporal coverage:` to the supplied text.
 #
-# - compose_access_rights_statement: map the WBME access-right code to its
+# - compose_access_rights_statement: map the access-right code to its
 #   configured label and append `: ` plus the description when one is supplied.
 
 profile:
   id: bsi-core-to-datacite-4.7
   version: "0.4.0"
   source:
-    system: WBME
+    system: World Bank Metadata Editor
     template: BSI Core
   target:
     schema: DataCite
@@ -171,7 +170,7 @@ constants:
     value: Dataset
 
 mappings:
-  # Copy the more specific WBME resource type into the DataCite Types object.
+  # Copy the more specific resource type into the DataCite Types object.
   # The current BSI Core template permits only the value `Dataset`.
   - id: resource_type
     source: required_metadata.resourceType
@@ -180,7 +179,7 @@ mappings:
       json_path: data.attributes.types.resourceType
     transform: copy_value
 
-  # Convert the BSI resource identifier into the canonical DOI identifier that
+  # Convert the resource identifier into the canonical DOI identifier that
   # identifies the DataCite record's dataset.
   - id: primary_identifier
     source: optional_additional_metadata.resourceIdentifier
@@ -215,8 +214,8 @@ mappings:
       - value: AlternativeTitle
         target_json: data.attributes.titles[].titleType
 
-  # Select agents whose WBME role is `author` and add them as DataCite Creators.
-  # The transform also normalises WBME person/organisation codes and ORCIDs.
+  # Select agents whose role is `author` and add them as DataCite Creators.
+  # The transform also normalises person/organisation codes and ORCIDs.
   - id: creators
     source: required_metadata.agents
     filter:
@@ -231,7 +230,7 @@ mappings:
         target_json: data.attributes.creators[].name
       - source: agentType
         target_json: data.attributes.creators[].nameType
-        transform: wbme_agent_type_to_datacite_name_type
+        transform: agent_type_to_datacite_name_type
         value_map:
           person: Personal
           organisation: Organizational
@@ -265,7 +264,7 @@ mappings:
         target_json: data.attributes.contributors[].name
       - source: agentType
         target_json: data.attributes.contributors[].nameType
-        transform: wbme_agent_type_to_datacite_name_type
+        transform: agent_type_to_datacite_name_type
         value_map:
           person: Personal
           organisation: Organizational
@@ -300,7 +299,7 @@ mappings:
         target_json: data.attributes.contributors[].name
       - source: agentType
         target_json: data.attributes.contributors[].nameType
-        transform: wbme_agent_type_to_datacite_name_type
+        transform: agent_type_to_datacite_name_type
         value_map:
           person: Personal
           organisation: Organizational
@@ -335,7 +334,7 @@ mappings:
         target_json: data.attributes.contributors[].name
       - source: agentType
         target_json: data.attributes.contributors[].nameType
-        transform: wbme_agent_type_to_datacite_name_type
+        transform: agent_type_to_datacite_name_type
         value_map:
           person: Personal
           organisation: Organizational
@@ -370,7 +369,7 @@ mappings:
         target_json: data.attributes.contributors[].name
       - source: agentType
         target_json: data.attributes.contributors[].nameType
-        transform: wbme_agent_type_to_datacite_name_type
+        transform: agent_type_to_datacite_name_type
         value_map:
           person: Personal
           organisation: Organizational
@@ -617,7 +616,7 @@ mappings:
       - source: relationType
         applies_to: relatedIdentifiers
         target_json: data.attributes.relatedIdentifiers[].relationType
-        transform: wbme_relation_type_to_datacite
+        transform: relation_type_to_datacite
         value_map:
           isDerivedFrom: IsDerivedFrom
           isPartOf: IsPartOf
@@ -642,7 +641,7 @@ mappings:
       - source: relationType
         applies_to: relatedItems
         target_json: data.attributes.relatedItems[].relationType
-        transform: wbme_relation_type_to_datacite
+        transform: relation_type_to_datacite
         value_map:
           isDerivedFrom: IsDerivedFrom
           isPartOf: IsPartOf
@@ -740,8 +739,8 @@ mappings:
       - value_from_parameter: contributor_type
         target_json: data.attributes.contributors[].contributorType
 
-  # Convert the BSI access-right type and optional explanation into a DataCite
-  # Rights entry, including normalisation of WBME's stored access-right code.
+  # Convert the BSI Core access-right type and optional explanation into a DataCite
+  # Rights entry, including normalisation of the access-right code.
   - id: access_rights
     source: optional_additional_metadata.accessRights
     target:
