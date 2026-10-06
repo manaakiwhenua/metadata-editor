@@ -32,7 +32,7 @@ class Project_export_writer_factory
         }
 
         $className = $this->writerMap[$type];
-        $this->ci->load->library('BSI_export_types/' . $className);
+        $this->ci->load->library('Custom_export_types/' . $className);
 
         $property = strtolower($className); // Code Igniter automatically converts class names to lowercase property names when loading libraries, so use lowercase to access the instance.
         return $this->ci->$property;

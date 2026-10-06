@@ -1,10 +1,9 @@
 <?php if (! defined('BASEPATH')) exit('No direct script access allowed');
 
+require_once 'application/libraries/Custom_export_types/Mapping_classes/Schema_transform_mapping_rules.php';
+
 class Project_datacite_writer implements IProject_export_writer
 {
-
-	const BSI_CORE_TO_DATACITE = 'application/libraries/Custom_export_types/Datacite/BSI_Core_to_DataCite_4.7_map.yaml';
-
 	/**
 	 * Constructor
 	 */
@@ -13,6 +12,7 @@ class Project_datacite_writer implements IProject_export_writer
 		$this->ci = &get_instance();
 		$this->ci->load->library("Custom_export_types/Project_json_writer");
 		$this->ci->load->library("Custom_export_types/Project_export_yaml_map_parser");
+		$this->ci->load->config('export_config');
 	}
 
 	public function export_type(): string

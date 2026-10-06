@@ -1,7 +1,7 @@
 <?php if (! defined('BASEPATH')) exit('No direct script access allowed');
 
-require_once 'application/libraries/BSI_export_types/IProject_export_writer.php';
-require_once 'application/libraries/BSI_export_types/Metadata_provenance.php';
+require_once 'application/libraries/Custom_export_types/IProject_export_writer.php';
+require_once 'application/libraries/Custom_export_types/Metadata_provenance.php';
 
 class Project_export_controller
 {
