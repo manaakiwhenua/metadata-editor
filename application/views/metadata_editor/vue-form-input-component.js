@@ -83,7 +83,31 @@ Vue.component("form-input", {
       return this.$store.state.project_id || null;
     },
     isRequired() {
-      return !!(this.field && (this.field.is_required || this.field.required));
+      return !!(this.field && this.field.is_required);
+    },
+    fieldUsesGlobalScalarEnum: function () {
+      return (
+        typeof fieldUsesGlobalScalarCodelist === "function" &&
+        fieldUsesGlobalScalarCodelist(this.field)
+      );
+    },
+    arrayTableEnums: function () {
+      if (!this.field || this.field.type !== "array") {
+        return this.field && this.field.enum ? this.field.enum : [];
+      }
+      if (
+        typeof fieldVocabularySourceGlobal === "function" &&
+        fieldVocabularySourceGlobal(this.field)
+      ) {
+        return [];
+      }
+      return this.field.enum || [];
+    },
+    dropdownEnumList: function () {
+      if (this.fieldUsesGlobalScalarEnum) {
+        return [];
+      }
+      return Array.isArray(this.field.enum) ? this.field.enum : [];
     },
     fieldUsesGlobalScalarEnum: function () {
       return (

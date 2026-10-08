@@ -15,7 +15,7 @@ class Project_validation
 
     public function __construct()
     {
-        $this->ci =& get_instance();
+        $this->ci = &get_instance();
         log_message('debug', 'Project_validation Class Initialized');
     }
 
@@ -178,7 +178,7 @@ class Project_validation
         $metadata = self::strip_application_managed_metadata_for_schema($metadata);
 
         $canonical_type = $type;
-        
+
         // Get canonical type from schema registry
         try {
             $this->ci->load->model('Metadata_schemas_model');
@@ -207,35 +207,35 @@ class Project_validation
 
         // Initialize PHP-specific issues array
         $php_specific_issues = array();
-        
+
         // Check for PHP-specific issues if compiled schema is provided
         if ($compiled_schema !== null) {
             $this->check_php_specific_issues($metadata, $compiled_schema, '', $php_specific_issues);
         }
-        
+
         // Validate using JSON Schema validator (handles union types, constraints, etc.)
         $validator = new Validator;
         $validator->validate(
             $metadata,
             (object)['$ref' => 'file://' . unix_path(realpath($schema_file))],
             Constraint::CHECK_MODE_TYPE_CAST
-            + Constraint::CHECK_MODE_APPLY_DEFAULTS
+                + Constraint::CHECK_MODE_APPLY_DEFAULTS
         );
 
         // Combine JsonSchema validator results with PHP-specific issues
         $json_schema_valid = $validator->isValid();
         $has_php_issues = !empty($php_specific_issues);
-        
+
         if ($json_schema_valid && !$has_php_issues) {
             $validation_result['valid'] = true;
         } else {
             $validation_result['valid'] = false;
-            
+
             // Add PHP-specific issues first (they're more specific)
             foreach ($php_specific_issues as $issue) {
                 $validation_result['issues'][] = $issue;
             }
-            
+
             // Convert JsonSchema validator errors to structured issues
             foreach (self::filter_redundant_json_schema_errors($validator->getErrors()) as $error) {
                 $validation_result['issues'][] = array(
@@ -276,12 +276,12 @@ class Project_validation
     {
         $extra_fields = array();
         $template_keys = array();
-        
+
         if (isset($template_data['items']) && is_array($template_data['items'])) {
             $this->collect_template_keys($template_data['items'], $template_keys);
             $this->find_template_extra_fields_recursive($metadata, $template_keys, '', $extra_fields);
         }
-        
+
         return $extra_fields;
     }
 
@@ -352,15 +352,15 @@ class Project_validation
 
             if (isset($schema_properties[$key])) {
                 $field_schema = $schema_properties[$key];
-                
+
                 if (isset($field_schema['$ref'])) {
                     $field_schema = $this->resolve_schema_ref($field_schema['$ref'], $schema);
                 }
-                
+
                 $expected_type = $this->get_schema_type($field_schema);
                 $actual_type = $this->get_php_type($value);
                 $actual_schema_type = $this->map_php_to_schema_type($actual_type, $value);
-                
+
                 // Check if schema allows array type (handles union types)
                 $allows_array = false;
                 if (isset($field_schema['type'])) {
@@ -372,7 +372,7 @@ class Project_validation
                 } elseif (isset($field_schema['items'])) {
                     $allows_array = true;
                 }
-                
+
                 // PHP-specific check: array stored as object with numeric keys
                 if ($allows_array && $actual_schema_type === 'object' && $this->is_object_with_numeric_keys($value)) {
                     $issues[] = array(
@@ -386,7 +386,7 @@ class Project_validation
                         'fixable' => true
                     );
                 }
-                
+
                 // Recurse into nested structures
                 if (is_array($value) || is_object($value)) {
                     if (isset($field_schema['items'])) {
@@ -394,7 +394,7 @@ class Project_validation
                         if (isset($items_schema['$ref'])) {
                             $items_schema = $this->resolve_schema_ref($items_schema['$ref'], $schema);
                         }
-                        
+
                         if (is_array($value)) {
                             foreach ($value as $index => $item) {
                                 $item_path = $field_path . '/' . $index;
@@ -471,7 +471,7 @@ class Project_validation
                     if (isset($items_schema['$ref'])) {
                         $items_schema = $this->resolve_schema_ref($items_schema['$ref'], $schema);
                     }
-                    
+
                     if (is_array($value)) {
                         foreach ($value as $index => $item) {
                             $item_path = $field_path . '/' . $index;
@@ -708,7 +708,7 @@ class Project_validation
     }
 
     /**
-     * Merge field-level required / is_required into the field's rules object or pipe string.
+     * Merge field-level is_required into the field's rules object or pipe string.
      * Does not strip an existing rules.required entry.
      *
      * @param array $item Template field or prop
@@ -717,8 +717,7 @@ class Project_validation
     public static function merge_required_into_rules($item)
     {
         $rules = isset($item['rules']) ? $item['rules'] : array();
-        $is_required = !empty($item['is_required']) || !empty($item['required']);
-        if (!$is_required) {
+        if (empty($item['is_required'])) {
             return $rules;
         }
 
@@ -1266,11 +1265,11 @@ class Project_validation
         if (!is_array($value) && !is_object($value)) {
             return $value;
         }
-        
+
         if (is_object($value)) {
             $value = (array) $value;
         }
-        
+
         $keys = array_keys($value);
         $numeric_keys = array();
         foreach ($keys as $key) {
@@ -1278,14 +1277,14 @@ class Project_validation
                 $numeric_keys[] = (int) $key;
             }
         }
-        
+
         sort($numeric_keys);
-        
+
         $result = array();
         foreach ($numeric_keys as $num_key) {
             $result[] = $value[(string) $num_key];
         }
-        
+
         return $result;
     }
 
@@ -1306,7 +1305,7 @@ class Project_validation
     {
         $definition = array();
         $definition['json_schema'] = $field_schema;
-        
+
         if (isset($field_schema['title'])) {
             $definition['title'] = $field_schema['title'];
         }
@@ -1316,11 +1315,11 @@ class Project_validation
         if (isset($field_schema['type'])) {
             $definition['type'] = $field_schema['type'];
         }
-        
+
         if (isset($field_schema['items'])) {
             $definition['items'] = $field_schema['items'];
         }
-        
+
         return $definition;
     }
 
@@ -1332,22 +1331,22 @@ class Project_validation
         if (!is_array($schema)) {
             return null;
         }
-        
+
         if (isset($schema['type'])) {
             if (is_array($schema['type'])) {
                 return $schema['type'][0];
             }
             return $schema['type'];
         }
-        
+
         if (isset($schema['items'])) {
             return 'array';
         }
-        
+
         if (isset($schema['properties'])) {
             return 'object';
         }
-        
+
         return null;
     }
 
@@ -1359,22 +1358,22 @@ class Project_validation
         if (!is_array($schema)) {
             return false;
         }
-        
+
         if (isset($schema['type'])) {
             if (is_array($schema['type'])) {
                 return in_array($actual_type, $schema['type']);
             }
             return $schema['type'] === $actual_type;
         }
-        
+
         if (isset($schema['items'])) {
             return $actual_type === 'array';
         }
-        
+
         if (isset($schema['properties'])) {
             return $actual_type === 'object';
         }
-        
+
         return false;
     }
 
@@ -1386,22 +1385,22 @@ class Project_validation
         if (!is_array($schema)) {
             return 'unknown';
         }
-        
+
         if (isset($schema['type'])) {
             if (is_array($schema['type'])) {
                 return implode(' | ', $schema['type']);
             }
             return $schema['type'];
         }
-        
+
         if (isset($schema['items'])) {
             return 'array';
         }
-        
+
         if (isset($schema['properties'])) {
             return 'object';
         }
-        
+
         return 'unknown';
     }
 
@@ -1414,19 +1413,19 @@ class Project_validation
         if (!is_array($value) && !is_object($value)) {
             return false;
         }
-        
+
         if (empty($value)) {
             return false;
         }
-        
+
         if (is_object($value)) {
             $value = (array) $value;
         }
-        
+
         $keys = array_keys($value);
         $all_numeric = true;
         $numeric_keys = array();
-        
+
         foreach ($keys as $key) {
             if (is_numeric($key)) {
                 $numeric_keys[] = (int) $key;
@@ -1435,11 +1434,11 @@ class Project_validation
                 break;
             }
         }
-        
+
         if (!$all_numeric || empty($numeric_keys)) {
             return false;
         }
-        
+
         sort($numeric_keys);
         $is_sequential = true;
         $start = $numeric_keys[0];
@@ -1449,7 +1448,7 @@ class Project_validation
                 break;
             }
         }
-        
+
         return $is_sequential;
     }
 
@@ -1504,7 +1503,7 @@ class Project_validation
         if (strpos($ref, '#/') === 0) {
             $path = substr($ref, 2);
             $parts = explode('/', $path);
-            
+
             $current = $schema;
             foreach ($parts as $part) {
                 if (isset($current[$part])) {
@@ -1515,7 +1514,7 @@ class Project_validation
             }
             return is_array($current) ? $current : array();
         }
-        
+
         return array();
     }
 
@@ -1545,4 +1544,3 @@ class Project_validation
         return (string) $value;
     }
 }
-

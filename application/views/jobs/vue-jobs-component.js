@@ -243,7 +243,7 @@ Vue.component('vue-jobs-component', {
         can_delete_selected_job: function () {
             return this.isAdmin && this.selected_job &&
                 (this.selected_job.status === 'completed' || this.selected_job.status === 'failed' ||
-                 this.selected_job.status === 'cancelled');
+                    this.selected_job.status === 'cancelled');
         },
 
         stale_filter_options: function () {
@@ -326,11 +326,12 @@ Vue.component('vue-jobs-component', {
             }
             var usage = this.assessment_usage;
             if (usage.unlimited || !usage.limit || usage.limit <= 0) {
-                return this.$t('assessment_monthly_unlimited') || 'No monthly assessment limit configured.';
+                return this.$t('assessment_monthly_unlimited');
             }
-            return (this.$t('assessment_monthly_usage') || 'Site usage this month: {used} of {limit}.')
-                .replace('{used}', usage.used_this_month)
-                .replace('{limit}', usage.limit);
+            return this.$t('assessment_monthly_usage', {
+                used: usage.used_this_month,
+                limit: usage.limit
+            });
         },
 
         dashboardStatCards: function () {
@@ -412,29 +413,29 @@ Vue.component('vue-jobs-component', {
                 },
                 credentials: 'same-origin'
             })
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-                if (data.status === 'success') {
-                    vm.jobs = data.jobs || [];
-                    vm.pagination.total = data.total != null ? data.total : vm.jobs.length;
-                    vm.assessment_usage = data.assessment_usage || null;
-                    if (data.stale_config) {
-                        vm.stale_config = data.stale_config;
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    if (data.status === 'success') {
+                        vm.jobs = data.jobs || [];
+                        vm.pagination.total = data.total != null ? data.total : vm.jobs.length;
+                        vm.assessment_usage = data.assessment_usage || null;
+                        if (data.stale_config) {
+                            vm.stale_config = data.stale_config;
+                        }
+                    } else {
+                        vm.error_message = data.message || (vm.$t('error_loading_jobs') || 'Failed to load jobs');
+                        vm.jobs = [];
+                        vm.pagination.total = 0;
                     }
-                } else {
-                    vm.error_message = data.message || (vm.$t('error_loading_jobs') || 'Failed to load jobs');
+                })
+                .catch(function () {
+                    vm.error_message = vm.$t('error_loading_jobs') || 'Failed to load jobs';
                     vm.jobs = [];
                     vm.pagination.total = 0;
-                }
-            })
-            .catch(function () {
-                vm.error_message = vm.$t('error_loading_jobs') || 'Failed to load jobs';
-                vm.jobs = [];
-                vm.pagination.total = 0;
-            })
-            .finally(function () {
-                vm.loading = false;
-            });
+                })
+                .finally(function () {
+                    vm.loading = false;
+                });
         },
 
         loadJobTypes: function () {
@@ -444,13 +445,13 @@ Vue.component('vue-jobs-component', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin'
             })
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-                if (data.status === 'success' && data.job_types) {
-                    vm.job_types = data.job_types;
-                }
-            })
-            .catch(function () {});
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    if (data.status === 'success' && data.job_types) {
+                        vm.job_types = data.job_types;
+                    }
+                })
+                .catch(function () { });
         },
 
         loadUsers: function () {
@@ -460,18 +461,18 @@ Vue.component('vue-jobs-component', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin'
             })
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-                if (data.status === 'success' && data.users) {
-                    vm.users = data.users.map(function (user) {
-                        return {
-                            value: user.id,
-                            text: user.username || user.email || ('User #' + user.id)
-                        };
-                    });
-                }
-            })
-            .catch(function () {});
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    if (data.status === 'success' && data.users) {
+                        vm.users = data.users.map(function (user) {
+                            return {
+                                value: user.id,
+                                text: user.username || user.email || ('User #' + user.id)
+                            };
+                        });
+                    }
+                })
+                .catch(function () { });
         },
 
         loadSummary: function () {
@@ -495,30 +496,30 @@ Vue.component('vue-jobs-component', {
             }
 
             Promise.all(requests)
-            .then(function (results) {
-                if (results[0].status === 'success') {
-                    vm.queue_stats = results[0].queue || null;
-                    vm.stale_count = (results[0].stale && results[0].stale.count != null)
-                        ? results[0].stale.count
-                        : 0;
-                    if (results[0].stale_config) {
-                        vm.stale_config = results[0].stale_config;
+                .then(function (results) {
+                    if (results[0].status === 'success') {
+                        vm.queue_stats = results[0].queue || null;
+                        vm.stale_count = (results[0].stale && results[0].stale.count != null)
+                            ? results[0].stale.count
+                            : 0;
+                        if (results[0].stale_config) {
+                            vm.stale_config = results[0].stale_config;
+                        }
                     }
-                }
-                if (vm.isAdmin && results[1] && results[1].status === 'success' && results[1].worker) {
-                    var worker = results[1].worker;
-                    vm.worker_status = {
-                        status: worker.is_running && worker.is_alive
-                            ? 'running'
-                            : (worker.is_running === false || worker.is_alive === false ? 'stopped' : 'unknown'),
-                        raw: worker
-                    };
-                }
-            })
-            .catch(function () {})
-            .finally(function () {
-                vm.loading_summary = false;
-            });
+                    if (vm.isAdmin && results[1] && results[1].status === 'success' && results[1].worker) {
+                        var worker = results[1].worker;
+                        vm.worker_status = {
+                            status: worker.is_running && worker.is_alive
+                                ? 'running'
+                                : (worker.is_running === false || worker.is_alive === false ? 'stopped' : 'unknown'),
+                            raw: worker
+                        };
+                    }
+                })
+                .catch(function () { })
+                .finally(function () {
+                    vm.loading_summary = false;
+                });
         },
 
         applyFilters: function () {
@@ -655,22 +656,22 @@ Vue.component('vue-jobs-component', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin'
             })
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-                if (data.status === 'success') {
-                    vm.selected_job = data.job;
-                } else {
-                    vm.error_message = data.message || (vm.$t('error_loading_job') || 'Failed to load job details');
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    if (data.status === 'success') {
+                        vm.selected_job = data.job;
+                    } else {
+                        vm.error_message = data.message || (vm.$t('error_loading_job') || 'Failed to load job details');
+                        vm.detail_dialog = false;
+                    }
+                })
+                .catch(function () {
+                    vm.error_message = vm.$t('error_loading_job') || 'Failed to load job details';
                     vm.detail_dialog = false;
-                }
-            })
-            .catch(function () {
-                vm.error_message = vm.$t('error_loading_job') || 'Failed to load job details';
-                vm.detail_dialog = false;
-            })
-            .finally(function () {
-                vm.loading_detail = false;
-            });
+                })
+                .finally(function () {
+                    vm.loading_detail = false;
+                });
         },
 
         closeDetail: function () {
@@ -832,7 +833,7 @@ Vue.component('vue-jobs-component', {
                         onConfirm(true);
                     }
                 },
-                reject: function () {}
+                reject: function () { }
             });
         },
 

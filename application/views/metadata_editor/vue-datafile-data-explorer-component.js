@@ -1,47 +1,47 @@
 /// datafile data explorer
 Vue.component('datafile-data-explorer', {
-    props:['file_id','value'],
-    data: function () {    
+    props: ['file_id', 'value'],
+    data: function () {
         return {
             field_data: this.value,
-            form_local:{},
-            fid:this.file_id,
-            variable_data:[],            
-            errors:[],            
-            file:null,
-            rows_limit:50,
-            data_loading_dialog:false,
+            form_local: {},
+            fid: this.file_id,
+            variable_data: [],
+            errors: [],
+            file: null,
+            rows_limit: 50,
+            data_loading_dialog: false,
             delete_confirm_dialog: false,
             delete_in_progress: false,
-            dialog:{
-                show:false,
-                title:'',
-                loading_message:'',
-                message_success:'',
-                message_error:'',
-                is_loading:false
+            dialog: {
+                show: false,
+                title: '',
+                loading_message: '',
+                message_success: '',
+                message_error: '',
+                is_loading: false
             },
-            export_dialog:{
-                show:false,
-                file_id:null,
-                file_name:'',
-                file_physical_name:''
+            export_dialog: {
+                show: false,
+                file_id: null,
+                file_name: '',
+                file_physical_name: ''
             }
         }
     },
-    mounted: function(){
-        this.fid=this.$route.params.file_id;
+    mounted: function () {
+        this.fid = this.$route.params.file_id;
         this.loadData();
     },
-    
+
     computed: {
-        dataFiles(){
+        dataFiles() {
             return this.$store.getters.getDataFiles;
         },
-        activeDataFile(){
+        activeDataFile() {
             return this.$store.getters.getDataFileById(this.fid);
         },
-        ProjectID(){
+        ProjectID() {
             return this.$store.state.project_id;
         },
 
@@ -51,84 +51,87 @@ Vue.component('datafile-data-explorer', {
                 Rows: {{variable_data.total}} 
         */
 
-        PageOffset(){
+        PageOffset() {
             return this.variable_data.offset;
         },
-        CurrentPage:{
+        CurrentPage: {
             get: function () {
                 currentPage_ = Math.ceil(this.variable_data.offset / this.rows_limit);
 
-                if (currentPage_<=0){
+                if (currentPage_ <= 0) {
                     return 1;
                 }
-    
-                return currentPage_+1;
+
+                return currentPage_ + 1;
             },
             set: function (newValue) {
-                
+
             }
         },
-        
-        PaginationTotalRecords()
-        {
+
+        PaginationTotalRecords() {
             return this.variable_data.total;
         },
-        PaginationPageSize()
-        {
+        PaginationPageSize() {
             return this.rows_limit;
         },
-        PaginationPages()
-        {
-            return Math.ceil((this.variable_data.total) / this.rows_limit);            
+        PaginationPages() {
+            return Math.ceil((this.variable_data.total) / this.rows_limit);
         },
     },
-    methods:{        
-        loadData: function(offset=0,limit=50) {
-            this.data_loading_dialog=true;
-            vm=this;
-            let url=CI.base_url + '/api/data/read_csv/'+this.ProjectID+'/'+this.fid+'?offset='+offset+'&limit='+limit;            
+    methods: {
+        loadData: function (offset = 0, limit = 50) {
+            this.data_loading_dialog = true;
+            vm = this;
+            let url = CI.base_url + '/api/data/read_csv/' + this.ProjectID + '/' + this.fid + '?offset=' + offset + '&limit=' + limit;
             axios.get(url)
-            .then(function (response) {
-                if(response.data){                    
-                    vm.variable_data=response.data;
-                    vm.data_loading_dialog=false;
-                }
-            })
-            .catch(function (error) {
-                console.log(error);
-                vm.data_loading_dialog=false;
-                vm.errors=error;
-            })
-            .then(function () {
-                console.log("request completed");
-                vm.data_loading_dialog=false;
-            });
+                .then(function (response) {
+                    if (response.data) {
+                        vm.variable_data = response.data;
+                        vm.data_loading_dialog = false;
+                    }
+                })
+                .catch(function (error) {
+                    console.log(error);
+                    vm.data_loading_dialog = false;
+                    vm.errors = error;
+                })
+                .then(function () {
+                    console.log("request completed");
+                    vm.data_loading_dialog = false;
+                });
         },
-        navigatePage: function(page)
-        {
-            page_offset=(page - 1) * this.PaginationPageSize;
+        navigatePage: function (page) {
+            page_offset = (page - 1) * this.PaginationPageSize;
             this.loadData(page_offset, this.PaginationPageSize);
         },
-        exportFile: function(){
+        exportFile: function () {
             this.export_dialog.file_id = this.activeDataFile.file_id;
             this.export_dialog.file_name = this.activeDataFile.file_name;
             this.export_dialog.file_physical_name = (this.activeDataFile && this.activeDataFile.file_physical_name) ? this.activeDataFile.file_physical_name : '';
             this.export_dialog.show = true;
         },
-        exportDictionaryCsv: function() {
+        exportDictionaryCsv: function () {
             if (!this.ProjectID || !this.fid) {
                 return;
             }
             var url = CI.base_url + '/api/variables/export_csv/' + this.ProjectID + '/' + encodeURIComponent(this.fid) + '?download=1';
             window.location.href = url;
         },
-        confirmDeleteData: function(){
+        exportVariableDocumentationCsv: function () {
+            if (!this.ProjectID || !this.fid) {
+                return;
+            }
+            var url = CI.base_url + '/api/variables/export_documentation_csv/' + this.ProjectID + '/' + encodeURIComponent(this.fid) + '?download=1&profile=full';
+            window.location.href = url;
+        },
+        confirmDeleteData: function () {
             this.delete_confirm_dialog = true;
         },
-        deleteData: async function(){
+        deleteData: async function () {
             if (!this.ProjectID || !this.fid) return;
             this.delete_in_progress = true;
-            const vm = this;            
+            const vm = this;
             // Delete only the physical CSV file; keep the datafile definition
             const url = CI.base_url + '/api/datafiles/delete_file/' + this.ProjectID + '/' + encodeURIComponent(this.fid);
             try {
@@ -154,10 +157,10 @@ Vue.component('datafile-data-explorer', {
                 vm.delete_in_progress = false;
             }
         },
-        sleep: function(ms) {
+        sleep: function (ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
         },
-    },  
+    },
     template: `
             <div class="datafile-component mt-5 pt-3 m-3">
             <template v-if="activeDataFile">
@@ -170,6 +173,9 @@ Vue.component('datafile-data-explorer', {
                     <div class="float-right d-flex align-center" style="gap: 8px;">
                         <v-btn v-if="activeDataFile" color="primary" outlined small @click="exportDictionaryCsv">
                             <v-icon>mdi-book-open-variant</v-icon> {{$t("export_data_dictionary")}}
+                        </v-btn>
+                        <v-btn v-if="activeDataFile" color="primary" outlined small @click="exportVariableDocumentationCsv">
+                            <v-icon>mdi-file-document-outline</v-icon> {{$t("export_variable_documentation")}}
                         </v-btn>
                         <template v-if="variable_data.records">
                             <v-btn color="primary" outlined small @click="exportFile">
@@ -331,6 +337,6 @@ Vue.component('datafile-data-explorer', {
             </v-dialog>
             
             </div>          
-            `    
+            `
 });
 
