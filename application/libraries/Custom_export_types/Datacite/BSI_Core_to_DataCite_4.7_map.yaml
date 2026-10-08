@@ -32,7 +32,7 @@
 #
 # - A leaf `sources` object supplies several relative values to one operation.
 #   `value` supplies a generated constant rather than a value;
-#   `value_from_parameter` and `value_from_default` copy named configured values.
+#   `value_from_parameter` and `default_value` copy named configured values.
 #
 # - `target_json` is the complete JSON destination. `[]` identifies one member
 #   of an output collection. A leaf `transform` names a small value conversion.
@@ -157,19 +157,36 @@ profile:
     schema: DataCite
     schema_version: "4.7"
     json_representation: DataCite REST API JSON:API
-  path_notation: .
+  path_delimiter: .
 
 defaults:
   metadata_language: en
-
-constants:
-  # DataCite's broad resource category is always Dataset for this BSI profile.
-  - target:
-      property: types.resourceTypeGeneral
-      json_path: data.attributes.types.resourceTypeGeneral
-    value: Dataset
+  datacite_type: dois
 
 mappings:
+
+  - id: primary_datacite_identifier
+    source: optional_additional_metadata.resourceIdentifier
+    target:
+      property: doi
+      json_path: data.id
+    transform: normalize_doi_identifier
+
+  - id: datacite_type
+    source: null
+    target:
+      property: type
+      json_path: data.type
+    transform: null
+    default_value: datacite_type
+
+  - id: primary_datacite_identifier_type
+    source: optional_additional_metadata.resourceIdentifier
+    target:
+      property: type
+      json_path: data.type
+    transform: null
+
   # Copy the more specific resource type into the DataCite Types object.
   # The current BSI Core template permits only the value `Dataset`.
   - id: resource_type
@@ -177,7 +194,7 @@ mappings:
     target:
       property: types.resourceType
       json_path: data.attributes.types.resourceType
-    transform: copy_value
+    transform: null
 
   # Convert the resource identifier into the canonical DOI identifier that
   # identifies the DataCite record's dataset.
@@ -494,7 +511,7 @@ mappings:
         target_json: data.attributes.descriptions[].description
       - value_from_parameter: description_type
         target_json: data.attributes.descriptions[].descriptionType
-      - value_from_default: metadata_language
+      - default_value: metadata_language
         target_json: data.attributes.descriptions[].lang
 
   # Preserve audience information in an Other Description prefixed `Audience:`.
@@ -515,7 +532,7 @@ mappings:
         transform: prepend_configured_prefix
       - value_from_parameter: description_type
         target_json: data.attributes.descriptions[].descriptionType
-      - value_from_default: metadata_language
+      - default_value: metadata_language
         target_json: data.attributes.descriptions[].lang
 
   # Preserve provenance in an Other Description prefixed `Provenance:`.
@@ -536,7 +553,7 @@ mappings:
         transform: prepend_configured_prefix
       - value_from_parameter: description_type
         target_json: data.attributes.descriptions[].descriptionType
-      - value_from_default: metadata_language
+      - default_value: metadata_language
         target_json: data.attributes.descriptions[].lang
 
   # Preserve general comments in an Other Description prefixed `Comments:`.
@@ -557,7 +574,7 @@ mappings:
         transform: prepend_configured_prefix
       - value_from_parameter: description_type
         target_json: data.attributes.descriptions[].descriptionType
-      - value_from_default: metadata_language
+      - default_value: metadata_language
         target_json: data.attributes.descriptions[].lang
 
   # Add every BSI keyword as an individual DataCite Subject.
@@ -590,7 +607,7 @@ mappings:
     target:
       property: version
       json_path: data.attributes.version
-    transform: copy_value
+    transform: null
 
   # Map each related-resource row according to the available content: URI only
   # becomes a RelatedIdentifier; text only becomes a RelatedItem; both produces
@@ -698,7 +715,7 @@ mappings:
       - value: Other
         when_source_present: description
         target_json: data.attributes.descriptions[].descriptionType
-      - value_from_default: metadata_language
+      - default_value: metadata_language
         when_source_present: description
         target_json: data.attributes.descriptions[].lang
 

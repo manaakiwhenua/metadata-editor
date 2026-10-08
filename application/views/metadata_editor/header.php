@@ -151,6 +151,14 @@
                                     <?php echo t("download_markdown"); ?>
                                 </v-list-item-title>
                             </v-list-item>
+                            <v-list-item @click="onLinkClick(base_url + '/api/editor/project_export/' + dataset_id + '/datacite')">
+                                <v-list-item-icon>
+                                    <v-icon>mdi-code-block-braces</v-icon>
+                                </v-list-item-icon>
+                                <v-list-item-title>
+                                    <?php echo t("download_datacite"); ?>
+                                </v-list-item-title>
+                            </v-list-item>
                             <v-list-item @click="onLinkClick(base_url + '/api/editor/html/' + dataset_id +'?download=true')">
                                 <v-list-item-icon>
                                     <v-icon>mdi-monitor-arrow-down-variant</v-icon>
