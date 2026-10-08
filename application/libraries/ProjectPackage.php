@@ -176,7 +176,7 @@ class ProjectPackage
 				return $this->metadata_path($project, 'rdf');
 
 			case 'markdown':				
-				$project_markdown_writer = $this->ci->project_export_writer_factory->create('markdown');
+				$project_markdown_writer = $this->ci->project_export_writer_factory->create_writer('markdown');
 				$this->ci->project_export_controller->generate_project_export($project_markdown_writer, $sid, $options);
 				$file_extension = $project_markdown_writer->file_extension();
 				return $this->metadata_path($project, $file_extension);

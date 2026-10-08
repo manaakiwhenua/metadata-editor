@@ -77,7 +77,6 @@ if (!isset($data) || empty($data) || !is_array($data)){
             </div>
             <?php endforeach;?>
   </div>
-  <?php endif; ?>
   <?php endforeach;?>
   
 </div>
