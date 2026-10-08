@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://landcareresearch.co.nz/metadata/schema/core/v0.1",
   "title": "BSI Core Metadata Schema",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Core metadata schema for Bioeconomy Science Institute Maiangi Taiao datasets, aligned to Dublin Core and Dublin Core Terms. Expressed in JSON Schema Draft-07.",
   "type": "object",
   "properties": {

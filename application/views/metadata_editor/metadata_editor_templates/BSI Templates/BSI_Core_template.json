@@ -3,7 +3,7 @@
     "lang": "en",
     "template_type": "custom",
     "name": "BSI Core",
-    "version": "0.0.1",
+    "version": "1.0.0",
     "organization": "Bioeconomy Science Institute Maiangi Taiao",
     "author": "Bioeconomy Science Institute Maiangi Taiao",
     "template": {
@@ -278,7 +278,7 @@
                                         "required": true,
                                         "rules": {
                                             "required": true,
-                                            "iso_datetime": true
+                                            "iso_date_partial": true
                                         },
                                         "is_required": true
                                     },
