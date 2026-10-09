@@ -45,8 +45,6 @@ class Project_export_yaml_map_parser
 
         $result_json = [];
         $result_json['logs'] = [];
-        // $result_json['mapping_rules'] = $mapping_rules;
-        // $result_json['project_json'] = $project_json;
 
         foreach ($mapping_rules as $rule) {
 
@@ -57,13 +55,13 @@ class Project_export_yaml_map_parser
                 $incoming_value = $this->filter_incoming_values($incoming_value, $rule->filter);
             }
 
-            if ($incoming_value === null) {
-                continue; // Skip this mapping rule if the project value is null after filtering
+            // Apply default value from mapping defaults if incoming value is null
+            if (isset($rule->default_value) && isset($mapping_defaults[$rule->default_value]) && $incoming_value === null) {
+                $incoming_value = $mapping_defaults[$rule->default_value];
             }
 
-            // Apply default value from mapping defaults if incoming value is null
-            if (isset($rule->default_value) && isset($mapping_defaults[$rule->id]) && $incoming_value === null) {
-                $incoming_value = $mapping_defaults[$rule->id];
+            if ($incoming_value === null) {
+                continue; // Skip this mapping if the incoming value is null after filtering and applying defaults
             }
 
             $target = $rule->target ?? null;
@@ -80,7 +78,6 @@ class Project_export_yaml_map_parser
             }
 
             $result_json['logs'][] = "Transformed value for {$project_json_path}: " . print_r($transformed_value, true) . "-----" . "Applied transformer: " . ($transformer ?? 'none') . "-----" . "Original value: " . print_r($incoming_value, true);
-
 
 
             if ($transformed_value !== null && $output_path) {

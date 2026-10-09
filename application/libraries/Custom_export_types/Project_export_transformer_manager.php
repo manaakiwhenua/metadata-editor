@@ -1,6 +1,7 @@
 <?php
 
 require_once 'application/libraries/Custom_export_types/Transformers/Date_transformers.php';
+require_once 'application/libraries/Custom_export_types/Transformers/Datacite_specific_transformers.php';
 
 class Project_export_transformer_manager
 {
@@ -8,6 +9,7 @@ class Project_export_transformer_manager
         'year_from_date'          => array('Date_transformers', 'year_from_date'),
         'datacite_date'           => array('Date_transformers', 'datacite_date'),
         'updated_dates'           => array('Date_transformers', 'updated_dates'),
+        'strip_to_doi_identifier' => array('Datacite_specific_transformers', 'strip_to_doi_identifier'),
         // add the other transformers here
     );
 

@@ -12,6 +12,7 @@ class Mapping_rule
     public readonly array $filter;
     public readonly array $parameters;
     public readonly array $field_mappings;
+    public readonly ?string $default_value;
     public readonly array $original_raw_fields;
 
     public function __construct(
@@ -27,6 +28,7 @@ class Mapping_rule
         $this->filter = $mapping_fields['filter'] ?? [];
         $this->parameters = $mapping_fields['parameters'] ?? [];
         $this->field_mappings = $mapping_fields['field_mappings'] ?? [];
+        $this->default_value = $mapping_fields['default_value'] ?? null;
         $this->original_raw_fields = $mapping_fields;
     }
 }

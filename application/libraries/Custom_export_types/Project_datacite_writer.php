@@ -1,5 +1,6 @@
 <?php if (! defined('BASEPATH')) exit('No direct script access allowed');
 
+require_once 'application/libraries/Custom_export_types/IProject_export_writer.php';
 require_once 'application/libraries/Custom_export_types/Mapping_classes/Schema_transform_mapping_rules.php';
 
 class Project_datacite_writer implements IProject_export_writer

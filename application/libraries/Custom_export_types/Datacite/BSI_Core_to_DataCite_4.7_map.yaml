@@ -63,8 +63,8 @@
 #
 # - copy_values: copy all non-empty values from a source collection.
 #
-# - normalize_doi_identifier: recognise a bare DOI, `doi:` value, or DOI URL and
-#   return the canonical DOI string for the DataCite API `doi` property.
+# - strip_to_doi_identifier: recognise a bare DOI, `doi:` value, or DOI URL and
+#   return the canonical DOI string 
 #
 # - main_title: create the primary DataCite title entry from one text value.
 #
@@ -165,14 +165,15 @@ defaults:
 
 mappings:
 
+  #TODO check how 'id' and 'type' are supposed to be mapped. All examples show these as present outside of the attributes block as 'dois' and the normalized doi identifier.
   - id: primary_datacite_identifier
     source: optional_additional_metadata.resourceIdentifier
     target:
       property: doi
       json_path: data.id
-    transform: normalize_doi_identifier
+    transform: strip_to_doi_identifier
 
-  - id: datacite_type
+  - id: primary_datacite_identifier_type
     source: null
     target:
       property: type
@@ -180,20 +181,22 @@ mappings:
     transform: null
     default_value: datacite_type
 
-  - id: primary_datacite_identifier_type
-    source: optional_additional_metadata.resourceIdentifier
-    target:
-      property: type
-      json_path: data.type
-    transform: null
-
   # Copy the more specific resource type into the DataCite Types object.
-  # The current BSI Core template permits only the value `Dataset`.
+  # resourceType is the a free-text field describing the type of the resource. This is a mandatory field.
+  # resourceTypeGeneral is the controlled vocab for the type of the resource.
+  # The current BSI Core template permits only the value `Dataset`, so we'll use this for both.
   - id: resource_type
     source: required_metadata.resourceType
     target:
       property: types.resourceType
       json_path: data.attributes.types.resourceType
+    transform: null
+
+  - id: resource_type_general_controlled_vocab
+    source: required_metadata.resourceType
+    target:
+      property: types.resourceType
+      json_path: data.attributes.types.resourceTypeGeneral
     transform: null
 
   # Convert the resource identifier into the canonical DOI identifier that
@@ -203,7 +206,7 @@ mappings:
     target:
       property: doi
       json_path: data.attributes.doi
-    transform: normalize_doi_identifier
+    transform: strip_to_doi_identifier
 
   # Add the required BSI title as the primary DataCite title.
   - id: main_title
