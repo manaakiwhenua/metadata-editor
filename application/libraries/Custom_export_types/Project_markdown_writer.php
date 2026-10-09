@@ -68,7 +68,7 @@ class Project_markdown_writer implements IProject_export_writer
 
 	private function convert_field_label_to_header(string $html, int $header_level_for_field_label)
 	{
-		$pattern = "/<div class=\"font-weight-bold field-label\">(.*?)<\/div>/";
+		$pattern = "/<div class=\"field-label\">(.*?)<\/div>/";
 		$replacement = "<h" . $header_level_for_field_label . ">$1</h" . $header_level_for_field_label . ">";
 		$html = preg_replace($pattern, $replacement, $html);
 		return $html;

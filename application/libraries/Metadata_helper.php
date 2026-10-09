@@ -1,4 +1,4 @@
-<?php  if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+<?php if (! defined('BASEPATH')) exit('No direct script access allowed');
 
 class Metadata_helper
 {
@@ -6,46 +6,44 @@ class Metadata_helper
 	function __construct()
 	{
 		log_message('debug', "Metadata_helper Class Initialized.");
-		$this->ci =& get_instance();
+		$this->ci = &get_instance();
 		$this->ci->load->helper('array_helper');
 	}
 
 
 	function extract_country_names_str($type, $metadata)
 	{
-		if ($type=='survey' || $type=='microdata'){
-			$nations=(array)get_array_nested_value($metadata,'study_desc/study_info/nation');
-        	$nations=$this->get_array_column_values($nations, 'name');
+		if ($type == 'survey' || $type == 'microdata') {
+			$nations = (array)get_array_nested_value($metadata, 'study_desc/study_info/nation');
+			$nations = $this->get_array_column_values($nations, 'name');
 			return $this->get_array_to_string($nations, 3);
-		}		
+		}
 	}
 
 	function extract_year_start($type, $metadata)
 	{
-		$years=$this->extract_years($type, $metadata);
+		$years = $this->extract_years($type, $metadata);
 
-		if (isset($years['start'])){
+		if (isset($years['start'])) {
 			return $years['start'];
-		}		
+		}
 	}
 
 	function extract_year_end($type, $metadata)
 	{
-		$years=$this->extract_years($type, $metadata);
-		if (isset($years['end'])){
+		$years = $this->extract_years($type, $metadata);
+		if (isset($years['end'])) {
 			return $years['end'];
 		}
 	}
 
 	function extract_years($type, $metadata)
 	{
-		if ($type=='survey' || $type=='microdata'){
-			$years=$this->get_data_collection_years($type,$metadata);
+		if ($type == 'survey' || $type == 'microdata') {
+			$years = $this->get_data_collection_years($type, $metadata);
 			return $years;
-		}
-		else if ($type=='timeseries' || $type=='indicator')
-		{
-			$years=$this->get_data_collection_years($type,$metadata);
+		} else if ($type == 'timeseries' || $type == 'indicator') {
+			$years = $this->get_data_collection_years($type, $metadata);
 			return $years;
 		}
 	}
@@ -61,10 +59,10 @@ class Metadata_helper
 	 * 
 	 * 
 	 */
-	function extract_attributes($type, $metadata, $encoded=false)
+	function extract_attributes($type, $metadata, $encoded = false)
 	{
-		if ($type=='timeseries' || $type=='indicator'){
-			$database_id=get_array_nested_value($metadata,'series_description/database_id');
+		if ($type == 'timeseries' || $type == 'indicator') {
+			$database_id = get_array_nested_value($metadata, 'series_description/database_id');
 
 			if ($database_id === null || $database_id === '') {
 				$databases = get_array_nested_value($metadata, 'series_description/databases');
@@ -86,103 +84,100 @@ class Metadata_helper
 					}
 				}
 			}
-			
-			$output=array(
-				'database_id'=>$database_id
+
+			$output = array(
+				'database_id' => $database_id
 			);
 
-			if ($encoded){
-				$output=json_encode($output);
+			if ($encoded) {
+				$output = json_encode($output);
 			}
 
 			return $output;
 		}
-
 	}
 
 	/**
-     * 
-     * get data collection years from a ddi data collection element
-     * 
-     **/
-	function get_data_collection_years($type,$options)
+	 * 
+	 * get data collection years from a ddi data collection element
+	 * 
+	 **/
+	function get_data_collection_years($type, $options)
 	{
-		$years=array();
+		$years = array();
 
-		if ($type=='survey' || $type=='microdata'){
-        	$data_coll=get_array_nested_value($options,'study_desc/study_info/coll_dates');
-		}
-		else if ($type=='timeseries' || $type=='indicator'){
-			$data_coll=get_array_nested_value($options,'series_description/time_periods');
-		}
-		else{
+		if ($type == 'survey' || $type == 'microdata') {
+			$data_coll = get_array_nested_value($options, 'study_desc/study_info/coll_dates');
+		} else if ($type == 'timeseries' || $type == 'indicator') {
+			$data_coll = get_array_nested_value($options, 'series_description/time_periods');
+		} else {
 			return array(
-				'start'=>0,
-				'end'=>0
+				'start' => 0,
+				'end' => 0
 			);
 		}
 
-        if (is_array($data_coll)){
-            foreach($data_coll as $row){
-                $year_=substr(trim($row['start']),0,4);
-                if((int)$year_>0){
-                    $years[]=$year_;
-                }					
-                if(isset($row['end'])){
-                    $year_=substr(trim($row['end']),0,4);
-                    if((int)$year_>0){
-                        $years[]=$year_;
-                    }
-                }
-            }
-        }
-
-		$start=0;
-		$end=0;
-		
-		if (count($years)>0){
-			$start=min($years);
-			$end=max($years);
+		if (is_array($data_coll)) {
+			foreach ($data_coll as $row) {
+				$year_ = substr(trim($row['start']), 0, 4);
+				if ((int)$year_ > 0) {
+					$years[] = $year_;
+				}
+				if (isset($row['end'])) {
+					$year_ = substr(trim($row['end']), 0, 4);
+					if ((int)$year_ > 0) {
+						$years[] = $year_;
+					}
+				}
+			}
 		}
 
-		if ($start==0){
-			$start=$end;
+		$start = 0;
+		$end = 0;
+
+		if (count($years) > 0) {
+			$start = min($years);
+			$end = max($years);
 		}
 
-		if($end==0){
-			$start=$end;
+		if ($start == 0) {
+			$start = $end;
+		}
+
+		if ($end == 0) {
+			$start = $end;
 		}
 
 		return array(
-			'start'=>$start,
-			'end'=>$end
+			'start' => $start,
+			'end' => $end
 		);
 	}
 
 
 	function get_country_names($nations)
 	{
-        if(!is_array($nations)){
-            return false;
-        }
+		if (!is_array($nations)) {
+			return false;
+		}
 
-        $nation_names=array();
+		$nation_names = array();
 
-        foreach($nations as $nation){
-            $nation_names[]=$nation['name'];
-        }	
-        return $nation_names;	
-    }
+		foreach ($nations as $nation) {
+			$nation_names[] = $nation['name'];
+		}
+		return $nation_names;
+	}
 
 
 
-	
+
 	function get_array_column_values($array, $column)
 	{
-		$values=array();
-		foreach($array as $row){
-			if (isset($row[$column])){
-				$values[]=$row[$column];
+		$values = array();
+		foreach ($array as $row) {
+			if (isset($row[$column])) {
+				$values[] = $row[$column];
 			}
 		}
 		return $values;
@@ -190,27 +185,27 @@ class Metadata_helper
 
 
 	/**
-     * 
-     * Return the values of an array as a comma separated string 
+	 * 
+	 * Return the values of an array as a comma separated string 
 	 * with max number of values to show
 	 * 
 	 * @param array $array
 	 * @param int $max_values
 	 * @return string
 	 * 
-     */
-    function get_array_to_string($array, $max_values=3)
+	 */
+	function get_array_to_string($array, $max_values = 3)
 	{
-		if (!is_array($array)){
+		if (!is_array($array)) {
 			return '';
 		}
 
-		$str='';
-		if (count($array)>$max_values){
-			$str=implode(", ", array_slice($array, 0, $max_values));
-			$str.='...and '. (count($array) - $max_values). ' more';
-		}else{
-			$str=implode(", ", $array);
+		$str = '';
+		if (count($array) > $max_values) {
+			$str = implode(", ", array_slice($array, 0, $max_values));
+			$str .= '...and ' . (count($array) - $max_values) . ' more';
+		} else {
+			$str = implode(", ", $array);
 		}
 
 		return $str;
@@ -273,7 +268,15 @@ class Metadata_helper
 		}
 
 		foreach ($identificationInfo['extent']['geographicElement'] as $geo_index => $element) {
-			if (!is_array($element) || !isset($element['geographicBoundingPolygon']['polygon'])) {
+			if (!is_array($element)) {
+				continue;
+			}
+
+			$this->normalize_geohash_on_geographic_element(
+				$identificationInfo['extent']['geographicElement'][$geo_index]
+			);
+
+			if (!isset($element['geographicBoundingPolygon']['polygon'])) {
 				continue;
 			}
 
@@ -372,5 +375,89 @@ class Metadata_helper
 		return $result;
 	}
 
+	/**
+	 * Geohash is a single object { geohash, note } in the geospatial schema.
+	 * Legacy editor rows may store table-grid data as [{ geohash, note }, ...].
+	 */
+	public function normalize_geohash_on_geographic_element(&$element)
+	{
+		if (!is_array($element) || !array_key_exists('geohash', $element)) {
+			return;
+		}
 
-} 
+		$geohash = $element['geohash'];
+
+		if ($geohash === null || $geohash === '' || $geohash === array()) {
+			unset($element['geohash']);
+			return;
+		}
+
+		if (is_string($geohash)) {
+			$element['geohash'] = array('geohash' => $geohash);
+			return;
+		}
+
+		if (!is_array($geohash)) {
+			unset($element['geohash']);
+			return;
+		}
+
+		if ($this->is_sequential_list_array($geohash)) {
+			$object = $this->merge_geohash_table_rows($geohash);
+			if ($object === null) {
+				unset($element['geohash']);
+			} else {
+				$element['geohash'] = $object;
+			}
+			return;
+		}
+
+		if (!$this->geohash_object_has_content($geohash)) {
+			unset($element['geohash']);
+		}
+	}
+
+	private function merge_geohash_table_rows(array $rows)
+	{
+		$merged = array();
+
+		foreach ($rows as $row) {
+			if (!is_array($row)) {
+				continue;
+			}
+
+			foreach ($row as $key => $value) {
+				if ($value === null || $value === '') {
+					continue;
+				}
+				$merged[$key] = $value;
+			}
+		}
+
+		if (!$this->geohash_object_has_content($merged)) {
+			return null;
+		}
+
+		return $merged;
+	}
+
+	private function geohash_object_has_content(array $geohash)
+	{
+		foreach ($geohash as $value) {
+			if ($value !== null && $value !== '') {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private function is_sequential_list_array(array $value)
+	{
+		if ($value === array()) {
+			return false;
+		}
+
+		return array_keys($value) === range(0, count($value) - 1);
+	}
+}
