@@ -4,14 +4,14 @@ class Nested_path_helper
 {
     public function __construct() {}
 
-    public function get_value_from_path(array $project_json, string | null $path, string $path_delimiter): mixed
+    public function get_value_from_path(array | string $incoming_data, string | null $path, string $path_delimiter): mixed
     {
         if ($path === null) {
             return null;
         }
 
         $path_parts = explode($path_delimiter, $path);
-        $value = $project_json;
+        $value = $incoming_data;
         foreach ($path_parts as $part) {
             if (is_array($value) && array_key_exists($part, $value)) {
                 $value = $value[$part];

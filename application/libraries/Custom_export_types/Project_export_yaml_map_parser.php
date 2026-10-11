@@ -31,12 +31,11 @@ class Project_export_yaml_map_parser
      *
      * @param Mapping_rule[] $mapping_rules - Array of mapping rules which give the source, target, and transformation details for mapping input to output
      * @param string $path_delimiter - Path notation for accessing nested values
-     * @param array $project_json - Project JSON data
+     * @param array $incoming_json - Incoming project JSON data
      * @return array - Generated JSON
      */
-    public function apply_export_mappings(Schema_transform_mapping_rules $map, array $project_json): array
+    public function apply_export_mappings(Schema_transform_mapping_rules $map, array $incoming_json): array
     {
-
         $transformer_manager = new Project_export_transformer_manager();
         $nested_path_helper = new Nested_path_helper();
         $path_delimiter = $map->map_metadata->path_delimiter;
@@ -44,51 +43,104 @@ class Project_export_yaml_map_parser
         $mapping_defaults = $map->mapping_defaults ?? [];
 
         $result_json = [];
-        $result_json['logs'] = [];
 
         foreach ($mapping_rules as $rule) {
 
-            $project_json_path = $rule->source;
-            $incoming_value = $nested_path_helper->get_value_from_path($project_json, $project_json_path, $path_delimiter);
+            $output_value = $this->apply_mapping_rule($rule, $incoming_json, $path_delimiter, $transformer_manager, $nested_path_helper, $mapping_defaults);
+            $output_path = $rule->target['json_path'] ?? null;
 
-            if (isset($rule->filter) && !empty($rule->filter) && is_array($incoming_value)) {
-                $incoming_value = $this->filter_incoming_values($incoming_value, $rule->filter);
-            }
-
-            // Apply default value from mapping defaults if incoming value is null
-            if (isset($rule->default_value) && isset($mapping_defaults[$rule->default_value]) && $incoming_value === null) {
-                $incoming_value = $mapping_defaults[$rule->default_value];
-            }
-
-            if ($incoming_value === null) {
-                continue; // Skip this mapping if the incoming value is null after filtering and applying defaults
-            }
-
-            $target = $rule->target ?? null;
-            $output_path = $target['json_path'] ?? null;
-            $output_property = $target['property'] ?? null;
-            $transformer = $rule->transformer ?? null;
-            $transformed_value = $incoming_value;
-
-            if ($incoming_value && $transformer) {
-                $transformed_value = $transformer_manager->call(
-                    $transformer,
-                    $incoming_value
-                );
-            }
-
-            $result_json['logs'][] = "Transformed value for {$project_json_path}: " . print_r($transformed_value, true) . "-----" . "Applied transformer: " . ($transformer ?? 'none') . "-----" . "Original value: " . print_r($incoming_value, true);
-
-
-            if ($transformed_value !== null && $output_path) {
-                $output = $nested_path_helper->build_object_from_path($transformed_value, $output_path, $path_delimiter);
+            if ($output_value !== null && $output_path) {
+                $output = $nested_path_helper->build_object_from_path($output_value, $output_path, $path_delimiter);
                 $result_json = array_merge_recursive($result_json, $output); // array_merge_recursive travels down into the paths and adds values at the correct levels            
             }
         }
         return $result_json;
     }
 
-    private function filter_incoming_values(array $incoming_array, array $filter_array)
+    private function apply_mapping_rule(Mapping_rule $rule, array | string $incoming_json, string $path_delimiter, Project_export_transformer_manager $transformer_manager, Nested_path_helper $nested_path_helper, array $mapping_defaults)
+    {
+        $incoming_value_json_path = $rule->source;
+
+        if ($incoming_value_json_path === '@value') {
+            $incoming_value = $incoming_json; // In this situation, we're dealing with a field mapping that uses the entire incoming JSON as its value
+        } else {
+            $incoming_value = $nested_path_helper->get_value_from_path($incoming_json, $incoming_value_json_path, $path_delimiter);
+        }
+
+        $field_mappings = $rule->field_mappings ?? [];
+        $transformer = $rule->transformer ?? null;
+        $result_value = $incoming_value;
+
+        if ($result_value === null) {
+            $result_value = $this->map_to_default($result_value, $rule->default_value, $mapping_defaults);
+        }
+
+        if (isset($rule->filter) && !empty($rule->filter) && is_array($result_value)) {
+            $result_value = $this->filter_values($result_value, $rule->filter);
+        }
+
+        if ($result_value === null) {
+            return null; // Skip this mapping if the incoming value is null after filtering and applying defaults
+        }
+
+        if (empty($field_mappings)) {
+            if ($result_value && $transformer) {
+                $result_value = $transformer_manager->call(
+                    $transformer,
+                    $result_value
+                );
+            }
+            return $result_value;
+        }
+
+        // If there ARE field mappings, the result value is an object that needs its fields to be mapped into specific datacite object fields before return.
+        if (!is_array($result_value) || !array_is_list($result_value)) {
+            $result_value = [$result_value];
+        }
+
+        $result_objects = array_map(
+            fn($row) => $this->build_result_object_from_field_mappings($rule->field_mappings, $row, $path_delimiter, $transformer_manager, $nested_path_helper, $mapping_defaults),
+            $result_value
+        );
+        return $result_objects;
+    }
+
+    /**
+     * Recursively builds a result object from the given field mappings and row data. Each field mapping is resolved, and the resulting values are placed into the output object according to their target paths.
+     */
+    private function build_result_object_from_field_mappings(array $field_mappings, $row, string $path_delimiter, $transformer_manager, $nested_path_helper, $mapping_defaults): array
+    {
+        $output_object = [];
+        foreach ($field_mappings as $field_mapping) {
+            $value = $this->apply_mapping_rule($field_mapping, $row, $path_delimiter, $transformer_manager, $nested_path_helper, $mapping_defaults);
+            $target_path = $field_mapping->target ? $field_mapping->target['json_path'] : null;
+
+            if ($value !== null && $target_path !== null) {
+                $output_object[$target_path] = $value;
+            }
+            // $output_object['logs'] = [
+            //     'target path' => ($target_path ?? 'null'),
+            //     'resolved value' => $value,
+            //     'field mapping' => $field_mapping->source ?? null,
+            //     'nested_path_helper output_object' => $nested_path_helper->get_value_from_path($row, $field_mapping->source ?? null, $path_delimiter),
+            //     'field map default' => $field_mapping->default_value ?? null,
+            //     'mapped to default' => $this->map_to_default($nested_path_helper->get_value_from_path($row, $field_mapping->source ?? null, $path_delimiter), $field_mapping->default_value ?? null, $mapping_defaults),
+
+            // ];
+        }
+
+        return $output_object;
+    }
+
+    private function map_to_default(mixed $incoming_value, ?string $default_value_id, array $mapping_defaults)
+    {
+        if ($default_value_id !== null && isset($mapping_defaults[$default_value_id]) && $incoming_value === null) {
+            $incoming_value = $mapping_defaults[$default_value_id];
+        }
+        return $incoming_value;
+    }
+
+    private function filter_values(array $incoming_array, array $filter_array)
     {
         $filtered_items = [];
 

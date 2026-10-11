@@ -13,9 +13,13 @@ class Project_export_transformer_manager
         // add the other transformers here
     );
 
-    public function call(string $name, array | string $input, array $parameters = array()): array | string
+    public function call(string $name, mixed $input, array $parameters = array()): array | string
     {
         //TODO add graceful handling for unknown transformers
+        if (is_null($input)) {
+            return ''; // Return empty string if input is null
+        }
+
         if (!isset($this->transformer_map[$name])) {
             // throw new Exception("Unknown transform in export: " . $name);
             return ''; // While we're building the transformer map, return empty string for unknown transformers

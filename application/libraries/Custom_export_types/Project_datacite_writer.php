@@ -78,7 +78,6 @@ class Project_datacite_writer implements IProject_export_writer
 	private function build_full_datacite_structure(array $data): array
 	{
 		$additional_datacite_structures = [
-			'logs' => $data['logs'] ?? [],
 			'relationships' => [],
 		];
 

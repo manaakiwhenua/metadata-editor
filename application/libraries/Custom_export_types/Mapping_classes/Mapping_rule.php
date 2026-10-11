@@ -27,7 +27,13 @@ class Mapping_rule
         $this->mode = $mapping_fields['mode'] ?? null;
         $this->filter = $mapping_fields['filter'] ?? [];
         $this->parameters = $mapping_fields['parameters'] ?? [];
-        $this->field_mappings = $mapping_fields['field_mappings'] ?? [];
+
+        //Field mappings is another, inner array of Mapping_rule, for the fields of objects within the main mapping rule.
+        $this->field_mappings = array_map(
+            fn($field_mapping) => new Mapping_rule($field_mapping),
+            $mapping_fields['field_mappings'] ?? [],
+        );
+
         $this->default_value = $mapping_fields['default_value'] ?? null;
         $this->original_raw_fields = $mapping_fields;
     }

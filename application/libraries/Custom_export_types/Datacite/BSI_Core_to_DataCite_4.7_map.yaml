@@ -66,8 +66,6 @@
 # - strip_to_doi_identifier: recognise a bare DOI, `doi:` value, or DOI URL and
 #   return the canonical DOI string 
 #
-# - main_title: create the primary DataCite title entry from one text value.
-#
 # - alternative_titles: create AlternativeTitle entries for all supplied values.
 #
 # - creator_agent: turn all filtered agent rows into DataCite Creators, mapping
@@ -162,6 +160,7 @@ profile:
 defaults:
   metadata_language: en
   datacite_type: dois
+  alternative_title_type: AlternativeTitle
 
 mappings:
 
@@ -169,14 +168,12 @@ mappings:
   - id: primary_datacite_identifier
     source: optional_additional_metadata.resourceIdentifier
     target:
-      property: doi
       json_path: data.id
     transform: strip_to_doi_identifier
 
   - id: primary_datacite_identifier_type
     source: null
     target:
-      property: type
       json_path: data.type
     transform: null
     default_value: datacite_type
@@ -188,14 +185,12 @@ mappings:
   - id: resource_type
     source: required_metadata.resourceType
     target:
-      property: types.resourceType
       json_path: data.attributes.types.resourceType
     transform: null
 
   - id: resource_type_general_controlled_vocab
     source: required_metadata.resourceType
     target:
-      property: types.resourceType
       json_path: data.attributes.types.resourceTypeGeneral
     transform: null
 
@@ -204,7 +199,6 @@ mappings:
   - id: primary_identifier
     source: optional_additional_metadata.resourceIdentifier
     target:
-      property: doi
       json_path: data.attributes.doi
     transform: strip_to_doi_identifier
 
@@ -212,27 +206,25 @@ mappings:
   - id: main_title
     source: required_metadata.title
     target:
-      property: titles
       json_path: data.attributes.titles
-    mode: append
-    transform: main_title
     field_mappings:
-      - source: "@value"
-        target_json: data.attributes.titles[].title
+    - source: "@value"
+      target:
+        json_path: title
 
   # Add every BSI alternative title as a DataCite AlternativeTitle.
   - id: alternative_titles
     source: optional_additional_metadata.alternativeTitle
     target:
-      property: titles
       json_path: data.attributes.titles
-    mode: append
-    transform: alternative_titles
     field_mappings:
       - source: "@value"
-        target_json: data.attributes.titles[].title
-      - value: AlternativeTitle
-        target_json: data.attributes.titles[].titleType
+        target: 
+          json_path: title
+      - source: null
+        target:
+          json_path: titleType
+        default_value: alternative_title_type
 
   # Select agents whose role is `author` and add them as DataCite Creators.
   # The transform also normalises person/organisation codes and ORCIDs.
@@ -241,30 +233,34 @@ mappings:
     filter:
       role: author
     target:
-      property: creators
       json_path: data.attributes.creators
-    mode: append
     transform: creator_agent
     field_mappings:
       - source: name
-        target_json: data.attributes.creators[].name
+        target:
+          json_path: name
       - source: agentType
-        target_json: data.attributes.creators[].nameType
+        target:
+          json_path: nameType
         transform: agent_type_to_datacite_name_type
         value_map:
           person: Personal
           organisation: Organizational
       - source: orcid
-        target_json: data.attributes.creators[].nameIdentifiers[].nameIdentifier
+        target:
+          json_path: nameIdentifiers[].nameIdentifier
         transform: normalise_orcid
       - value: ORCID
         when_source_present: orcid
-        target_json: data.attributes.creators[].nameIdentifiers[].nameIdentifierScheme
+        target:
+          json_path: nameIdentifiers[].nameIdentifierScheme
       - value: https://orcid.org
         when_source_present: orcid
-        target_json: data.attributes.creators[].nameIdentifiers[].schemeUri
+        target:
+          json_path: nameIdentifiers[].schemeUri
       - source: affiliation
-        target_json: data.attributes.creators[].affiliation[].name
+        target:
+          json_path: affiliation[].name
 
   # Select agents whose role is `custodian` and add them as DataManager
   # Contributors; this expresses custodianship using the closest DataCite role.
@@ -273,7 +269,6 @@ mappings:
     filter:
       role: custodian
     target:
-      property: contributors
       json_path: data.attributes.contributors
     mode: append
     transform: contributor_agent
@@ -281,26 +276,33 @@ mappings:
       contributor_type: DataManager
     field_mappings:
       - source: name
-        target_json: data.attributes.contributors[].name
+        target:
+          json_path: name
       - source: agentType
-        target_json: data.attributes.contributors[].nameType
+        target:
+          json_path: nameType
         transform: agent_type_to_datacite_name_type
         value_map:
           person: Personal
           organisation: Organizational
       - source: orcid
-        target_json: data.attributes.contributors[].nameIdentifiers[].nameIdentifier
+        target:
+          json_path: nameIdentifiers[].nameIdentifier
         transform: normalise_orcid
       - value: ORCID
         when_source_present: orcid
-        target_json: data.attributes.contributors[].nameIdentifiers[].nameIdentifierScheme
+        target:
+          json_path: nameIdentifiers[].nameIdentifierScheme
       - value: https://orcid.org
         when_source_present: orcid
-        target_json: data.attributes.contributors[].nameIdentifiers[].schemeUri
+        target:
+          json_path: nameIdentifiers[].schemeUri
       - source: affiliation
-        target_json: data.attributes.contributors[].affiliation[].name
+        target:
+          json_path: affiliation[].name
       - value_from_parameter: contributor_type
-        target_json: data.attributes.contributors[].contributorType
+        target:
+          json_path: contributorType
 
   # Select `pointOfContact` agents and add them as ContactPerson Contributors.
   - id: points_of_contact
@@ -308,7 +310,6 @@ mappings:
     filter:
       role: pointOfContact
     target:
-      property: contributors
       json_path: data.attributes.contributors
     mode: append
     transform: contributor_agent
@@ -316,26 +317,33 @@ mappings:
       contributor_type: ContactPerson
     field_mappings:
       - source: name
-        target_json: data.attributes.contributors[].name
+        target:
+          json_path: name
       - source: agentType
-        target_json: data.attributes.contributors[].nameType
+        target:
+          json_path: nameType
         transform: agent_type_to_datacite_name_type
         value_map:
           person: Personal
           organisation: Organizational
       - source: orcid
-        target_json: data.attributes.contributors[].nameIdentifiers[].nameIdentifier
+        target:
+          json_path: nameIdentifiers[].nameIdentifier
         transform: normalise_orcid
       - value: ORCID
         when_source_present: orcid
-        target_json: data.attributes.contributors[].nameIdentifiers[].nameIdentifierScheme
+        target:
+          json_path: nameIdentifiers[].nameIdentifierScheme
       - value: https://orcid.org
         when_source_present: orcid
-        target_json: data.attributes.contributors[].nameIdentifiers[].schemeUri
+        target:
+          json_path: nameIdentifiers[].schemeUri
       - source: affiliation
-        target_json: data.attributes.contributors[].affiliation[].name
+        target:
+          json_path: affiliation[].name
       - value_from_parameter: contributor_type
-        target_json: data.attributes.contributors[].contributorType
+        target:
+          json_path : contributorType
 
   # Select `dataCollector` agents and add them as DataCollector Contributors.
   - id: data_collectors
@@ -343,7 +351,6 @@ mappings:
     filter:
       role: dataCollector
     target:
-      property: contributors
       json_path: data.attributes.contributors
     mode: append
     transform: contributor_agent
@@ -351,26 +358,33 @@ mappings:
       contributor_type: DataCollector
     field_mappings:
       - source: name
-        target_json: data.attributes.contributors[].name
+        target:
+          json_path: name
       - source: agentType
-        target_json: data.attributes.contributors[].nameType
+        target:
+          json_path: nameType
         transform: agent_type_to_datacite_name_type
         value_map:
           person: Personal
           organisation: Organizational
       - source: orcid
-        target_json: data.attributes.contributors[].nameIdentifiers[].nameIdentifier
+        target:
+          json_path: nameIdentifiers[].nameIdentifier
         transform: normalise_orcid
       - value: ORCID
         when_source_present: orcid
-        target_json: data.attributes.contributors[].nameIdentifiers[].nameIdentifierScheme
+        target:
+          json_path: nameIdentifiers[].nameIdentifierScheme
       - value: https://orcid.org
         when_source_present: orcid
-        target_json: data.attributes.contributors[].nameIdentifiers[].schemeUri
+        target:
+          json_path: nameIdentifiers[].schemeUri
       - source: affiliation
-        target_json: data.attributes.contributors[].affiliation[].name
+        target:
+          json_path: affiliation[].name
       - value_from_parameter: contributor_type
-        target_json: data.attributes.contributors[].contributorType
+        target:
+          json_path: contributorType
 
   # Select generic `contributor` agents and add them as Other Contributors.
   - id: other_contributors
@@ -378,7 +392,6 @@ mappings:
     filter:
       role: contributor
     target:
-      property: contributors
       json_path: data.attributes.contributors
     mode: append
     transform: contributor_agent
@@ -386,26 +399,33 @@ mappings:
       contributor_type: Other
     field_mappings:
       - source: name
-        target_json: data.attributes.contributors[].name
+        target:
+          json_path: name
       - source: agentType
-        target_json: data.attributes.contributors[].nameType
+        target:
+          json_path: nameType
         transform: agent_type_to_datacite_name_type
         value_map:
           person: Personal
           organisation: Organizational
       - source: orcid
-        target_json: data.attributes.contributors[].nameIdentifiers[].nameIdentifier
+        target:
+          json_path: nameIdentifiers[].nameIdentifier
         transform: normalise_orcid
       - value: ORCID
         when_source_present: orcid
-        target_json: data.attributes.contributors[].nameIdentifiers[].nameIdentifierScheme
+        target:
+          json_path: nameIdentifiers[].nameIdentifierScheme
       - value: https://orcid.org
         when_source_present: orcid
-        target_json: data.attributes.contributors[].nameIdentifiers[].schemeUri
+        target:
+          json_path: nameIdentifiers[].schemeUri
       - source: affiliation
-        target_json: data.attributes.contributors[].affiliation[].name
+        target:
+          json_path: affiliation[].name
       - value_from_parameter: contributor_type
-        target_json: data.attributes.contributors[].contributorType
+        target:
+          json_path: contributorType
 
   # Select `funder` agents and add their names as DataCite FundingReferences.
   - id: funders
@@ -413,30 +433,29 @@ mappings:
     filter:
       role: funder
     target:
-      property: fundingReferences
       json_path: data.attributes.fundingReferences
     mode: append
     transform: funding_reference
     field_mappings:
       - source: name
-        target_json: data.attributes.fundingReferences[].funderName
+        target:
+          json_path: funderName
 
   # Map the required BSI publisher name to the DataCite publisher property.
   - id: publisher
     source: required_metadata.publisher
     target:
-      property: publisher
       json_path: data.attributes.publisher
     transform: publisher
     field_mappings:
       - source: "@value"
-        target_json: data.attributes.publisher.name
+        target:
+          json_path: name
 
   # Derive DataCite publicationYear from the year component of datePublished.
   - id: publication_year
     source: optional_additional_metadata.datePublished
     target:
-      property: publicationYear
       json_path: data.attributes.publicationYear
     transform: year_from_date
 
@@ -444,7 +463,6 @@ mappings:
   - id: issued_date
     source: optional_additional_metadata.datePublished
     target:
-      property: dates
       json_path: data.attributes.dates
     mode: append
     transform: datacite_date
@@ -452,15 +470,16 @@ mappings:
       date_type: Issued
     field_mappings:
       - source: "@value"
-        target_json: data.attributes.dates[].date
+        target:
+          json_path: date
       - value_from_parameter: date_type
-        target_json: data.attributes.dates[].dateType
+        target:
+          json_path: dateType
 
   # Add BSI dateCreated as a DataCite Created Date, preserving its precision.
   - id: created_date
     source: required_metadata.dateCreated
     target:
-      property: dates
       json_path: data.attributes.dates
     mode: append
     transform: datacite_date
@@ -468,33 +487,36 @@ mappings:
       date_type: Created
     field_mappings:
       - source: "@value"
-        target_json: data.attributes.dates[].date
+        target:
+          json_path: date
       - value_from_parameter: date_type
-        target_json: data.attributes.dates[].dateType
+        target:
+          json_path: dateType
 
   # Add every dateModified row as an Updated Date and retain the version paired
   # with that date as DataCite date information.
   - id: modification_dates
     source: optional_additional_metadata.dateModified
     target:
-      property: dates
       json_path: data.attributes.dates
     mode: append
     transform: updated_dates
     field_mappings:
       - source: date
-        target_json: data.attributes.dates[].date
+        target:
+          json_path: date
       - value: Updated
-        target_json: data.attributes.dates[].dateType
+        target:
+          json_path: dateType
       - source: version
-        target_json: data.attributes.dates[].dateInformation
+        target:
+          json_path: dateInformation
 
   # Map the BSI language only when there is one value. DataCite has one language
   # property, so multiple BSI languages are omitted and reported outside YAML.
   - id: language
     source: optional_additional_metadata.language
     target:
-      property: language
       json_path: data.attributes.language
     transform: single_language
 
@@ -502,7 +524,6 @@ mappings:
   - id: abstract
     source: required_metadata.description
     target:
-      property: descriptions
       json_path: data.attributes.descriptions
     mode: append
     transform: description
@@ -511,17 +532,19 @@ mappings:
       language_default: metadata_language
     field_mappings:
       - source: "@value"
-        target_json: data.attributes.descriptions[].description
+        target:
+          json_path: description
       - value_from_parameter: description_type
-        target_json: data.attributes.descriptions[].descriptionType
+        target:
+          json_path: descriptionType
       - default_value: metadata_language
-        target_json: data.attributes.descriptions[].lang
+        target:
+          json_path: lang
 
   # Preserve audience information in an Other Description prefixed `Audience:`.
   - id: audience
     source: optional_additional_metadata.audience
     target:
-      property: descriptions
       json_path: data.attributes.descriptions
     mode: append
     transform: prefixed_description
@@ -531,18 +554,20 @@ mappings:
       language_default: metadata_language
     field_mappings:
       - source: "@value"
-        target_json: data.attributes.descriptions[].description
+        target:
+          json_path: description
         transform: prepend_configured_prefix
       - value_from_parameter: description_type
-        target_json: data.attributes.descriptions[].descriptionType
+        target:
+          json_path: descriptionType
       - default_value: metadata_language
-        target_json: data.attributes.descriptions[].lang
+        target:
+          json_path: lang
 
   # Preserve provenance in an Other Description prefixed `Provenance:`.
   - id: provenance
     source: optional_additional_metadata.provenance
     target:
-      property: descriptions
       json_path: data.attributes.descriptions
     mode: append
     transform: prefixed_description
@@ -552,18 +577,20 @@ mappings:
       language_default: metadata_language
     field_mappings:
       - source: "@value"
-        target_json: data.attributes.descriptions[].description
+        target:
+          json_path: description
         transform: prepend_configured_prefix
       - value_from_parameter: description_type
-        target_json: data.attributes.descriptions[].descriptionType
+        target:
+          json_path: descriptionType
       - default_value: metadata_language
-        target_json: data.attributes.descriptions[].lang
+        target:
+          json_path: lang
 
   # Preserve general comments in an Other Description prefixed `Comments:`.
   - id: comments
     source: optional_additional_metadata.comments
     target:
-      property: descriptions
       json_path: data.attributes.descriptions
     mode: append
     transform: prefixed_description
@@ -573,42 +600,44 @@ mappings:
       language_default: metadata_language
     field_mappings:
       - source: "@value"
-        target_json: data.attributes.descriptions[].description
+        target:
+          json_path: description
         transform: prepend_configured_prefix
       - value_from_parameter: description_type
-        target_json: data.attributes.descriptions[].descriptionType
+        target:
+          json_path: descriptionType
       - default_value: metadata_language
-        target_json: data.attributes.descriptions[].lang
+        target:
+          json_path: lang
 
   # Add every BSI keyword as an individual DataCite Subject.
   - id: keywords
     source: required_metadata.keywords
     target:
-      property: subjects
       json_path: data.attributes.subjects
     mode: append
     transform: subjects
     field_mappings:
       - source: "@value"
-        target_json: data.attributes.subjects[].subject
+        target:
+          json_path: subject
 
   # Add every listed BSI data format to the DataCite formats collection.
   - id: formats
     source: optional_additional_metadata.dataFormat
     target:
-      property: formats
       json_path: data.attributes.formats
     mode: append
     transform: copy_values
     field_mappings:
       - source: "@value"
-        target_json: data.attributes.formats[]
+        target:
+          json_path: data.attributes.formats[]
 
   # Copy the current BSI dataset version to DataCite version.
   - id: dataset_version
     source: optional_additional_metadata.datasetVersion
     target:
-      property: version
       json_path: data.attributes.version
     transform: null
 
@@ -618,24 +647,25 @@ mappings:
   - id: related_resources
     source: optional_additional_metadata.relatedResources
     targets:
-      - property: relatedIdentifiers
         json_path: data.attributes.relatedIdentifiers
-      - property: relatedItems
         json_path: data.attributes.relatedItems
     mode: append
     transform: related_resources
     field_mappings:
       - source: uri
         applies_to: relatedIdentifiers
-        target_json: data.attributes.relatedIdentifiers[].relatedIdentifier
+        target:
+          json_path: relatedIdentifier
         transform: normalize_related_identifier
       - source: uri
         applies_to: relatedIdentifiers
-        target_json: data.attributes.relatedIdentifiers[].relatedIdentifierType
+        target:
+          json_path: relatedIdentifierType
         transform: classify_related_identifier_type
       - source: relationType
         applies_to: relatedIdentifiers
-        target_json: data.attributes.relatedIdentifiers[].relationType
+        target:
+          json_path: relationType
         transform: relation_type_to_datacite
         value_map:
           isDerivedFrom: IsDerivedFrom
@@ -651,16 +681,20 @@ mappings:
           other: Other
       - source: relationTypeInformation
         applies_to: relatedIdentifiers
-        target_json: data.attributes.relatedIdentifiers[].relationTypeInformation
+        target:
+          json_path: relationTypeInformation
       - source: resource
         applies_to: relatedItems
-        target_json: data.attributes.relatedItems[].titles[].title
+        target:
+          json_path: titles[].title
       - value: Other
         applies_to: relatedItems
-        target_json: data.attributes.relatedItems[].relatedItemType
+        target:
+          json_path: relatedItemType
       - source: relationType
         applies_to: relatedItems
-        target_json: data.attributes.relatedItems[].relationType
+        target:
+          json_path: relationType
         transform: relation_type_to_datacite
         value_map:
           isDerivedFrom: IsDerivedFrom
@@ -676,16 +710,19 @@ mappings:
           other: Other
       - source: relationTypeInformation
         applies_to: relatedItems
-        target_json: data.attributes.relatedItems[].relationTypeInformation
+        target:
+          json_path: relationTypeInformation
       - source: uri
         applies_to: relatedItems
         when_source_present: uri
-        target_json: data.attributes.relatedItems[].relatedItemIdentifier.relatedItemIdentifier
+        target:
+          json_path: relatedItemIdentifier.relatedItemIdentifier
         transform: normalize_related_identifier
       - source: uri
         applies_to: relatedItems
         when_source_present: uri
-        target_json: data.attributes.relatedItems[].relatedItemIdentifier.relatedItemIdentifierType
+        target:
+          json_path: relatedItemIdentifier.relatedItemIdentifierType
         transform: classify_related_identifier_type
 
   # Map structured start/end temporal coverage to DataCite Dates and preserve a
@@ -693,9 +730,7 @@ mappings:
   - id: temporal_coverage
     source: optional_additional_metadata.temporalCoverage
     targets:
-      - property: dates
         json_path: data.attributes.dates
-      - property: descriptions
         json_path: data.attributes.descriptions
     mode: append
     transform: temporal_coverage
@@ -705,49 +740,57 @@ mappings:
       - sources:
           start: start
           end: end
-        target_json: data.attributes.dates[].date
+        target:
+          json_path: date
         transform: make_iso8601_interval
       - value: Coverage
         when_any_source_present:
           - start
           - end
-        target_json: data.attributes.dates[].dateType
+        target:
+          json_path: dateType
       - source: description
-        target_json: data.attributes.descriptions[].description
+        target:
+          json_path: description
         transform: prefix_temporal_coverage
       - value: Other
         when_source_present: description
-        target_json: data.attributes.descriptions[].descriptionType
+        target:
+          json_path: descriptionType
       - default_value: metadata_language
         when_source_present: description
-        target_json: data.attributes.descriptions[].lang
+        target:
+          json_path: lang
 
   # Convert each geographic element's bounding box and/or place description to
   # a DataCite GeoLocation. The transformer does not convert geohash values.
   - id: geographic_coverage
     source: optional_additional_metadata.geographicCoverage.geographicElement
     target:
-      property: geoLocations
       json_path: data.attributes.geoLocations
     mode: append
     transform: geographic_elements
     field_mappings:
       - source: geographicDescription
-        target_json: data.attributes.geoLocations[].geoLocationPlace
+        target:
+          json_path: geoLocationPlace
       - source: geographicBoundingBox.westBoundLongitude
-        target_json: data.attributes.geoLocations[].geoLocationBox.westBoundLongitude
+        target:
+          json_path: geoLocationBox.westBoundLongitude
       - source: geographicBoundingBox.eastBoundLongitude
-        target_json: data.attributes.geoLocations[].geoLocationBox.eastBoundLongitude
+        target:
+          json_path: geoLocationBox.eastBoundLongitude
       - source: geographicBoundingBox.southBoundLatitude
-        target_json: data.attributes.geoLocations[].geoLocationBox.southBoundLatitude
+        target:
+          json_path: geoLocationBox.southBoundLatitude
       - source: geographicBoundingBox.northBoundLatitude
-        target_json: data.attributes.geoLocations[].geoLocationBox.northBoundLatitude
+        target:
+          json_path: geoLocationBox.northBoundLatitude
 
   # Add the BSI rights-holder name as a DataCite RightsHolder Contributor.
   - id: rights_holder
     source: optional_additional_metadata.rightsHolder
     target:
-      property: contributors
       json_path: data.attributes.contributors
     mode: append
     transform: rights_holder_contributor
@@ -755,16 +798,17 @@ mappings:
       contributor_type: RightsHolder
     field_mappings:
       - source: "@value"
-        target_json: data.attributes.contributors[].name
+        target:
+          json_path: name
       - value_from_parameter: contributor_type
-        target_json: data.attributes.contributors[].contributorType
+        target:
+          json_path: contributorType
 
   # Convert the BSI Core access-right type and optional explanation into a DataCite
   # Rights entry, including normalisation of the access-right code.
   - id: access_rights
     source: optional_additional_metadata.accessRights
     target:
-      property: rightsList
       json_path: data.attributes.rightsList
     mode: append
     transform: access_rights
@@ -781,7 +825,8 @@ mappings:
       - sources:
           type: accessRightsType
           description: accessRightsDescription
-        target_json: data.attributes.rightsList[].rights
+        target:
+          json_path: rights
         transform: compose_access_rights_statement
 
   # Combine the BSI licence wording and licence URI into one DataCite Rights
@@ -791,12 +836,13 @@ mappings:
       details: optional_additional_metadata.licenseDetails
       uri: optional_additional_metadata.licenseURI
     target:
-      property: rightsList
       json_path: data.attributes.rightsList
     mode: append
     transform: licence_rights
     field_mappings:
       - source: details
-        target_json: data.attributes.rightsList[].rights
+        target:
+          json_path: rights
       - source: uri
-        target_json: data.attributes.rightsList[].rightsUri
+        target:
+          json_path: rightsUri
