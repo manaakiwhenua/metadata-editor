@@ -1,52 +1,52 @@
 //variables
 Vue.component('variables', {
-    props:['file_id'],
+    props: ['file_id'],
     data() {
         return {
-            dataset_id:project_sid,
-            dataset_idno:project_idno,
-            dataset_type:project_type,
-            form_errors:[],
-            schema_errors:[],
-            data_files:[],
+            dataset_id: project_sid,
+            dataset_idno: project_idno,
+            dataset_type: project_type,
+            form_errors: [],
+            schema_errors: [],
+            data_files: [],
             //variables:[],
-            page_action:'list',            
-            variable_copy:{},//copy of the variable before any editing
-            fid:this.file_id,
-            variable_search:'',
+            page_action: 'list',
+            variable_copy: {},//copy of the variable before any editing
+            fid: this.file_id,
+            variable_search: '',
             changeCaseDialog: false,
             dialogm1: '',
-            changeCaseFields:["name"],
-            changeCaseType:"title",
-            changeCaseUpdateStatus:'',
-            edit_item:0,
-            edit_items:[],    
-            variableMultipleTemplate:{
+            changeCaseFields: ["name"],
+            changeCaseType: "title",
+            changeCaseUpdateStatus: '',
+            edit_item: 0,
+            edit_items: [],
+            variableMultipleTemplate: {
                 "name": "NaN",
-                "fid":"",
+                "fid": "",
                 "labl": this.$t("multiple_selected"),
                 "var_valrng": {
-                  "range": {                    
-                  }
+                    "range": {
+                    }
                 },
                 "var_sumstat": [
-                  {}
+                    {}
                 ],
-                "var_catgry": [                  
-                  {}
+                "var_catgry": [
+                    {}
                 ],
-                "var_format": {                  
+                "var_format": {
                 },
-                "var_wgt_id":"",
-                "var_wgt":false,
-                "is_key":false,
-                "update_required":false,
+                "var_wgt_id": "",
+                "var_wgt": false,
+                "is_key": false,
+                "update_required": false,
                 "var_type": "",
                 "var_concept": [],
                 "var_txt": "",
                 "var_universe": "",
                 "var_std_catgry": [],
-                "sum_stats_options":{
+                "sum_stats_options": {
                     "wgt": true,
                     "freq": true,
                     "missing": true,
@@ -59,53 +59,60 @@ Vue.component('variables', {
                     "stdev": true,
                     "stdev_wgt": true
                 },
-                "time_stamp":0
-              },
-            variableMultiple:{},
-            variableMultipleUpdateFields: //fields to be updated for multiple selection
-            [
-                "var_txt",
-                "var_universe",
-                "var_concept",
-                "var_qstn_postqtxt",
-                "var_qstn_preqtxt",
-                "var_qstn_qstnlit",
-                "var_codinstr",
-                "var_imputation",
-                "var_qstn_ivulnstr",
-                "var_resp_unit",
-                "sum_stats_options",
-                "var_wgt_id",
-                "var_wgt",
-                "var_std_catgry",
-                "update_required"
-            ],
-            showSpreadMetadataDialog: false,
-            summaryStatsDialog:{
-                show:false                
+                "time_stamp": 0
             },
-            has_clicked_edit:true, //to ignore watch from triggering on editVariable click
-            is_initializing_multi:false, //to ignore watch from triggering during multi-variable initialization
-            is_navigating:false, //to ignore watch from triggering during navigation
-            variables_loading:false, // true while loading variables for this file (on-demand load)
-            spread_metadata_loading:false, // true while loading all variables for spread-metadata dialog
+            variableMultiple: {},
+            variableMultipleUpdateFields: //fields to be updated for multiple selection
+                [
+                    "var_txt",
+                    "var_universe",
+                    "var_concept",
+                    "var_qstn_postqtxt",
+                    "var_qstn_preqtxt",
+                    "var_qstn_qstnlit",
+                    "var_codinstr",
+                    "var_imputation",
+                    "var_qstn_ivulnstr",
+                    "var_resp_unit",
+                    "sum_stats_options",
+                    "var_wgt_id",
+                    "var_wgt",
+                    "var_std_catgry",
+                    "update_required"
+                ],
+            showSpreadMetadataDialog: false,
+            summaryStatsDialog: {
+                show: false
+            },
+            has_clicked_edit: true, //to ignore watch from triggering on editVariable click
+            is_initializing_multi: false, //to ignore watch from triggering during multi-variable initialization
+            is_navigating: false, //to ignore watch from triggering during navigation
+            variables_loading: false, // true while loading variables for this file (on-demand load)
+            spread_metadata_loading: false, // true while loading all variables for spread-metadata dialog
             columns_diff: null,
             invalid_names: [],
             columns_diff_loading: false,
             batchSumStatsOptionsDialog: false,
+            dialog_import_variable_documentation: {
+                show: false,
+                selected_file: null,
+                uploading: false,
+                message_success: '',
+                message_error: ''
+            },
             editingNameIndex: -1,
             editingNameOld: '',
             renameErrorDialog: false,
             renameErrorMessage: ''
         }
-    }, 
-    created: async function(){
-        this.fid=this.$route.params.file_id;
+    },
+    created: async function () {
+        this.fid = this.$route.params.file_id;
     },
     mounted: function () {
-        var vm=this;
-        this.ensureVariablesLoaded().then(function(){
-            setTimeout(function() {
+        var vm = this;
+        this.ensureVariablesLoaded().then(function () {
+            setTimeout(function () {
                 if (vm.variableSelectedCount() === 0) {
                     vm.editVariable(0);
                 }
@@ -113,40 +120,40 @@ Vue.component('variables', {
         });
     },
     watch: {
-        '$route.params.file_id': function(newFileId) {
+        '$route.params.file_id': function (newFileId) {
             if (newFileId && newFileId !== this.fid) {
                 this.fid = newFileId;
                 this.ensureVariablesLoaded();
             }
         },
-        activeVariable: {            
+        activeVariable: {
             deep: true,
-            handler(val,oldVal){
-                if (this.page_action!="edit"){
+            handler(val, oldVal) {
+                if (this.page_action != "edit") {
                     return;
                 }
 
-                if (this.has_clicked_edit){
-                    this.has_clicked_edit=false;
+                if (this.has_clicked_edit) {
+                    this.has_clicked_edit = false;
                     return;
                 }
 
                 //don't save initializing multi-variable selection
-                if (this.is_initializing_multi){
+                if (this.is_initializing_multi) {
                     return;
                 }
 
                 //don't save if navigating to a variable
-                if (this.is_navigating){
+                if (this.is_navigating) {
                     return;
                 }
 
                 //don't save if val is null/undefined
-                if (!val){
+                if (!val) {
                     return;
                 }
 
-                if (this.variableSelectedCount()>1){
+                if (this.variableSelectedCount() > 1) {
                     // For multi-variable, check if any actual changes were made
                     if (this.hasMultiVariableDataChanged(val)) {
                         //console.log("multi-variable CHANGE DETECTED");
@@ -157,18 +164,18 @@ Vue.component('variables', {
                     return;
                 }
 
-              // For single variable, compare with the original copy
-              if (JSON.stringify(val)==JSON.stringify(this.variable_copy)){
-                  //console.log("no change detected for single variable");
-              }
-              else{                
-                this.saveVariableDebounce(val);                
-              }
+                // For single variable, compare with the original copy
+                if (JSON.stringify(val) == JSON.stringify(this.variable_copy)) {
+                    //console.log("no change detected for single variable");
+                }
+                else {
+                    this.saveVariableDebounce(val);
+                }
             }
-          }
+        }
     },
     methods: {
-        ensureVariablesLoaded: function() {
+        ensureVariablesLoaded: function () {
             var vm = this;
             if (!this.fid || !this.ProjectID) {
                 return Promise.resolve();
@@ -180,16 +187,16 @@ Vue.component('variables', {
             }
             this.variables_loading = true;
             return this.$store.dispatch('loadVariables', { dataset_id: this.ProjectID, fid: this.fid })
-                .then(function() {
+                .then(function () {
                     vm.variables_loading = false;
                     vm.fetchColumnsDiff();
                 })
-                .catch(function(err) {
+                .catch(function (err) {
                     vm.variables_loading = false;
                     console.log('error loading variables', err);
                 });
         },
-        fetchColumnsDiff: function() {
+        fetchColumnsDiff: function () {
             var vm = this;
             if (!this.fid || !this.ProjectID) {
                 return;
@@ -204,7 +211,7 @@ Vue.component('variables', {
                 axios.get(base + 'columns_diff/' + sid + '/' + fid),
                 axios.get(base + 'invalid_variable_names/' + sid + '/' + fid)
             ])
-                .then(function(responses) {
+                .then(function (responses) {
                     vm.columns_diff_loading = false;
                     if (responses[0].data && responses[0].data.status === 'success') {
                         vm.columns_diff = responses[0].data.columns_diff || null;
@@ -213,72 +220,70 @@ Vue.component('variables', {
                         vm.invalid_names = responses[1].data.invalid_names || [];
                     }
                 })
-                .catch(function(err) {
+                .catch(function (err) {
                     vm.columns_diff_loading = false;
                     vm.columns_diff = null;
                     vm.invalid_names = [];
                     console.log('columns_diff / invalid_variable_names error', err);
                 });
         },
-        clearVariableSearch: function(){
-            this.variable_search='';
+        clearVariableSearch: function () {
+            this.variable_search = '';
         },
-        reloadVariablesAfterBatchSumStats: function(){
+        reloadVariablesAfterBatchSumStats: function () {
             var vm = this;
             if (!vm.fid || !vm.ProjectID) return;
             vm.$store.dispatch('loadVariables', { dataset_id: vm.ProjectID, fid: vm.fid });
         },
-        scrollToVariableBottom: function(){            
-            document.getElementById('variables-table').scrollTop= document.getElementById('variables-table').scrollHeight;
+        scrollToVariableBottom: function () {
+            document.getElementById('variables-table').scrollTop = document.getElementById('variables-table').scrollHeight;
         },
-        scrollToVariable: function(idx=0){
-            var id=this.edit_items[0];
+        scrollToVariable: function (idx = 0) {
+            var id = this.edit_items[0];
 
-            if (idx>0){
-                id=idx;    
+            if (idx > 0) {
+                id = idx;
             }
 
             this.editVariable(id);
-            
-            var myElement = document.getElementById('v-'+id);
+
+            var myElement = document.getElementById('v-' + id);
             var topPos = myElement.offsetTop - 100;
 
             document.getElementById('variables-rows').scrollTop = topPos;
-            console.log("scroll to variable",id, myElement, topPos);
+            console.log("scroll to variable", id, myElement, topPos);
         },
-        varNavigate: function(direction)
-        {
-            total_vars=this.variables.length-1;
+        varNavigate: function (direction) {
+            total_vars = this.variables.length - 1;
             this.is_navigating = true;
 
-            switch(direction) {
+            switch (direction) {
                 case 'first':
-                    this.edit_items=[0];
-                  break;
+                    this.edit_items = [0];
+                    break;
                 case 'prev':
-                  if (this.edit_items[0]>0){
-                    this.edit_items[0]=this.edit_items[0]-1;
-                  }
-                  break;
-                case 'next':
-                    if (this.edit_items[0]<total_vars){
-                        this.edit_items[0]=this.edit_items[0]+1;
+                    if (this.edit_items[0] > 0) {
+                        this.edit_items[0] = this.edit_items[0] - 1;
                     }
-                    break;  
+                    break;
+                case 'next':
+                    if (this.edit_items[0] < total_vars) {
+                        this.edit_items[0] = this.edit_items[0] + 1;
+                    }
+                    break;
                 case 'last':
-                    this.edit_items[0]=total_vars;
-                    break;  
-              }
-            
+                    this.edit_items[0] = total_vars;
+                    break;
+            }
+
             this.scrollToVariable();
-            
+
             // Reset the navigation flag after a short delay
             setTimeout(() => {
-                this.is_navigating=false;
+                this.is_navigating = false;
             }, 100);
         },
-        spreadMetadata: async function ()
-        {
+        spreadMetadata: async function () {
             var vm = this;
             var dataFiles = vm.$store.state.data_files || [];
             var variables = vm.$store.state.variables || {};
@@ -299,12 +304,12 @@ Vue.component('variables', {
             } finally {
                 vm.spread_metadata_loading = false;
             }
-        },        
-        onVariableNameFocus: function(index) {
+        },
+        onVariableNameFocus: function (index) {
             this.editingNameIndex = index;
             this.editingNameOld = this.variables[index] && this.variables[index].name ? String(this.variables[index].name) : '';
         },
-        validateVariableNameForRename: function(name) {
+        validateVariableNameForRename: function (name) {
             var n = (name && String(name).trim()) || '';
             if (n === '') return { valid: false, message: 'Variable name is required.' };
             if (n.length > 32) return { valid: false, message: 'Variable name cannot be longer than 32 characters.' };
@@ -312,7 +317,7 @@ Vue.component('variables', {
             if (!/^[a-zA-Z0-9_]+$/.test(n)) return { valid: false, message: 'Variable name may only contain letters, numbers, and underscores. No spaces or special characters.' };
             return { valid: true, message: '' };
         },
-        onVariableNameBlur: function(index) {
+        onVariableNameBlur: function (index) {
             var vm = this;
             var variable = vm.variables[index];
             if (!variable) return;
@@ -345,8 +350,7 @@ Vue.component('variables', {
                     vm.renameErrorDialog = true;
                 });
         },
-        changeCase: function()
-        {
+        changeCase: function () {
             var vm = this;
             vm.changeCaseUpdateStatus = "Applying...";
 
@@ -377,108 +381,103 @@ Vue.component('variables', {
                     vm.changeCaseUpdateStatus = "";
                 });
         },
-        editVariableMultiple: function(index,isShift=0)
-        {
-            if (isShift==1){
-                start=this.getSelectionLastVariableIndex;
-                end=index;
+        editVariableMultiple: function (index, isShift = 0) {
+            if (isShift == 1) {
+                start = this.getSelectionLastVariableIndex;
+                end = index;
 
-                if (start>end){
-                    start=index;
-                    end=this.getSelectionLastVariableIndex;
+                if (start > end) {
+                    start = index;
+                    end = this.getSelectionLastVariableIndex;
                 }
 
-                for(i=start;i<=end;i++){
+                for (i = start; i <= end; i++) {
                     this.edit_items.push(i);
                 }
 
                 //remove duplicates
                 this.edit_items = [...new Set(this.edit_items)];
-            }else{
-                if (!this.isVariableSelected(index)){
-                    this.edit_items.push(index);                
-                }else{
-                    if (this.edit_items.length>1){
+            } else {
+                if (!this.isVariableSelected(index)) {
+                    this.edit_items.push(index);
+                } else {
+                    if (this.edit_items.length > 1) {
                         this.removeVariableFromSelection(index);
                     }
                 }
             }
-            if(this.edit_items.length>1){
-                this.page_action="edit";
-                this.has_clicked_edit=true;
+            if (this.edit_items.length > 1) {
+                this.page_action = "edit";
+                this.has_clicked_edit = true;
                 this.initializeMultiVariable();
             }
         },
-        removeVariableFromSelection: function(item_idx)
-        {
+        removeVariableFromSelection: function (item_idx) {
             const item = this.edit_items.indexOf(item_idx);
             if (item > -1) {
                 this.edit_items.splice(item, 1);
             }
         },
-        isVariableSelected: function(index)
-        { 
-            if (this.edit_items.includes(index)){
+        isVariableSelected: function (index) {
+            if (this.edit_items.includes(index)) {
                 return true;
             }
             return false;
         },
-        editVariable:function(index)
-        {
+        editVariable: function (index) {
             this.exitEditMode();
             this.is_navigating = true;
             this.$nextTick().then(() => {
-                this.page_action="edit";
-                this.has_clicked_edit=true;
-                this.edit_items=[index];
-                this.variable_copy=_.cloneDeep(this.variables[index]);
-                
+                this.page_action = "edit";
+                this.has_clicked_edit = true;
+                this.edit_items = [index];
+                this.variable_copy = _.cloneDeep(this.variables[index]);
+
                 // Reset the flags after a short delay to ensure the watch doesn't trigger
                 setTimeout(() => {
-                    this.has_clicked_edit=false;
-                    this.is_navigating=false;
+                    this.has_clicked_edit = false;
+                    this.is_navigating = false;
                 }, 100);
             });
         },
-        addVariable:function()
-        {
-            this.variable_search="";
-            this.page_action="edit";
+        addVariable: function () {
+            this.variable_search = "";
+            this.page_action = "edit";
 
-            let url=CI.base_url + '/api/variables/create/'+vm.dataset_id;
-            let new_var={
-                    "vid": "V" + (this.MaxVariableID+1),
-                    "sid": this.dataset_id,
-                    "file_id": this.fid,
-                    "fid":this.fid,
-                    "name": this.$t("untitled"),
-                    "labl": this.$t("untitled"),
-                    "var_format":{
-                        "type":''
-                    },
-                    "var_catgry": []
-              }
+            let url = CI.base_url + '/api/variables/create/' + vm.dataset_id;
+            let new_var = {
+                "vid": "V" + (this.MaxVariableID + 1),
+                "sid": this.dataset_id,
+                "file_id": this.fid,
+                "fid": this.fid,
+                "name": this.$t("untitled"),
+                "labl": this.$t("untitled"),
+                "var_format": {
+                    "type": ''
+                },
+                "var_catgry": []
+            }
 
-            axios.post(url, 
+            axios.post(url,
                 {
                     "variable": new_var
                 }
             )
-            .then(function (response) {
-                variable=response.data.variable;
-                new_var.uid=variable.uid;
-                
-                vm.scrollToVariableBottom();
-                vm.$store.commit('variable_add',{fid:vm.fid, variable:new_var});
-                newIdx=vm.variables.length -1;
-                vm.editVariable(newIdx);
-            })
-            .catch(function (error) {
-                console.log("error deleting variables",error);
-            });
+                .then(function (response) {
+                    variable = response.data.variable;
+                    new_var.uid = variable.uid;
+
+                    vm.scrollToVariableBottom();
+                    vm.$store.commit('variable_add', { fid: vm.fid, variable: new_var });
+                    newIdx = vm.variables.length - 1;
+                    vm.editVariable(newIdx);
+                })
+                .catch(function (error) {
+                    console.log("error deleting variables", error);
+                });
         },
         /** True when var_wgt_id refers to a real variable UID (not 0 / "0" / empty). */
-        variableHasValidWeightId: function(v) {
+        variableHasValidWeightId: function (v) {
             if (v === undefined || v === null || v === '') {
                 return false;
             }
@@ -486,7 +485,7 @@ Vue.component('variables', {
             return !isNaN(n) && n > 0;
         },
         /** Remove invalid weight refs; character variables may never reference a weight. */
-        sanitizeVariableWeightFields: function(variable_) {
+        sanitizeVariableWeightFields: function (variable_) {
             var vf = variable_.var_format;
             if (vf && vf.type === 'character') {
                 if (Object.prototype.hasOwnProperty.call(variable_, 'var_wgt_id')) {
@@ -500,30 +499,29 @@ Vue.component('variables', {
                 }
             }
         },
-        saveMultiSelectedVariables: function()
-        {
-            if(this.edit_items.length<=1){
+        saveMultiSelectedVariables: function () {
+            if (this.edit_items.length <= 1) {
                 return;
             }
 
-            for(i=0;i<this.edit_items.length;i++){
-                variable_=this.variables[this.edit_items[i]];
-                variable_copy=_.cloneDeep(variable_);
+            for (i = 0; i < this.edit_items.length; i++) {
+                variable_ = this.variables[this.edit_items[i]];
+                variable_copy = _.cloneDeep(variable_);
                 //update key/values
-                for(k=0;k<this.variableMultipleUpdateFields.length;k++){
-                    field_name=this.variableMultipleUpdateFields[k];
+                for (k = 0; k < this.variableMultipleUpdateFields.length; k++) {
+                    field_name = this.variableMultipleUpdateFields[k];
 
                     //key exists and is not null
-                    if(this.variableMultiple[field_name]!=null){
+                    if (this.variableMultiple[field_name] != null) {
 
-                        if (field_name=='sum_stats_options'){
+                        if (field_name == 'sum_stats_options') {
                             // Skip if the entire sum_stats_options is null (means all variables have different values)
                             if (this.variableMultiple[field_name] === null) {
                                 continue;
                             }
-                            let sum_stats_options_={}
-                            sum_stats_keys=Object.keys(this.variableMultiple[field_name]);
-                            
+                            let sum_stats_options_ = {}
+                            sum_stats_keys = Object.keys(this.variableMultiple[field_name]);
+
                             // Initialize with existing values from the variable
                             if (variable_.sum_stats_options) {
                                 sum_stats_options_ = JSON.parse(JSON.stringify(variable_.sum_stats_options));
@@ -531,21 +529,21 @@ Vue.component('variables', {
                                 // If variable doesn't have sum_stats_options, initialize with template
                                 sum_stats_options_ = JSON.parse(JSON.stringify(this.variableMultipleTemplate.sum_stats_options));
                             }
-                            
-                            for(s=0;s<sum_stats_keys.length;s++){
-                                sum_stats_key=sum_stats_keys[s];
+
+                            for (s = 0; s < sum_stats_keys.length; s++) {
+                                sum_stats_key = sum_stats_keys[s];
                                 // Only update values that are not null (null means the values differ across variables)
-                                if (this.variableMultiple[field_name][sum_stats_key] !== null){
-                                    sum_stats_options_[sum_stats_key]=this.variableMultiple[field_name][sum_stats_key];
+                                if (this.variableMultiple[field_name][sum_stats_key] !== null) {
+                                    sum_stats_options_[sum_stats_key] = this.variableMultiple[field_name][sum_stats_key];
                                 }
                             }
-                            Vue.set(variable_,'sum_stats_options',sum_stats_options_);
+                            Vue.set(variable_, 'sum_stats_options', sum_stats_options_);
                         }
-                        else{
+                        else {
 
                             //don't apply weights to string variables
-                            if (variable_.var_format && variable_.var_format.type=='character'){
-                                if (field_name=='var_wgt' || field_name=='var_wgt_id'){
+                            if (variable_.var_format && variable_.var_format.type == 'character') {
+                                if (field_name == 'var_wgt' || field_name == 'var_wgt_id') {
                                     continue;
                                 }
                             }
@@ -561,7 +559,7 @@ Vue.component('variables', {
                             }
 
                             //variable_[field_name]=JSON.parse(JSON.stringify(this.variableMultiple[field_name]));
-                            Vue.set(variable_,field_name,JSON.parse(JSON.stringify(this.variableMultiple[field_name])));
+                            Vue.set(variable_, field_name, JSON.parse(JSON.stringify(this.variableMultiple[field_name])));
                         }
                     }
                 }
@@ -569,18 +567,18 @@ Vue.component('variables', {
                 this.sanitizeVariableWeightFields(variable_);
 
                 //skip if no changes
-                if (JSON.stringify(variable_copy)==JSON.stringify(variable_)){                    
+                if (JSON.stringify(variable_copy) == JSON.stringify(variable_)) {
                     console.log("No changes detected for variable", variable_.name);
                     continue;
                 }
-                
+
                 this.saveVariable(variable_);
             }
         },
-        saveVariableDebounce: _.debounce(function(data) {
-            
+        saveVariableDebounce: _.debounce(function (data) {
+
             //multiple variables selected
-            if(this.edit_items.length>1){
+            if (this.edit_items.length > 1) {
                 this.saveMultiSelectedVariables();
                 return false;
             }
@@ -588,116 +586,112 @@ Vue.component('variables', {
             //single variable
             this.saveVariable(data);
         }, 500),
-        saveVariable: function(data){///_.debounce(function(data) {
-            vm=this;
+        saveVariable: function (data) {///_.debounce(function(data) {
+            vm = this;
             if (data && typeof data === 'object') {
                 vm.sanitizeVariableWeightFields(data);
             }
-            let url=CI.base_url + '/api/variables/'+vm.dataset_id;
-            axios.post(url, 
+            let url = CI.base_url + '/api/variables/' + vm.dataset_id;
+            axios.post(url,
                 data
             )
-            .then(function (response) {
-                EventBus.$emit('onSuccess', 'Variable saved!');
-                // Update variable_copy only after successful save
-                if (vm.edit_items.length === 1) {
-                    vm.variable_copy = _.cloneDeep(vm.variables[vm.edit_items[0]]);
-                }
-            })
-            .catch(function (error) {
-                console.log(error);
-                EventBus.$emit('onFail', 'Failed to save variable');
-            })
-            .then(function () {
-                //console.log("request completed");
-            });
+                .then(function (response) {
+                    EventBus.$emit('onSuccess', 'Variable saved!');
+                    // Update variable_copy only after successful save
+                    if (vm.edit_items.length === 1) {
+                        vm.variable_copy = _.cloneDeep(vm.variables[vm.edit_items[0]]);
+                    }
+                })
+                .catch(function (error) {
+                    console.log(error);
+                    EventBus.$emit('onFail', 'Failed to save variable');
+                })
+                .then(function () {
+                    //console.log("request completed");
+                });
         }
         //}, 100)
         ,
-        exitEditMode: function()
-        {
-            if (!this.edit_items[0]){
+        exitEditMode: function () {
+            if (!this.edit_items[0]) {
                 return;
             }
 
-            this.page_action="list";
-            this.edit_items=[];
+            this.page_action = "list";
+            this.edit_items = [];
         },
-        hasDataChanged: function(){
+        hasDataChanged: function () {
             if (this.edit_items.length === 0) return false;
-            return JSON.stringify(this.variables[this.edit_items[0]])!==JSON.stringify(this.variable_copy);
+            return JSON.stringify(this.variables[this.edit_items[0]]) !== JSON.stringify(this.variable_copy);
         },
-        hasMultiVariableDataChanged: function(val) {
+        hasMultiVariableDataChanged: function (val) {
             // Check if any of the editable fields have been modified from template
             for (let field of this.variableMultipleUpdateFields) {
-                if (val[field] !== null && val[field] !== undefined && 
+                if (val[field] !== null && val[field] !== undefined &&
                     JSON.stringify(val[field]) !== JSON.stringify(this.variableMultipleTemplate[field])) {
                     return true;
                 }
             }
             return false;
         },
-        titleCase: function(str) {
+        titleCase: function (str) {
             return str.replace(
-              /\w\S*/g,
-              function(txt) {
-                return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
-              }
+                /\w\S*/g,
+                function (txt) {
+                    return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+                }
             );
-        },        
-        deleteVariable: function()
-        {
-            if (!confirm(this.$t("confirm_delete_variables"))){
+        },
+        deleteVariable: function () {
+            if (!confirm(this.$t("confirm_delete_variables"))) {
                 return;
             }
 
-            let vm=this;
-            let url=CI.base_url + '/api/variables/delete/'+vm.ProjectID;
-            let var_uid_list=[];
+            let vm = this;
+            let url = CI.base_url + '/api/variables/delete/' + vm.ProjectID;
+            let var_uid_list = [];
 
             this.edit_items.forEach((item) => {
                 var_uid_list.push(this.variables[item].uid);
             });
 
             //delete variables
-            axios.post(url, 
+            axios.post(url,
                 {
                     "uid": var_uid_list
                 }
             )
-            .then(function (response) {
-                //need to sort in descending order to delete from the end of the array
-                let edit_items_descending=vm.edit_items.sort(function(a, b){return b-a});
+                .then(function (response) {
+                    //need to sort in descending order to delete from the end of the array
+                    let edit_items_descending = vm.edit_items.sort(function (a, b) { return b - a });
 
-                edit_items_descending.forEach((item) => {
-                    vm.$store.commit('variable_remove',{fid:vm.fid, idx:item});
+                    edit_items_descending.forEach((item) => {
+                        vm.$store.commit('variable_remove', { fid: vm.fid, idx: item });
+                    });
+                    vm.edit_items = [];
+
+                    //select item before the deleted item or after the deleted item
+                    let newIdx = edit_items_descending[0] - 1;
+                    if (newIdx < 0) {
+                        newIdx = edit_items_descending[0] + 1;
+                    }
+                    vm.editVariable(newIdx);
+                })
+                .catch(function (error) {
+                    if (error.response && error.response.data && error.response.data.message) {
+                        alert(vm.$t("error_deleting_variables") + ": " + error.response.data.message);
+                    } else {
+                        alert(vm.$t("error_deleting_variables"));
+                    }
+                    console.log("error deleting variables", error);
                 });
-                vm.edit_items=[];
-
-                //select item before the deleted item or after the deleted item
-                let newIdx=edit_items_descending[0]-1;
-                if (newIdx<0){
-                    newIdx=edit_items_descending[0]+1;
-                }
-                vm.editVariable(newIdx);
-            })
-            .catch(function (error) {
-                if (error.response && error.response.data && error.response.data.message){
-                    alert(vm.$t("error_deleting_variables") + ": " + error.response.data.message);
-                }else{
-                    alert(vm.$t("error_deleting_variables"));
-                }
-                console.log("error deleting variables",error);
-            });
         },
-        
-        variableSelectedCount: function()
-        {
+
+        variableSelectedCount: function () {
             return this.edit_items.length;
         },
-        variableSelectedNames: function()
-        {
-            let var_names=[];
+        variableSelectedNames: function () {
+            let var_names = [];
             this.edit_items.forEach((item) => {
                 var_names.push(this.variables[item].name);
             });
@@ -705,21 +699,21 @@ Vue.component('variables', {
             return var_names;
         },
         //on selection of multiple variables
-        initializeMultiVariable: function(){
+        initializeMultiVariable: function () {
             console.log("Initializing multi-variable selection");
             this.is_initializing_multi = true;
-            
-            this.variableMultiple=JSON.parse(JSON.stringify(this.variableMultipleTemplate));
+
+            this.variableMultiple = JSON.parse(JSON.stringify(this.variableMultipleTemplate));
 
             //initialize variableMultiple using the first variable from the selection
-            let fields=Object.keys(this.variableMultipleTemplate);
-            let first_variable=this.selectedVariables[0];            
+            let fields = Object.keys(this.variableMultipleTemplate);
+            let first_variable = this.selectedVariables[0];
 
             //loop through editable properties
             // fill values from the first variable
-            for(i=0;i<fields.length;i++){
+            for (i = 0; i < fields.length; i++) {
 
-                let field=fields[i];
+                let field = fields[i];
                 if (field === 'var_wgt_id') {
                     let wid = first_variable.var_wgt_id;
                     if (wid !== undefined && wid !== null && wid !== '' && Number(wid) > 0) {
@@ -733,7 +727,7 @@ Vue.component('variables', {
                     continue;
                 }
                 //check if property is set for the first variable
-                if (first_variable[field]){
+                if (first_variable[field]) {
                     if (field === "sum_stats_options") {
                         // Deep copy sum_stats_options to avoid reference issues
                         if (first_variable[field]) {
@@ -745,41 +739,41 @@ Vue.component('variables', {
                     } else {
                         this.variableMultiple[field] = first_variable[field];
                     }
-                }        
+                }
             }
 
-            let sum_stats_props=Object.keys(this.variableMultipleTemplate.sum_stats_options);
+            let sum_stats_props = Object.keys(this.variableMultipleTemplate.sum_stats_options);
 
             //loop all variables
             //compare with first_variable
             //if different, set to null
-            for(i=1;i<this.selectedVariables.length;i++){
-                let variable=this.selectedVariables[i];
-                for(k=0;k<fields.length;k++){
-                    let field=fields[k];
-                    console.log("field",field);
-                    if (field=="sum_stats_options"){
+            for (i = 1; i < this.selectedVariables.length; i++) {
+                let variable = this.selectedVariables[i];
+                for (k = 0; k < fields.length; k++) {
+                    let field = fields[k];
+                    console.log("field", field);
+                    if (field == "sum_stats_options") {
                         // Check if both variables have sum_stats_options
                         if (variable[field] && this.variableMultiple[field]) {
-                            for(p=0;p<sum_stats_props.length;p++){
+                            for (p = 0; p < sum_stats_props.length; p++) {
                                 let prop_name = sum_stats_props[p];
                                 // Compare values, handling undefined/null cases
                                 let current_val = this.variableMultiple[field][prop_name];
                                 let compare_val = variable[field][prop_name];
-                                
-                                if (current_val !== compare_val){
+
+                                if (current_val !== compare_val) {
                                     this.variableMultiple[field][prop_name] = null;
                                 }
                             }
                         } else if (!variable[field] && this.variableMultiple[field]) {
                             // If current variable doesn't have sum_stats_options but template does, 
                             // compare with template values
-                            for(p=0;p<sum_stats_props.length;p++){
+                            for (p = 0; p < sum_stats_props.length; p++) {
                                 let prop_name = sum_stats_props[p];
                                 let template_val = this.variableMultipleTemplate[field][prop_name];
                                 let current_val = this.variableMultiple[field][prop_name];
-                                
-                                if (current_val !== template_val){
+
+                                if (current_val !== template_val) {
                                     this.variableMultiple[field][prop_name] = null;
                                 }
                             }
@@ -789,8 +783,8 @@ Vue.component('variables', {
                         }
                     }
                     else {
-                        if (JSON.stringify(variable[field])!==JSON.stringify(this.variableMultiple[field])){
-                            this.variableMultiple[field]=null;
+                        if (JSON.stringify(variable[field]) !== JSON.stringify(this.variableMultiple[field])) {
+                            this.variableMultiple[field] = null;
                         }
                     }
                 }
@@ -802,70 +796,120 @@ Vue.component('variables', {
                 this.is_initializing_multi = false;
             });
 
-        },        
-        variableActiveClass: function(idx,variable_name)
-        {
-            if (!variable_name){
+        },
+        variableActiveClass: function (idx, variable_name) {
+            if (!variable_name) {
                 return;
             }
 
-            let classes=[];
-            variable_name=variable_name.toLowerCase().trim();
+            let classes = [];
+            variable_name = variable_name.toLowerCase().trim();
 
             //check for duplicate variable names
-            if (this.duplicateVariableNames[variable_name]){
+            if (this.duplicateVariableNames[variable_name]) {
                 classes.push('variable-name-duplicate bg-warning');
             }
 
-            if (variable_name.trim()==''){
+            if (variable_name.trim() == '') {
                 classes.push('variable-name-empty bg-warning');
             }
 
-            if (this.isVariableSelected(idx)){
+            if (this.isVariableSelected(idx)) {
                 classes.push('activeRow');
             }
 
             return classes.join(' ');
-        },        
-        exportDictionaryCsv: function() {
+        },
+        exportDictionaryCsv: function () {
             if (!this.fid || !this.ProjectID) {
                 return;
             }
             var url = CI.base_url + '/api/variables/export_csv/' + this.ProjectID + '/' + encodeURIComponent(this.fid) + '?download=1';
             window.location.href = url;
         },
-        refreshSummaryStats: async function(){
+        exportVariableDocumentationCsv: function () {
+            if (!this.fid || !this.ProjectID) {
+                return;
+            }
+            var url = CI.base_url + '/api/variables/export_documentation_csv/' + this.ProjectID + '/' + encodeURIComponent(this.fid) + '?download=1&profile=full';
+            window.location.href = url;
+        },
+        openImportVariableDocumentationDialog: function () {
+            this.dialog_import_variable_documentation.show = true;
+            this.dialog_import_variable_documentation.selected_file = null;
+            this.dialog_import_variable_documentation.uploading = false;
+            this.dialog_import_variable_documentation.message_success = '';
+            this.dialog_import_variable_documentation.message_error = '';
+        },
+        submitImportVariableDocumentation: async function () {
+            var raw = this.dialog_import_variable_documentation.selected_file;
+            var file = Array.isArray(raw) ? (raw.length ? raw[0] : null) : raw;
+            if (!file || !(file instanceof File)) {
+                this.dialog_import_variable_documentation.message_error = this.$t("please_select_file");
+                return;
+            }
+            let vm = this;
+            let url = CI.base_url + '/api/variables/import_documentation_csv/' + vm.ProjectID + '/' + encodeURIComponent(vm.fid) + '?profile=full';
+            let formData = new FormData();
+            formData.append('file', file);
+            this.dialog_import_variable_documentation.uploading = true;
+            this.dialog_import_variable_documentation.message_error = '';
+            this.dialog_import_variable_documentation.message_success = '';
+            try {
+                let response = await axios.post(url, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                if (response.data && response.data.status === 'success') {
+                    this.dialog_import_variable_documentation.message_success = this.$t("import_variable_documentation_success") + ' (' + (response.data.updated || 0) + ' ' + this.$t("variables") + ')';
+                    await vm.reloadDataFileVariables();
+                } else {
+                    this.dialog_import_variable_documentation.message_error = (response.data && response.data.message) ? response.data.message : vm.$t("failed");
+                }
+            } catch (error) {
+                let msg = (error.response && error.response.data && error.response.data.message) ? error.response.data.message : error.message;
+                if (error.response && error.response.data && error.response.data.errors && error.response.data.errors.length) {
+                    let first = error.response.data.errors[0];
+                    if (first && first.message) {
+                        msg = first.message;
+                    }
+                }
+                this.dialog_import_variable_documentation.message_error = vm.$t("failed") + ": " + msg;
+            } finally {
+                this.dialog_import_variable_documentation.uploading = false;
+            }
+        },
+        refreshSummaryStats: async function () {
 
-            if (!confirm(this.$t("confirm_import_summary_statistics"))){
+            if (!confirm(this.$t("confirm_import_summary_statistics"))) {
                 return;
             }
 
-            this.summaryStatsDialog={
-                show:true,
-                title:this.$t("summary_stats"),
-                loading_message:this.$t("processing_please_wait"),
-                message_success:'',
-                message_error:'',
-                is_loading:true
+            this.summaryStatsDialog = {
+                show: true,
+                title: this.$t("summary_stats"),
+                loading_message: this.$t("processing_please_wait"),
+                message_success: '',
+                message_error: '',
+                is_loading: true
             }
 
-            try{
-                let result=await this.$store.dispatch('importDataFileSummaryStatisticsQueue',{file_id:this.fid});
-                console.log("sumstats queued",result);
-                this.importSummaryStatisticsQueueStatusCheck(this.fid,result.data.job_id);
-            }catch(e){
-                console.log("failed",e);
-                this.summaryStatsDialog.is_loading=false;
-                this.summaryStatsDialog.message_error=this.$t("failed_to_import_stats") + ": " + e.response.data.message;
+            try {
+                let result = await this.$store.dispatch('importDataFileSummaryStatisticsQueue', { file_id: this.fid });
+                console.log("sumstats queued", result);
+                this.importSummaryStatisticsQueueStatusCheck(this.fid, result.data.job_id);
+            } catch (e) {
+                console.log("failed", e);
+                this.summaryStatsDialog.is_loading = false;
+                this.summaryStatsDialog.message_error = this.$t("failed_to_import_stats") + ": " + e.response.data.message;
             }
         },
-        importSummaryStatisticsQueueStatusCheck: async function(file_id,job_id){
-            this.summaryStatsDialog.is_loading=true;
-            this.summaryStatsDialog.loading_message=this.$t("processing_please_wait");
-            try{
+        importSummaryStatisticsQueueStatusCheck: async function (file_id, job_id) {
+            this.summaryStatsDialog.is_loading = true;
+            this.summaryStatsDialog.loading_message = this.$t("processing_please_wait");
+            try {
                 await this.sleep(5000);
-                let result=await this.$store.dispatch('importDataFileSummaryStatisticsQueueStatusCheck',{file_id:file_id, job_id:job_id});
-                console.log("job updated",result);
+                let result = await this.$store.dispatch('importDataFileSummaryStatisticsQueueStatusCheck', { file_id: file_id, job_id: job_id });
+                console.log("job updated", result);
 
                 if (result.data.job_status === 'failed' || result.data.job_status === 'error') {
                     const msg = result.data.message || (typeof result.data.detail === 'string' ? result.data.detail : '') || 'Job failed';
@@ -873,205 +917,196 @@ Vue.component('variables', {
                     this.summaryStatsDialog.message_error = msg;
                     return;
                 }
-                if (result.data.job_status!=='done'){
-                    this.importSummaryStatisticsQueueStatusCheck(file_id,job_id);
-                }else if (result.data.job_status==='done'){
+                if (result.data.job_status !== 'done') {
+                    this.importSummaryStatisticsQueueStatusCheck(file_id, job_id);
+                } else if (result.data.job_status === 'done') {
                     await this.reloadDataFileVariables();
-                    this.summaryStatsDialog.is_loading=false;
-                    this.summaryStatsDialog.message_success=this.$t("sum_stats_imported_success");
+                    this.summaryStatsDialog.is_loading = false;
+                    this.summaryStatsDialog.message_success = this.$t("sum_stats_imported_success");
                 }
-                
-            }catch(e){
-                console.log("failed",e);
-                this.summaryStatsDialog.is_loading=false;
-                this.summaryStatsDialog.message_error=this.$t("failed") + ": " + (e.response && e.response.data && e.response.data.message ? e.response.data.message : e.message);
+
+            } catch (e) {
+                console.log("failed", e);
+                this.summaryStatsDialog.is_loading = false;
+                this.summaryStatsDialog.message_error = this.$t("failed") + ": " + (e.response && e.response.data && e.response.data.message ? e.response.data.message : e.message);
             }
         },
-        reloadDataFileVariables: async function(){
-            var result = await this.$store.dispatch('loadVariables',{dataset_id:this.ProjectID, fid:this.fid});
+        reloadDataFileVariables: async function () {
+            var result = await this.$store.dispatch('loadVariables', { dataset_id: this.ProjectID, fid: this.fid });
             this.fetchColumnsDiff();
             return result;
         },
-        sleep: function(ms) {
+        sleep: function (ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
         },
-        getVariableNameByUID: function(uid)
-        {
-            let variable=this.getVariableByUID(uid);
-            if (variable){
+        getVariableNameByUID: function (uid) {
+            let variable = this.getVariableByUID(uid);
+            if (variable) {
                 return variable.name;
             }
         },
-        getVariableByUID: function(uid)
-        {
-            let variable=null;
+        getVariableByUID: function (uid) {
+            let variable = null;
             this.variables.forEach((item) => {
-                if (item.uid==uid){
-                    variable=item;
+                if (item.uid == uid) {
+                    variable = item;
                 }
             });
 
             return variable;
         },
-        getVariableIndexByUID: function(uid)
-        {
-            let idx=-1;
+        getVariableIndexByUID: function (uid) {
+            let idx = -1;
             this.variables.forEach((item, index) => {
-                if (item.uid==uid){
-                    idx=index;
+                if (item.uid == uid) {
+                    idx = index;
                 }
             });
 
             return idx;
         },
-        OnVariableUpdate: function(variable)
-        {
-            if (this.edit_items.length<1){
+        OnVariableUpdate: function (variable) {
+            if (this.edit_items.length < 1) {
                 return;
             }
 
-            for (let i=0;i<this.edit_items.length;i++){
-                Vue.set (this.variables, this.edit_items[i], variable);
+            for (let i = 0; i < this.edit_items.length; i++) {
+                Vue.set(this.variables, this.edit_items[i], variable);
             }
         },
-        onVariableKeydown: function(event,idx,field_name){
+        onVariableKeydown: function (event, idx, field_name) {
             let UP = 38;
             let DOWN = 40;
 
-            if (idx<0 || idx>=this.variables.length){
+            if (idx < 0 || idx >= this.variables.length) {
                 return;
             }
 
-            let mv_idx=idx;
+            let mv_idx = idx;
 
-            if (event.keyCode==UP){
-                mv_idx=idx-1;
-            }else if (event.keyCode==DOWN){
-                mv_idx=idx+1;
+            if (event.keyCode == UP) {
+                mv_idx = idx - 1;
+            } else if (event.keyCode == DOWN) {
+                mv_idx = idx + 1;
             }
-            
-            let el =this.$refs[field_name][mv_idx];
-            if (el){
+
+            let el = this.$refs[field_name][mv_idx];
+            if (el) {
                 this.editVariable(mv_idx);
                 el.focus();
             }
         },
-        onVariableDrag: function(event)
-        {
-            console.log("onVariableDrag",event);
+        onVariableDrag: function (event) {
+            console.log("onVariableDrag", event);
 
             this.editVariable(event.newIndex);
-            
-            let sorted_variables=[];
-            let vm=this;
-                        
+
+            let sorted_variables = [];
+            let vm = this;
+
             this.variables.forEach((item, index) => {
-                sorted_variables.push(item.uid);                
+                sorted_variables.push(item.uid);
             });
 
-            console.log("sorted_variables",JSON.stringify(sorted_variables));
+            console.log("sorted_variables", JSON.stringify(sorted_variables));
             this.updateVariablesOrder(sorted_variables);
         },
-        updateVariablesOrder: function(sorted_variables)
-        {
-            let vm=this;
+        updateVariablesOrder: function (sorted_variables) {
+            let vm = this;
             let formData = {
-                "sorted_uid":sorted_variables
+                "sorted_uid": sorted_variables
             }
 
-            let url=CI.base_url + '/api/variables/order/'+this.ProjectID + '/' + this.fid;
-            axios.post(url, formData,{
+            let url = CI.base_url + '/api/variables/order/' + this.ProjectID + '/' + this.fid;
+            axios.post(url, formData, {
                 headers: {
                     'Content-Type': 'application/json'
-                    }
-            }).then(function(response) {
-                console.log("variables order updated",response);                
+                }
+            }).then(function (response) {
+                console.log("variables order updated", response);
             })
-            .catch(function(response) {
-                alert("Error updateVariablesOrder");
-                console.log("updateVariablesOrder error",response);
-            });
+                .catch(function (response) {
+                    alert("Error updateVariablesOrder");
+                    console.log("updateVariablesOrder error", response);
+                });
         }
 
     },
     computed: {
-        ProjectID(){
+        ProjectID() {
             return this.$store.state.project_id;
         },
-        isSingleVariableSelected: function()
-        {
-            if (this.edit_items.length==1){
+        isSingleVariableSelected: function () {
+            if (this.edit_items.length == 1) {
                 return true;
             }
             return false;
         },
-        getSelectionLastVariableIndex: function(){
-            return this.edit_items[this.edit_items.length -1];
+        getSelectionLastVariableIndex: function () {
+            return this.edit_items[this.edit_items.length - 1];
         },
-        SingleVariableIndex: function()
-        {
-            if (this.edit_items.length==1){
+        SingleVariableIndex: function () {
+            if (this.edit_items.length == 1) {
                 return this.edit_items[0];
             }
         },
-        activeVariable: function()
-        {
+        activeVariable: function () {
 
-            if (this.edit_items.length>1){
+            if (this.edit_items.length > 1) {
                 return this.variableMultiple;
             }
 
             //for single variable selected
-            if (this.edit_items.length==1){
-                let variable_= this.variables[this.edit_items[0]];
-                if (variable_ && !variable_.var_invalrng){
+            if (this.edit_items.length == 1) {
+                let variable_ = this.variables[this.edit_items[0]];
+                if (variable_ && !variable_.var_invalrng) {
                     Vue.set(variable_, 'var_invalrng', {
-                        "values":[]
+                        "values": []
                     });
                 }
                 return variable_;
             }
-        },        
-        selectedVariables: function(){
-            let variables=[];
-            this.edit_items.forEach((variable_idx)=>{
+        },
+        selectedVariables: function () {
+            let variables = [];
+            this.edit_items.forEach((variable_idx) => {
                 variables.push(this.variables[variable_idx]);
             });
             return variables;
         },
-        MaxVariableID(){
+        MaxVariableID() {
             return this.$store.getters["getMaxVariableId"];
         },
-        variables(){    
-            vars=this.$store.getters.getVariablesByFid(this.fid);
-            
-            if (vars==undefined){
+        variables() {
+            vars = this.$store.getters.getVariablesByFid(this.fid);
+
+            if (vars == undefined) {
                 return [];
             }
 
-            if (this.variable_search!==''){
+            if (this.variable_search !== '') {
                 let tmpVars = vars;
-        
+
                 tmpVars = tmpVars.filter((item) => {
                     return (item.name + item.labl)
                         .toUpperCase()
                         .includes(this.variable_search.toUpperCase())
                 })
-                
+
                 return tmpVars;
             }
 
-            if (!Array.isArray(vars)){
+            if (!Array.isArray(vars)) {
                 return [];
             }
 
             return vars;
         },
-        variablesAllForFile(){
+        variablesAllForFile() {
             var vars = this.$store.getters.getVariablesByFid(this.fid);
             return Array.isArray(vars) ? vars : [];
         },
-        columnsDiffCount(){
+        columnsDiffCount() {
             if (!this.columns_diff || this.columns_diff.in_sync) return 0;
             var count = 0;
             if (this.columns_diff.columns_in_db_not_in_csv && this.columns_diff.columns_in_db_not_in_csv.length) {
@@ -1079,12 +1114,12 @@ Vue.component('variables', {
             }
             return count;
         },
-        validationIssueCount(){
+        validationIssueCount() {
             var c = this.columnsDiffCount || 0;
             var n = Array.isArray(this.invalid_names) ? this.invalid_names.length : 0;
             return c + n;
         },
-        columnsDiffTooltip(){
+        columnsDiffTooltip() {
             if (!this.columns_diff || this.columns_diff.in_sync) return '';
 
             var count = 0;
@@ -1096,7 +1131,7 @@ Vue.component('variables', {
             var msg = this.$t('variables_vs_csv_mismatch_tooltip');
             return msg + " (" + count + ")";
         },
-        validationTooltip(){
+        validationTooltip() {
             var parts = [];
             if (this.columnsDiffCount > 0) {
                 parts.push((this.$t('variables_vs_csv_mismatch_tooltip') || 'Sync issues') + ' (' + this.columnsDiffCount + ')');
@@ -1106,36 +1141,36 @@ Vue.component('variables', {
             }
             return parts.length ? parts.join('; ') : '';
         },
-        duplicateVariableNamesCount(){
+        duplicateVariableNamesCount() {
             return Object.keys(this.duplicateVariableNames).length;
         },
-        duplicateVariableNames(){
-            let names={};
-            
-            if (Array.isArray(this.variables)==false){
+        duplicateVariableNames() {
+            let names = {};
+
+            if (Array.isArray(this.variables) == false) {
                 return names;
             }
 
-            this.variables.forEach((variable)=>{
-                let name=variable.name;
+            this.variables.forEach((variable) => {
+                let name = variable.name;
 
-                if (!name){
+                if (!name) {
                     return;
                 }
 
                 //lowercase variable names and trim
-                name=name.toLowerCase().trim();
+                name = name.toLowerCase().trim();
 
-                if (names[name]){
+                if (names[name]) {
                     names[name]++;
-                }else{
-                names[name]=1;
+                } else {
+                    names[name] = 1;
                 }
             });
 
             //only return names that are duplicated
-            for (let name in names){
-                if (names[name]==1){
+            for (let name in names) {
+                if (names[name] == 1) {
                     delete names[name];
                 }
             }
@@ -1220,6 +1255,12 @@ Vue.component('variables', {
                                         <span v-show="variablesAllForFile.length > 0" class="ml-2">
                                             <span @click="exportDictionaryCsv" :title="$t('export_data_dictionary')">
                                                 <v-icon aria-hidden="false" class="var-icon">mdi-book-open-variant</v-icon>
+                                            </span>
+                                            <span @click="exportVariableDocumentationCsv" :title="$t('export_variable_documentation')">
+                                                <v-icon aria-hidden="false" class="var-icon">mdi-file-document-outline</v-icon>
+                                            </span>
+                                            <span @click="openImportVariableDocumentationDialog" :title="$t('import_variable_documentation')">
+                                                <v-icon aria-hidden="false" class="var-icon">mdi-file-upload-outline</v-icon>
                                             </span>
                                             <span @click="batchSumStatsOptionsDialog = true" :title="$t('batch_sum_stats_options')">
                                                 <v-icon aria-hidden="false" class="var-icon">mdi-tune-variant</v-icon>
@@ -1373,6 +1414,44 @@ Vue.component('variables', {
                         <v-spacer></v-spacer>
                         <v-btn color="primary" text @click="renameErrorDialog = false">
                             {{ $t('ok') || 'OK' }}
+                        </v-btn>
+                    </v-card-actions>
+                </v-card>
+            </v-dialog>
+
+            <v-dialog v-model="dialog_import_variable_documentation.show" max-width="500" persistent>
+                <v-card>
+                    <v-card-title class="text-h6 grey lighten-2">
+                        {{$t("import_variable_documentation")}}
+                    </v-card-title>
+                    <v-card-text>
+                        <p class="mb-3">{{$t("import_variable_documentation_help")}}</p>
+                        <v-file-input
+                            v-model="dialog_import_variable_documentation.selected_file"
+                            accept=".csv,text/csv"
+                            label=""
+                            outlined
+                            truncate-length="50"
+                            dense
+                            clearable
+                            prepend-icon=""
+                            prepend-inner-icon="mdi-paperclip"
+                            show-size
+                        ></v-file-input>
+                        <div class="alert alert-success mt-3" v-if="dialog_import_variable_documentation.message_success">
+                            {{dialog_import_variable_documentation.message_success}}
+                        </div>
+                        <div class="alert alert-danger mt-3" v-if="dialog_import_variable_documentation.message_error">
+                            {{dialog_import_variable_documentation.message_error}}
+                        </div>
+                    </v-card-text>
+                    <v-card-actions>
+                        <v-spacer></v-spacer>
+                        <v-btn small text @click="dialog_import_variable_documentation.show = false" :disabled="dialog_import_variable_documentation.uploading">
+                            {{$t("close")}}
+                        </v-btn>
+                        <v-btn small color="primary" @click="submitImportVariableDocumentation" :loading="dialog_import_variable_documentation.uploading">
+                            {{$t("import")}}
                         </v-btn>
                     </v-card-actions>
                 </v-card>

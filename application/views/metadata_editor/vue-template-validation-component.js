@@ -1,19 +1,19 @@
 /// Template validation component
 Vue.component('template-validation-component', {
-    data () {
+    data() {
         return {
-          validation_errors: "",
-          schema_validation: null,
-          variables_validation: null,
-          variables_validation_errors: "",
-          template_idx:-1,
-          template_validation:[],
-          validation_report:[],
-          validation_delay_ms: 2000,
-          validation_debounce_ms: 600
+            validation_errors: "",
+            schema_validation: null,
+            variables_validation: null,
+            variables_validation_errors: "",
+            template_idx: -1,
+            template_validation: [],
+            validation_report: [],
+            validation_delay_ms: 2000,
+            validation_debounce_ms: 600
         }
-      },
-    watch:{
+    },
+    watch: {
         ProjectMetadata: {
             immediate: true,
             handler: function (val, oldVal) {
@@ -30,7 +30,7 @@ Vue.component('template-validation-component', {
             }
         }
     },
-    created: function() {
+    created: function () {
         var vm = this;
         var debounceMs = vm.validation_debounce_ms || 600;
         this.runValidationDebounced = typeof _.debounce === 'function'
@@ -43,60 +43,58 @@ Vue.component('template-validation-component', {
                 vm.projectValidationReport();
             };
     },
-    beforeDestroy: function() {
+    beforeDestroy: function () {
         if (this._validationDelayTimer) {
             clearTimeout(this._validationDelayTimer);
         }
     },
     computed: {
-        ProjectID(){
+        ProjectID() {
             return this.$store.state.project_id;
         },
-        ProjectIDNo(){
+        ProjectIDNo() {
             return this.$store.state.idno;
         },
-        ProjectTemplates()
-        {
+        ProjectTemplates() {
             return this.$store.state.templates;
         },
-        ProjectTemplate()
-        {
+        ProjectTemplate() {
             return this.$store.state.formTemplate;
         },
-        projectTemplateUID(){
+        projectTemplateUID() {
             return this.$store.state.formTemplate.uid;
         },
         projectTemplateSelectedIndex: {
             get: function () {
-                if (this.template_idx>-1){
+                if (this.template_idx > -1) {
                     return this.template_idx;
                 }
 
-                let templates=this.ProjectTemplates;
-                let idx=-1;
-                for(let i=0;i<templates.length;i++){
-                    if(templates[i].uid==this.projectTemplateUID){
-                        idx=i;
+                let templates = this.ProjectTemplates;
+                let idx = -1;
+                for (let i = 0; i < templates.length; i++) {
+                    if (templates[i].uid == this.projectTemplateUID) {
+                        idx = i;
                         break;
                     }
-                }                
+                }
                 return idx;
             },
             set: function (newValue) {
                 this.template_idx = newValue;
             }
         },
-        ProjectType(state){
+        ProjectType(state) {
             return this.$store.state.project_type;
         },
-        ProjectMetadata(){
+        ProjectMetadata() {
             return this.$store.state.formData;
         },
-        TemplateValidationErrors(){
-            let errors=[];
+        TemplateValidationErrors() {
+            let errors = [];
             //check validation_report for errors
-            for(let i=0;i<this.validation_report.length;i++){
-                if (!this.validation_report[i].result.valid){
+            for (let i = 0; i < this.validation_report.length; i++) {
+                if (!this.validation_report[i].result.valid) {
                     errors.push(this.validation_report[i]);
                 }
             }
@@ -109,12 +107,12 @@ Vue.component('template-validation-component', {
             return projectType === 'microdata' || projectType === 'survey';
         }
     },
-    methods:{
-        RefreshValidation: function() {
+    methods: {
+        RefreshValidation: function () {
             this.validateProject();
             this.projectValidationReport();
         },
-        fieldValidationRules: function(item) {
+        fieldValidationRules: function (item) {
             if (!item) {
                 return {};
             }
@@ -127,7 +125,7 @@ Vue.component('template-validation-component', {
             } else if (typeof rules === 'object' && !Array.isArray(rules)) {
                 rules = Object.assign({}, rules);
             }
-            if (item.is_required || item.required) {
+            if (item.is_required) {
                 if (typeof rules === 'string') {
                     if (rules.indexOf('required') === -1) {
                         rules = rules ? ('required|' + rules) : 'required';
@@ -142,7 +140,7 @@ Vue.component('template-validation-component', {
             }
             return rules;
         },
-        hasFieldValidationRules: function(item) {
+        hasFieldValidationRules: function (item) {
             var rules = this.fieldValidationRules(item);
             if (!rules) {
                 return false;
@@ -155,25 +153,25 @@ Vue.component('template-validation-component', {
             }
             return Object.keys(rules).length > 0;
         },
-        navigateToValidationReport: function() {
+        navigateToValidationReport: function () {
             this.$router.push('/validation-report');
         },
-        navigateToFullValidationReport: function() {
+        navigateToFullValidationReport: function () {
             this.$router.push('/validation-report');
         },
-        navigateToError: function(key, variableFid){
-            let vm=this;
-            let key_parts=key.split("[");
+        navigateToError: function (key, variableFid) {
+            let vm = this;
+            let key_parts = key.split("[");
 
             //variables
-            if (key.startsWith("variables") || variableFid){
+            if (key.startsWith("variables") || variableFid) {
                 // Use variable_fid if provided, otherwise extract from path
                 let fileId = variableFid;
-                
+
                 if (!fileId && key.startsWith("variables")) {
                     // Extract file ID from path (format: variables/{fid}/... or /variables/{fid}/...)
                     let pathParts = key.split('/');
-                    
+
                     // Find the file ID (F1, F2, etc.) in the path
                     for (let i = 0; i < pathParts.length; i++) {
                         // File IDs typically start with 'F' followed by a number
@@ -183,7 +181,7 @@ Vue.component('template-validation-component', {
                         }
                     }
                 }
-                
+
                 if (fileId) {
                     store.commit('tree_active_node_path', 'variables/' + fileId);
                     this.$router.push('/variables/' + fileId);
@@ -195,240 +193,240 @@ Vue.component('template-validation-component', {
                 return;
             }
 
-            store.commit('tree_active_node_path',key_parts[0]);
+            store.commit('tree_active_node_path', key_parts[0]);
             this.$router.push('/study/' + key_parts[0]);
         },
-        projectValidationReport: async function() 
-        {
-            let vm=this;
-            let validation_report=[];
-            this.validation_report=[];
+        projectValidationReport: async function () {
+            let vm = this;
+            let validation_report = [];
+            this.validation_report = [];
 
             //recursively walk through template items and validate
-            async function walkTemplate(item, metadata){
-                
-                if (item.hasOwnProperty("is_custom")){
+            async function walkTemplate(item, metadata) {
+
+                if (item.hasOwnProperty("is_custom")) {
                     return;
                 }
 
-                if(vm.hasFieldValidationRules(item)){
-                    let value=_.get(metadata, item.key, null);
+                if (vm.hasFieldValidationRules(item)) {
+                    let value = _.get(metadata, item.key, null);
 
-                    VeeValidate.validate(value, vm.fieldValidationRules(item), {name:item.title}).then(result => {
-                        if (item.prop_key){
-                            validation_report[item.prop_key]=result;
-                            vm.validation_report.push({key:item.prop_key, item:item, result:result, value:value});
-                        }else{
-                            validation_report[item.key]=result;
-                            vm.validation_report.push({key:item.key, item:item, result:result, value:value});
+                    VeeValidate.validate(value, vm.fieldValidationRules(item), { name: item.title }).then(result => {
+                        if (item.prop_key) {
+                            validation_report[item.prop_key] = result;
+                            vm.validation_report.push({ key: item.prop_key, item: item, result: result, value: value });
+                        } else {
+                            validation_report[item.key] = result;
+                            vm.validation_report.push({ key: item.key, item: item, result: result, value: value });
                         }
                         //console.log("validation-report",item.key,validation_report);
-                      });
+                    });
                 }
 
-                if(item.hasOwnProperty("items")){
-                    for(let i=0;i<item.items.length;i++){
-                        walkTemplate(item.items[i], metadata);                        
+                if (item.hasOwnProperty("items")) {
+                    for (let i = 0; i < item.items.length; i++) {
+                        walkTemplate(item.items[i], metadata);
                     }
                 }
 
-                if (item.hasOwnProperty("props")){
-                    let itemMetadata=_.get(metadata, item.key, null);
+                if (item.hasOwnProperty("props")) {
+                    let itemMetadata = _.get(metadata, item.key, null);
 
-                    if (itemMetadata==null){
+                    if (itemMetadata == null) {
                         return;
                     }
 
-                    for (let k=0;k<itemMetadata.length;k++){
-                        for(let i=0;i<item.props.length;i++){
-                            let propMetadata=_.get(itemMetadata[k], item.props[i].key, null);
-                            walkTemplateProp(item.props[i], propMetadata, item.key+"["+k+"]");
+                    for (let k = 0; k < itemMetadata.length; k++) {
+                        for (let i = 0; i < item.props.length; i++) {
+                            let propMetadata = _.get(itemMetadata[k], item.props[i].key, null);
+                            walkTemplateProp(item.props[i], propMetadata, item.key + "[" + k + "]");
                         }
                     }
                 }
             }
 
-            function walkTemplateProp(item, metadata, item_path=null){
-                if(vm.hasFieldValidationRules(item)){
+            function walkTemplateProp(item, metadata, item_path = null) {
+                if (vm.hasFieldValidationRules(item)) {
                     //for props metadata is single prop value
-                    let value=metadata;                    
-                    
-                    VeeValidate.validate(value, vm.fieldValidationRules(item),{name:item.title}).then(result => {
-                        if (item.prop_key){
-                            if (item_path!=null){
+                    let value = metadata;
+
+                    VeeValidate.validate(value, vm.fieldValidationRules(item), { name: item.title }).then(result => {
+                        if (item.prop_key) {
+                            if (item_path != null) {
 
                                 vm.validation_report.push({
-                                    key:item_path + "." + item.key,
-                                    item:item,
-                                    result:result,
-                                    value:JSON.stringify(value)
+                                    key: item_path + "." + item.key,
+                                    item: item,
+                                    result: result,
+                                    value: JSON.stringify(value)
                                 });
 
-                                validation_report[item_path]={
-                                    result:result,
-                                    item:item,
-                                    value:JSON.stringify(value)};
-                            }else{
-                                validation_report[item.prop_key]=result;
+                                validation_report[item_path] = {
+                                    result: result,
+                                    item: item,
+                                    value: JSON.stringify(value)
+                                };
+                            } else {
+                                validation_report[item.prop_key] = result;
                                 vm.validation_report.push({
-                                    key:item.prop_key, 
-                                    item:item,
-                                    result:result,
-                                    value:JSON.stringify(value)
+                                    key: item.prop_key,
+                                    item: item,
+                                    result: result,
+                                    value: JSON.stringify(value)
                                 });
                             }
-                        }else{
-                            validation_report[item.key]=result;
+                        } else {
+                            validation_report[item.key] = result;
                             vm.validation_report.push({
-                                key:item.key, 
-                                item:item,
-                                result:result,
-                                value:JSON.stringify(value)
+                                key: item.key,
+                                item: item,
+                                result: result,
+                                value: JSON.stringify(value)
                             });
                         }
                         //console.log("validation-report-prop",item.key,validation_report);
-                      });
+                    });
                 }
 
-                if(item.hasOwnProperty("items")){
-                    for(let i=0;i<item.items.length;i++){
-                        walkTemplate(item.items[i], metadata);                        
+                if (item.hasOwnProperty("items")) {
+                    for (let i = 0; i < item.items.length; i++) {
+                        walkTemplate(item.items[i], metadata);
                     }
                 }
 
-                if (item.hasOwnProperty("props")){
-                    let itemMetadata=metadata;                    
+                if (item.hasOwnProperty("props")) {
+                    let itemMetadata = metadata;
 
-                    if (itemMetadata==null){                        
+                    if (itemMetadata == null) {
                         return;
                     }
 
-                    for (let k=0;k<itemMetadata.length;k++){
-                        for(let i=0;i<item.props.length;i++){
-                            let propMetadata=_.get(itemMetadata[k], item.props[i].key, null);
-                            walkTemplateProp(item.props[i], propMetadata, item_path + "." + item.props[i].key + "["+k+"]");
+                    for (let k = 0; k < itemMetadata.length; k++) {
+                        for (let i = 0; i < item.props.length; i++) {
+                            let propMetadata = _.get(itemMetadata[k], item.props[i].key, null);
+                            walkTemplateProp(item.props[i], propMetadata, item_path + "." + item.props[i].key + "[" + k + "]");
                         }
                     }
 
                 }
             }
-            
+
             //validate
             walkTemplate(this.ProjectTemplate.template, this.ProjectMetadata);
-        },        
-        validateProject: function() {
-            let vm=this;
-            this.validation_errors="";
+        },
+        validateProject: function () {
+            let vm = this;
+            this.validation_errors = "";
             this.schema_validation = null;
             this.variables_validation = null;
             this.variables_validation_errors = "";
-            
+
             // Always load schema validation
-            let schemaUrl = CI.base_url + '/api/validation/'+this.ProjectID+'/schema';
+            let schemaUrl = CI.base_url + '/api/validation/' + this.ProjectID + '/schema';
             axios.get(schemaUrl)
-            .then(function (response) {
-                if(response.data && response.data.status === 'success') {
-                    const validation = response.data.validation;
-                    vm.schema_validation = validation;
-                    
-                    // Convert validation.issues to the format expected by the template
-                    if (!validation.valid && validation.issues && validation.issues.length > 0) {
-                        vm.validation_errors = {
-                            errors: validation.issues.map(issue => {
-                                // Convert JSON Pointer path to dot notation for editor navigation
-                                // e.g., /study_desc/title_statement/title -> study_desc.title_statement.title
-                                let propertyPath = issue.path || issue.property || '';
-                                if (propertyPath && propertyPath.startsWith('/')) {
-                                    // Remove leading slash and replace slashes with dots
-                                    propertyPath = propertyPath.substring(1).replace(/\//g, '.');
-                                }
-                                
-                                return {
-                                    property: propertyPath,
-                                    message: issue.message || '',
-                                    type: issue.type || 'validation_error',
-                                    constraint: issue.constraint || null,
-                                    expected_type: issue.expected_type || null,
-                                    actual_type: issue.actual_type || null
-                                };
-                            })
-                        };
-                    } else {
-                        // No errors - clear validation_errors
-                        vm.validation_errors = "";
-                    }
-                    console.log("schema validation response", response);
-                } else {
-                    vm.validation_errors = "";
-                }
-            })
-            .catch(function (error) {
-                console.log("schema validation errors", error);
-                // Handle error response from API
-                if (error.response && error.response.data) {
-                    // If API returns structured error, use it
-                    vm.validation_errors = error.response.data;
-                } else {
-                    // Generic error
-                    vm.validation_errors = {
-                        errors: [{
-                            property: '',
-                            message: error.message || 'Failed to load schema validation'
-                        }]
-                    };
-                }
-            });
-            
-            if (this.isMicrodataProject) {
-                let variablesUrl = CI.base_url + '/api/validation/'+this.ProjectID+'/variables?limit=5&mode=light';
-                
-                axios.get(variablesUrl)
                 .then(function (response) {
-                    if(response.data && response.data.status === 'success') {
+                    if (response.data && response.data.status === 'success') {
                         const validation = response.data.validation;
-                        vm.variables_validation = validation;
-                        
+                        vm.schema_validation = validation;
+
                         // Convert validation.issues to the format expected by the template
                         if (!validation.valid && validation.issues && validation.issues.length > 0) {
-                            vm.variables_validation_errors = {
+                            vm.validation_errors = {
                                 errors: validation.issues.map(issue => {
-                                    // For variables, path is like 'variables/{fid}/{property}'
+                                    // Convert JSON Pointer path to dot notation for editor navigation
+                                    // e.g., /study_desc/title_statement/title -> study_desc.title_statement.title
                                     let propertyPath = issue.path || issue.property || '';
-                                    
+                                    if (propertyPath && propertyPath.startsWith('/')) {
+                                        // Remove leading slash and replace slashes with dots
+                                        propertyPath = propertyPath.substring(1).replace(/\//g, '.');
+                                    }
+
                                     return {
                                         property: propertyPath,
                                         message: issue.message || '',
                                         type: issue.type || 'validation_error',
                                         constraint: issue.constraint || null,
-                                        variable_fid: issue.variable_fid || null,
-                                        variable_name: issue.variable_name || null
+                                        expected_type: issue.expected_type || null,
+                                        actual_type: issue.actual_type || null
                                     };
                                 })
                             };
                         } else {
-                            // No errors - clear variables_validation_errors
-                            vm.variables_validation_errors = "";
+                            // No errors - clear validation_errors
+                            vm.validation_errors = "";
                         }
-                        console.log("variables validation response", response);
+                        console.log("schema validation response", response);
                     } else {
-                        vm.variables_validation_errors = "";
+                        vm.validation_errors = "";
                     }
                 })
                 .catch(function (error) {
-                    console.log("variables validation errors", error);
-                    // Don't show error if project is not microdata type (400 error is expected for non-microdata)
-                    if (error.response && error.response.status !== 400) {
-                        vm.variables_validation_errors = {
+                    console.log("schema validation errors", error);
+                    // Handle error response from API
+                    if (error.response && error.response.data) {
+                        // If API returns structured error, use it
+                        vm.validation_errors = error.response.data;
+                    } else {
+                        // Generic error
+                        vm.validation_errors = {
                             errors: [{
                                 property: '',
-                                message: error.response?.data?.message || error.message || 'Failed to load variables validation'
+                                message: error.message || 'Failed to load schema validation'
                             }]
                         };
                     }
                 });
+
+            if (this.isMicrodataProject) {
+                let variablesUrl = CI.base_url + '/api/validation/' + this.ProjectID + '/variables?limit=5&mode=light';
+
+                axios.get(variablesUrl)
+                    .then(function (response) {
+                        if (response.data && response.data.status === 'success') {
+                            const validation = response.data.validation;
+                            vm.variables_validation = validation;
+
+                            // Convert validation.issues to the format expected by the template
+                            if (!validation.valid && validation.issues && validation.issues.length > 0) {
+                                vm.variables_validation_errors = {
+                                    errors: validation.issues.map(issue => {
+                                        // For variables, path is like 'variables/{fid}/{property}'
+                                        let propertyPath = issue.path || issue.property || '';
+
+                                        return {
+                                            property: propertyPath,
+                                            message: issue.message || '',
+                                            type: issue.type || 'validation_error',
+                                            constraint: issue.constraint || null,
+                                            variable_fid: issue.variable_fid || null,
+                                            variable_name: issue.variable_name || null
+                                        };
+                                    })
+                                };
+                            } else {
+                                // No errors - clear variables_validation_errors
+                                vm.variables_validation_errors = "";
+                            }
+                            console.log("variables validation response", response);
+                        } else {
+                            vm.variables_validation_errors = "";
+                        }
+                    })
+                    .catch(function (error) {
+                        console.log("variables validation errors", error);
+                        // Don't show error if project is not microdata type (400 error is expected for non-microdata)
+                        if (error.response && error.response.status !== 400) {
+                            vm.variables_validation_errors = {
+                                errors: [{
+                                    property: '',
+                                    message: error.response?.data?.message || error.message || 'Failed to load variables validation'
+                                }]
+                            };
+                        }
+                    });
             }
         }
-    },     
+    },
     template: `
             <div class="summary-template-validation-component">
 
@@ -551,6 +549,6 @@ Vue.component('template-validation-component', {
                     </v-card-actions>
                 </v-card>
             </div>          
-            `    
+            `
 });
 
