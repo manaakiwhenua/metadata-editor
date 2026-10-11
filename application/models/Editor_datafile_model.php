@@ -12,15 +12,16 @@ use League\Csv\Reader;
  * Editor datafile model for microdata
  * 
  */
-class Editor_datafile_model extends CI_Model {
+class Editor_datafile_model extends CI_Model
+{
 
-	private $data_file_fields=array(
+	private $data_file_fields = array(
 		'id',
 		'sid',
 		'file_id',
 		'file_physical_name',
 		'file_name',
-		'description', 
+		'description',
 		'case_count',
 		'var_count',
 		'producer',
@@ -42,18 +43,18 @@ class Editor_datafile_model extends CI_Model {
 		'created_by',
 		'changed_by'
 	);
-		
 
-	private $encoded_fields=array(
+
+	private $encoded_fields = array(
 		"metadata"
 	);
 
- 
-    public function __construct()
-    {
+
+	public function __construct()
+	{
 		parent::__construct();
 		$this->load->helper("Array");
-		$this->load->library("form_validation");		
+		$this->load->library("form_validation");
 		$this->load->model("Editor_model");
 		$this->load->model("Editor_resource_model");
 	}
@@ -91,7 +92,7 @@ class Editor_datafile_model extends CI_Model {
 
 	/**
 	 * 
-	 * Create new data file by uploading a data file (csv, dta, sav)
+	 * Create new data file by uploading a data file (csv, dta, sav, or zip)
 	 *
 	 * Provide either a standard multipart field `file` or a completed resumable `upload_id`, not both.
 	 *
@@ -100,7 +101,7 @@ class Editor_datafile_model extends CI_Model {
 	 * NULL. Omitted keys are left unchanged when overwriting an existing file row.
 	 * 
 	 */
-	function upload_create($sid,$overwrite=false, $store_data=null,$user_id=null,$upload_id=null,$metadata=null)
+	function upload_create($sid, $overwrite = false, $store_data = null, $user_id = null, $upload_id = null, $metadata = null)
 	{
 		$metadata = is_array($metadata) ? $metadata : array();
 		$meta_patch = $this->normalize_datafile_upload_metadata($metadata);
@@ -114,52 +115,62 @@ class Editor_datafile_model extends CI_Model {
 			throw new Exception("File upload is required, or provide upload_id after completing a chunked upload.");
 		}
 
+		$upload_info = null;
+		$incoming_name = null;
+
 		if ($upload_id !== '') {
 			$this->load->library('Resumable_upload', null, 'uploader');
 			$upload_info = $this->uploader->get_completed_upload($upload_id);
 			if (!$upload_info) {
 				throw new Exception("Resumable upload not found or not complete. Upload all chunks before registering the data file.");
 			}
-			// Must use sanitized `filename` (not original_filename): that is what move_resumable_upload
-			// stores on disk and what we persist as file_name. Using original broke duplicate detection
-			// when sanitize_filename() changed the basename (e.g. spaces → underscores).
-			$datafile_info = $this->data_file_by_name($sid, $this->filename_part($upload_info['filename']));
-			// Also match legacy rows created before that fix (file_name from original basename).
-			if (!$datafile_info && isset($upload_info['original_filename'])) {
-				$by_original = $this->data_file_by_name($sid, $this->filename_part($upload_info['original_filename']));
-				if ($by_original) {
-					$datafile_info = $by_original;
-				}
-			}
+			$incoming_name = $upload_info['filename'];
 		} else {
-			$datafile_info = $this->check_uploaded_file_exists($sid);
-			$upload_info = null;
+			$incoming_name = isset($_FILES['file']['name']) ? $_FILES['file']['name'] : null;
 		}
 
-		if ($overwrite==false && $datafile_info){
-			throw new Exception("Data file already exists. To overwrite, use the overwrite parameter.");
-		}
-		
-		// If overwrite is true and file exists, delete the physical file
-		if ($overwrite==true && $datafile_info){
-			$this->delete_physical_file($sid, $datafile_info['file_id']);
+		$incoming_ext = $incoming_name ? strtolower(pathinfo($incoming_name, PATHINFO_EXTENSION)) : '';
+		$is_zip_upload = ($incoming_ext === 'zip');
+
+		$datafile_info = null;
+		if (!$is_zip_upload) {
+			if ($upload_id !== '') {
+				// Must use sanitized `filename` (not original_filename): that is what move_resumable_upload
+				// stores on disk and what we persist as file_name. Using original broke duplicate detection
+				// when sanitize_filename() changed the basename (e.g. spaces → underscores).
+				$datafile_info = $this->data_file_by_name($sid, $this->filename_part($upload_info['filename']));
+				// Also match legacy rows created before that fix (file_name from original basename).
+				if (!$datafile_info && isset($upload_info['original_filename'])) {
+					$by_original = $this->data_file_by_name($sid, $this->filename_part($upload_info['original_filename']));
+					if ($by_original) {
+						$datafile_info = $by_original;
+					}
+				}
+			} else {
+				$datafile_info = $this->check_uploaded_file_exists($sid);
+			}
+
+			if ($overwrite == false && $datafile_info) {
+				throw new Exception("Data file already exists. To overwrite, use the overwrite parameter.");
+			}
+
+			if ($overwrite == true && $datafile_info) {
+				$this->delete_physical_file($sid, $datafile_info['file_id']);
+			}
 		}
 
 		if ($upload_id !== '') {
 			$upload_result = $this->Editor_resource_model->move_resumable_upload($sid, 'data', $upload_id);
 		} else {
-			$upload_result = $this->Editor_resource_model->upload_file($sid,$file_type='data',$file_field_name='file', $remove_spaces=false);
+			$upload_result = $this->Editor_resource_model->upload_file($sid, $file_type = 'data', $file_field_name = 'file', $remove_spaces = false);
 		}
-		$uploaded_file_name=$upload_result['file_name'];
-		$uploaded_path=$upload_result['full_path'];
+		$uploaded_file_name = $upload_result['file_name'];
+		$uploaded_path = $upload_result['full_path'];
 
-		// Validate uploaded file name
-		validate_filename($uploaded_file_name, 200);
-
-		if ($store_data=='store'){
-			$store_data=1;
-		}else {
-			$store_data=0;
+		if ($store_data == 'store') {
+			$store_data = 1;
+		} else {
+			$store_data = 0;
 		}
 
 		$original_client_name = null;
@@ -169,118 +180,253 @@ class Editor_datafile_model extends CI_Model {
 			$original_client_name = $_FILES['file']['name'];
 		}
 
+		$uploaded_ext = strtolower(pathinfo($uploaded_file_name, PATHINFO_EXTENSION));
+		if ($uploaded_ext === 'zip') {
+			return $this->upload_create_from_zip(
+				$sid,
+				$uploaded_path,
+				$uploaded_file_name,
+				$overwrite,
+				$store_data,
+				$user_id,
+				$meta_patch,
+				$original_client_name
+			);
+		}
+
+		validate_filename($uploaded_file_name, 200);
+
 		$source_fields = $this->source_fields_from_upload(
 			$uploaded_file_name,
 			$original_client_name,
 			$user_id
 		);
 
-		if (!$datafile_info){
-			//create data file
-			$options=array(
-				'sid'=>$sid,
-				'file_id'=>$this->generate_fileid($sid),
-				'file_physical_name'=>$uploaded_file_name,
-				'file_name'=>$this->filename_part($uploaded_file_name),
-				'wght'=>$this->max_wght($sid)+1,
-				'store_data'=>$store_data,
-				'created_by'=>$user_id,
-				'changed_by'=>$user_id
+		if (!$datafile_info) {
+			$options = array(
+				'sid' => $sid,
+				'file_id' => $this->generate_fileid($sid),
+				'file_physical_name' => $uploaded_file_name,
+				'file_name' => $this->filename_part($uploaded_file_name),
+				'wght' => $this->max_wght($sid) + 1,
+				'store_data' => $store_data,
+				'created_by' => $user_id,
+				'changed_by' => $user_id
 			);
 			$options = array_merge($options, $source_fields);
 			if (!empty($meta_patch)) {
 				$options = array_merge($options, $meta_patch);
 			}
 
-			$result=$this->insert($sid,$options);
-		}else{
-			//update data file
-			$options=array(
-				'file_physical_name'=>$uploaded_file_name,
-				'file_name'=>$this->filename_part($uploaded_file_name),
-				'file_path'=>$uploaded_path,
-				'store_data'=>$store_data,
-				'changed_by'=>$user_id
+			$this->insert($sid, $options);
+		} else {
+			$options = array(
+				'file_physical_name' => $uploaded_file_name,
+				'file_name' => $this->filename_part($uploaded_file_name),
+				'file_path' => $uploaded_path,
+				'store_data' => $store_data,
+				'changed_by' => $user_id
 			);
 			$options = array_merge($options, $source_fields);
 			if (!empty($meta_patch)) {
 				$options = array_merge($options, $meta_patch);
 			}
 
-			$result=$this->update($datafile_info['id'],$options);
+			$this->update($datafile_info['id'], $options);
 		}
 
 		return [
-			'uploaded'=>[
-				'uploaded_file_name'=>$uploaded_file_name,
-				'base64'=>base64_encode($uploaded_file_name),
-				//'uploaded_path'=>$uploaded_path
+			'uploaded' => [
+				'uploaded_file_name' => $uploaded_file_name,
+				'base64' => base64_encode($uploaded_file_name),
 			],
-			'file_id'=>$this->file_id_by_name($sid,$uploaded_file_name)
+			'file_id' => $this->file_id_by_name($sid, $uploaded_file_name),
+			'file_ids' => array($this->file_id_by_name($sid, $uploaded_file_name)),
 		];
+	}
+
+	/**
+	 * Extract supported microdata files from a ZIP and register each as a data file.
+	 *
+	 * @param int $sid
+	 * @param string $zip_path Absolute path to ZIP in project data folder
+	 * @param string $zip_filename Stored ZIP basename
+	 * @param bool|int $overwrite
+	 * @param int $store_data
+	 * @param int|null $user_id
+	 * @param array $meta_patch
+	 * @param string|null $original_client_name
+	 * @return array
+	 */
+	private function upload_create_from_zip($sid, $zip_path, $zip_filename, $overwrite, $store_data, $user_id, array $meta_patch, $original_client_name = null)
+	{
+		$this->load->library('Microdata_zip_processor');
+		$data_folder = dirname($zip_path);
+
+		$scan = $this->microdata_zip_processor->scan($zip_path);
+		if (!$scan['valid']) {
+			@unlink($zip_path);
+			throw new Exception(implode(' ', $scan['errors']));
+		}
+
+		foreach ($scan['files'] as $file) {
+			$existing = $this->data_file_by_name($sid, $file['flat_name']);
+			if ($existing && !$overwrite) {
+				@unlink($zip_path);
+				throw new Exception(
+					"Data file already exists: " . $this->filename_part($file['flat_name']) . ". To overwrite, use the overwrite parameter."
+				);
+			}
+		}
+
+		if ($overwrite) {
+			foreach ($scan['files'] as $file) {
+				$existing = $this->data_file_by_name($sid, $file['flat_name']);
+				if ($existing) {
+					$this->delete_physical_file($sid, $existing['file_id']);
+				}
+			}
+		}
+
+		$extract = $this->microdata_zip_processor->extract($zip_path, $data_folder, $scan['files']);
+		if (!$extract['success']) {
+			$this->microdata_zip_processor->cleanup_files($data_folder, isset($extract['extracted_files']) ? $extract['extracted_files'] : array());
+			if (file_exists($zip_path)) {
+				@unlink($zip_path);
+			}
+			$message = !empty($extract['errors']) ? implode(' ', $extract['errors']) : 'Failed to extract ZIP file.';
+			throw new Exception($message);
+		}
+
+		$file_ids = array();
+		$uploaded_names = array();
+		$wght = $this->max_wght($sid);
+
+		foreach ($extract['extracted_files'] as $flat_name) {
+			$existing = $this->data_file_by_name($sid, $flat_name);
+			$source_fields = $this->source_fields_from_upload(
+				$flat_name,
+				$original_client_name ?: $zip_filename,
+				$user_id
+			);
+
+			if (!$existing) {
+				$wght++;
+				$options = array(
+					'sid' => $sid,
+					'file_id' => $this->generate_fileid($sid),
+					'file_physical_name' => $flat_name,
+					'file_name' => $this->filename_part($flat_name),
+					'wght' => $wght,
+					'store_data' => $store_data,
+					'created_by' => $user_id,
+					'changed_by' => $user_id,
+				);
+				$options = array_merge($options, $source_fields);
+				if (!empty($meta_patch)) {
+					$options = array_merge($options, $meta_patch);
+				}
+				$this->insert($sid, $options);
+			} else {
+				$options = array(
+					'file_physical_name' => $flat_name,
+					'file_name' => $this->filename_part($flat_name),
+					'store_data' => $store_data,
+					'changed_by' => $user_id,
+				);
+				$options = array_merge($options, $source_fields);
+				if (!empty($meta_patch)) {
+					$options = array_merge($options, $meta_patch);
+				}
+				$this->update($existing['id'], $options);
+			}
+
+			$file_id = $this->file_id_by_name($sid, $flat_name);
+			if ($file_id) {
+				$file_ids[] = $file_id;
+				$uploaded_names[] = $flat_name;
+			}
+		}
+
+		if (empty($file_ids)) {
+			throw new Exception('No data files were registered from ZIP archive.');
+		}
+
+		return array(
+			'uploaded' => array(
+				'uploaded_file_name' => $uploaded_names[0],
+				'uploaded_file_names' => $uploaded_names,
+				'base64' => base64_encode($uploaded_names[0]),
+				'extracted_from' => $zip_filename,
+				'skipped_count' => isset($scan['skipped_count']) ? (int) $scan['skipped_count'] : 0,
+			),
+			'file_id' => $file_ids[0],
+			'file_ids' => $file_ids,
+			'extracted_from' => $zip_filename,
+		);
 	}
 
 	function check_uploaded_file_exists($sid)
 	{
-		if (isset($_FILES) && isset($_FILES['file'])){
-			$filename=$_FILES['file']['name'];
-			$filename=$this->filename_part($filename);
-			$exists=$this->data_file_by_name($sid,$filename);
+		if (isset($_FILES) && isset($_FILES['file'])) {
+			$filename = $_FILES['file']['name'];
+			$filename = $this->filename_part($filename);
+			$exists = $this->data_file_by_name($sid, $filename);
 			return $exists;
 		}
 
 		return false;
 	}
-	
-	
+
+
 
 	/**
 	 * 
 	 * Get path to the data physical file
 	 * 
 	 */
-	function get_file_path($sid,$file_id)
+	function get_file_path($sid, $file_id)
 	{
-		$datafile=$this->data_file_by_id($sid,$file_id);
+		$datafile = $this->data_file_by_id($sid, $file_id);
 
-		if (!$datafile){
+		if (!$datafile) {
 			throw new Exception("Data file ID not found: ");
 		}
 
-		$filename=$datafile['file_physical_name'];
+		$filename = $datafile['file_physical_name'];
 
-		if (empty($filename)){
+		if (empty($filename)) {
 			throw new Exception("Data file physical name not found: ");
 		}
 
-		$project_folder_path=$this->Editor_model->get_project_folder($sid).'/data/';
-		$filepath=$project_folder_path.$filename;
+		$project_folder_path = $this->Editor_model->get_project_folder($sid) . '/data/';
+		$filepath = $project_folder_path . $filename;
 
-		if (file_exists($filepath)){
+		if (file_exists($filepath)) {
 			return $filepath;
 		}
 
 		// Resolve CSV path (tries .csv and .CSV for case-sensitive filesystems)
-		$filepath_csv=$this->resolve_csv_path($project_folder_path,$this->filename_part($filename));
-		if ($filepath_csv){
+		$filepath_csv = $this->resolve_csv_path($project_folder_path, $this->filename_part($filename));
+		if ($filepath_csv) {
 			return $filepath_csv;
 		}
 
-		throw new Exception("Data file not found: ".$filepath);
+		throw new Exception("Data file not found: " . $filepath);
 	}
 
 
 	function get_file_csv_path($sid, $file_id)
 	{
-		$files=$this->get_files_info($sid,$file_id);
+		$files = $this->get_files_info($sid, $file_id);
 
-		if (!isset($files['csv'])){
+		if (!isset($files['csv'])) {
 			return false;
 		}
 
-		$csv_path=$files['csv']['filepath'];
+		$csv_path = $files['csv']['filepath'];
 
-		if (!file_exists($csv_path)){
+		if (!file_exists($csv_path)) {
 			return false;
 		}
 
@@ -294,16 +440,15 @@ class Editor_datafile_model extends CI_Model {
 	 */
 	function check_csv_exists($sid, $file_id)
 	{
-		try{
-			$csv_path=$this->get_file_csv_path($sid,$file_id);
-			
-			if (!$csv_path){
+		try {
+			$csv_path = $this->get_file_csv_path($sid, $file_id);
+
+			if (!$csv_path) {
 				return false;
 			}
 
 			return $csv_path;
-		}
-		catch(Exception $e){
+		} catch (Exception $e) {
 			return false;
 		}
 	}
@@ -319,7 +464,7 @@ class Editor_datafile_model extends CI_Model {
 	 * @param bool $include_names Include all variable names from db and csv in the result
 	 * @return array db_variable_names, csv_column_names, columns_to_remove_from_csv, columns_in_db_not_in_csv, in_sync, csv_exists
 	 */
-	function get_columns_out_of_sync($sid, $file_id, $include_names=false)
+	function get_columns_out_of_sync($sid, $file_id, $include_names = false)
 	{
 		$empty_result = array(
 			'db_variable_names' => array(),
@@ -356,15 +501,15 @@ class Editor_datafile_model extends CI_Model {
 		$columns_in_db_not_in_csv = array_values(array_diff($db_names, $csv_names));
 		$in_sync = (count($columns_to_remove_from_csv) === 0 && count($columns_in_db_not_in_csv) === 0);
 
-		$result=array();
+		$result = array();
 
-		if ($include_names){
+		if ($include_names) {
 			$result['db_variable_names'] = $db_names;
 			$result['csv_column_names'] = $csv_names;
 		}
 
 		//merge with result
-		$result=array_merge($result, array(
+		$result = array_merge($result, array(
 			'columns_to_remove_from_csv' => $columns_to_remove_from_csv,
 			'columns_in_db_not_in_csv' => $columns_in_db_not_in_csv,
 			'in_sync' => $in_sync,
@@ -374,35 +519,35 @@ class Editor_datafile_model extends CI_Model {
 		return $result;
 	}
 
-	function get_tmp_file_info($sid,$fid,$type)
+	function get_tmp_file_info($sid, $fid, $type)
 	{
-		$datafile=$this->data_file_by_id($sid,$fid);
+		$datafile = $this->data_file_by_id($sid, $fid);
 
-		if (!$datafile){
+		if (!$datafile) {
 			throw new Exception("Data file ID not found: ");
 		}
 
-		$filename=$datafile['file_physical_name'];
+		$filename = $datafile['file_physical_name'];
 
-		if (empty($filename)){
+		if (empty($filename)) {
 			throw new Exception("Data file not set");
 		}
 
-		$filename=$this->filename_part($filename).'.'.$type;
-		$project_folder_path=$this->Editor_model->get_project_folder($sid).'/data/tmp/';
+		$filename = $this->filename_part($filename) . '.' . $type;
+		$project_folder_path = $this->Editor_model->get_project_folder($sid) . '/data/tmp/';
 
-		if (!file_exists(realpath($project_folder_path.$filename))){
+		if (!file_exists(realpath($project_folder_path . $filename))) {
 			$dirpath = $this->Editor_model->get_project_dirpath($sid);
-			$path_for_message = ($dirpath !== false && $dirpath !== '') ? $dirpath.'/data/tmp/'.$filename : $filename;
-			throw new Exception("Data file not found: ".$path_for_message);
+			$path_for_message = ($dirpath !== false && $dirpath !== '') ? $dirpath . '/data/tmp/' . $filename : $filename;
+			throw new Exception("Data file not found: " . $path_for_message);
 		}
 
 		return [
-			'filename'=>$filename,
-			'filepath'=>$project_folder_path.$filename,				
-			'file_info'=>pathinfo($project_folder_path.$filename),
-			'file_size'=>format_bytes(filesize($project_folder_path.$filename)),
-		];		
+			'filename' => $filename,
+			'filepath' => $project_folder_path . $filename,
+			'file_info' => pathinfo($project_folder_path . $filename),
+			'file_size' => format_bytes(filesize($project_folder_path . $filename)),
+		];
 	}
 
 
@@ -411,61 +556,60 @@ class Editor_datafile_model extends CI_Model {
 	 * Get path for data original + csv file
 	 * 
 	 */
-	function get_files_info($sid,$file_id)
+	function get_files_info($sid, $file_id)
 	{
-		$datafile=$this->data_file_by_id($sid,$file_id);
+		$datafile = $this->data_file_by_id($sid, $file_id);
 
-		if (!$datafile){
+		if (!$datafile) {
 			throw new Exception("Data file ID not found: ");
 		}
 
-		$filename=$datafile['file_physical_name'];		
+		$filename = $datafile['file_physical_name'];
 
-		if (empty($filename)){
-			return[
-			];
+		if (empty($filename)) {
+			return [];
 		}
 
-		$project_folder_path=$this->Editor_model->get_project_folder($sid).'/data/';
-		$original_path=$project_folder_path.$filename;
+		$project_folder_path = $this->Editor_model->get_project_folder($sid) . '/data/';
+		$original_path = $project_folder_path . $filename;
 
 		// CSV path: if uploaded file is already CSV (any case), use its exact path so case-sensitive filesystems find it
-		$is_original_csv=(strtolower($this->get_file_extension($filename))==='csv');
-		if ($is_original_csv){
-			$csv_path=$original_path;
-			$csv_filename=$filename;
+		$is_original_csv = (strtolower($this->get_file_extension($filename)) === 'csv');
+		if ($is_original_csv) {
+			$csv_path = $original_path;
+			$csv_filename = $filename;
 		} else {
-			$base=$this->filename_part($filename);
-			$csv_path=$this->resolve_csv_path($project_folder_path,$base);
-			$csv_filename=$csv_path ? basename($csv_path) : $base.'.csv';
+			$base = $this->filename_part($filename);
+			$csv_path = $this->resolve_csv_path($project_folder_path, $base);
+			$csv_filename = $csv_path ? basename($csv_path) : $base . '.csv';
 		}
 
-		$files=array(
-			'original'=>array(
-				'filename'=>$filename,
-				'filepath'=>$original_path,
-				'file_exists'=>file_exists($original_path),
-				'file_info'=>pathinfo($original_path),
+		$files = array(
+			'original' => array(
+				'filename' => $filename,
+				'filepath' => $original_path,
+				'file_exists' => file_exists($original_path),
+				'file_info' => pathinfo($original_path),
 				#'file_size'=>format_bytes(filesize($project_folder_path.$filename)),
 			),
-			'csv'=>array(
-				'filename'=>$csv_filename,
-				'filepath'=>$csv_path ?: $project_folder_path.$this->filename_part($filename).'.csv',
-				'file_exists'=>$csv_path ? file_exists($csv_path) : false,
-				'file_info'=>$csv_path ? pathinfo($csv_path) : pathinfo($project_folder_path.$this->filename_part($filename).'.csv'),
+			'csv' => array(
+				'filename' => $csv_filename,
+				'filepath' => $csv_path ?: $project_folder_path . $this->filename_part($filename) . '.csv',
+				'file_exists' => $csv_path ? file_exists($csv_path) : false,
+				'file_info' => $csv_path ? pathinfo($csv_path) : pathinfo($project_folder_path . $this->filename_part($filename) . '.csv'),
 				#'file_size'=>format_bytes(filesize($project_folder_path.$filename_csv)),
 			)
 		);
 
 		//file sizes
-		if ($files['original']['file_exists']){
-			$files['original']['file_size']=format_bytes(filesize($original_path));
+		if ($files['original']['file_exists']) {
+			$files['original']['file_size'] = format_bytes(filesize($original_path));
 		}
 
-		if ($files['csv']['file_exists']){
-			$files['csv']['file_size']=format_bytes(filesize($files['csv']['filepath']));
+		if ($files['csv']['file_exists']) {
+			$files['csv']['file_size'] = format_bytes(filesize($files['csv']['filepath']));
 		}
-		
+
 		return $files;
 	}
 
@@ -522,8 +666,18 @@ class Editor_datafile_model extends CI_Model {
 		}
 
 		$map = array(
-			104 => 8, 105 => 9, 108 => 10, 114 => 11, 115 => 12,
-			117 => 13, 118 => 14, 119 => 15, 120 => 16, 121 => 17, 122 => 18, 123 => 19,
+			104 => 8,
+			105 => 9,
+			108 => 10,
+			114 => 11,
+			115 => 12,
+			117 => 13,
+			118 => 14,
+			119 => 15,
+			120 => 16,
+			121 => 17,
+			122 => 18,
+			123 => 19,
 		);
 		$n = (int) $release;
 		if ($n <= 0) {
@@ -542,12 +696,12 @@ class Editor_datafile_model extends CI_Model {
 	 * @param string $base Filename without extension
 	 * @return string|null Full path if file exists, null otherwise
 	 */
-	private function resolve_csv_path($dir,$base)
+	private function resolve_csv_path($dir, $base)
 	{
-		$dir=rtrim($dir,'/');
-		foreach (array('.csv','.CSV') as $ext){
-			$path=$dir.'/'.$base.$ext;
-			if (file_exists($path) && is_file($path)){
+		$dir = rtrim($dir, '/');
+		foreach (array('.csv', '.CSV') as $ext) {
+			$path = $dir . '/' . $base . $ext;
+			if (file_exists($path) && is_file($path)) {
 				return $path;
 			}
 		}
@@ -613,55 +767,55 @@ class Editor_datafile_model extends CI_Model {
 	 * Get all data files by project ID
 	 * 
 	 */
-    function select_all($sid, $include_file_info=false)
-    {
-        $this->db->select("*");
-		$this->db->where("sid",$sid);
-		$this->db->order_by('wght','ASC');
-		$this->db->order_by('file_name','ASC');
-		$files=$this->db->get("editor_data_files")->result_array();
+	function select_all($sid, $include_file_info = false)
+	{
+		$this->db->select("*");
+		$this->db->where("sid", $sid);
+		$this->db->order_by('wght', 'ASC');
+		$this->db->order_by('file_name', 'ASC');
+		$files = $this->db->get("editor_data_files")->result_array();
 
-		if(empty($files)){
+		if (empty($files)) {
 			return array();
 		}
 
 		//get varcounts
-		$varcounts=$this->get_varcount($sid);
-		
+		$varcounts = $this->get_varcount($sid);
+
 		//add file_id as key
-		$output=array();
-		foreach($files as $file){
-			$output[$file['file_id']]=$file;
+		$output = array();
+		foreach ($files as $file) {
+			$output[$file['file_id']] = $file;
 			//add varcounts
-			$output[$file['file_id']]['var_count']=isset($varcounts[$file['file_id']]) ? $varcounts[$file['file_id']] : 0;
+			$output[$file['file_id']]['var_count'] = isset($varcounts[$file['file_id']]) ? $varcounts[$file['file_id']] : 0;
 		}
 
 		//apply sorting to keep files in the order - F1, F2...F9, F10, F11
 		$file_keys = array_keys($output);
-  		//natsort($file_keys);
+		//natsort($file_keys);
 
-		$sorted_files=array();
+		$sorted_files = array();
 
-  		foreach ($file_keys as $key_){
+		foreach ($file_keys as $key_) {
 			$sorted_files[$key_] = $output[$key_];
-			if($include_file_info){
-				$sorted_files[$key_]['file_info']=$this->get_files_info($sid,$key_);
+			if ($include_file_info) {
+				$sorted_files[$key_]['file_info'] = $this->get_files_info($sid, $key_);
 			}
 		}
 
-  		return $sorted_files;
+		return $sorted_files;
 	}
 
 	//get an array of all file IDs e.g. F1, F2, ...
-    function list($sid)
-    {
-        $this->db->select("file_id");
-        $this->db->where("sid",$sid);
-		$result=$this->db->get("editor_data_files")->result_array();
-		
-		$output=array();
-		foreach($result as $row){
-			$output[]=$row['file_id'];
+	function list($sid)
+	{
+		$this->db->select("file_id");
+		$this->db->where("sid", $sid);
+		$result = $this->db->get("editor_data_files")->result_array();
+
+		$output = array();
+		foreach ($result as $row) {
+			$output[] = $row['file_id'];
 		}
 
 		return $output;
@@ -672,14 +826,14 @@ class Editor_datafile_model extends CI_Model {
 	 * 
 	 * Get FILE_ID by file name - e.g. F1, F2, F3
 	 */
-	function file_id_by_name($sid,$file_name)
+	function file_id_by_name($sid, $file_name)
 	{
 		$this->db->select("file_id");
-		$this->db->where("sid",$sid);
-		$this->db->where("file_name",$this->filename_part($file_name));
-		$result=$this->db->get("editor_data_files")->row_array();
-		
-		if ($result){
+		$this->db->where("sid", $sid);
+		$this->db->where("file_name", $this->filename_part($file_name));
+		$result = $this->db->get("editor_data_files")->row_array();
+
+		if ($result) {
 			return $result['file_id'];
 		}
 
@@ -694,13 +848,12 @@ class Editor_datafile_model extends CI_Model {
 	function file_id_name_list($sid)
 	{
 		$this->db->select("file_id, file_name");
-		$this->db->where("sid",$sid);
-		$result= $this->db->get("editor_data_files")->result_array();
+		$this->db->where("sid", $sid);
+		$result = $this->db->get("editor_data_files")->result_array();
 
-		$output=array();
-		foreach($result as $row)
-		{
-			$output[$row['file_name']]=$row['file_id'];
+		$output = array();
+		foreach ($result as $row) {
+			$output[$row['file_name']] = $row['file_id'];
 		}
 
 		return $output;
@@ -708,66 +861,65 @@ class Editor_datafile_model extends CI_Model {
 
 
 	//get data file by file_id
-    function data_file_by_id($sid,$file_id)
-    {
-        $this->db->select("*");
-        $this->db->where("sid",$sid);
-        $this->db->where("file_id",$file_id);
-        return $this->db->get("editor_data_files")->row_array();
+	function data_file_by_id($sid, $file_id)
+	{
+		$this->db->select("*");
+		$this->db->where("sid", $sid);
+		$this->db->where("file_id", $file_id);
+		return $this->db->get("editor_data_files")->row_array();
 	}
 
-	function data_file_by_pk_id($pk_id, $sid=null)
-    {
-        $this->db->select("*");
-        if ($sid){
-            $this->db->where("sid",$sid);
-        }
-        $this->db->where("id",$pk_id);
-        return $this->db->get("editor_data_files")->row_array();
+	function data_file_by_pk_id($pk_id, $sid = null)
+	{
+		$this->db->select("*");
+		if ($sid) {
+			$this->db->where("sid", $sid);
+		}
+		$this->db->where("id", $pk_id);
+		return $this->db->get("editor_data_files")->row_array();
 	}
 
 
-	function data_file_by_name($sid,$file_name)
-    {
-        $this->db->select("*");
-        $this->db->where("sid",$sid);
-		$file_name=$this->filename_part($file_name);
-        $this->db->where("file_name",$file_name);
-        return $this->db->get("editor_data_files")->row_array();
+	function data_file_by_name($sid, $file_name)
+	{
+		$this->db->select("*");
+		$this->db->where("sid", $sid);
+		$file_name = $this->filename_part($file_name);
+		$this->db->where("file_name", $file_name);
+		return $this->db->get("editor_data_files")->row_array();
 	}
-	
+
 
 	function generate_fileid($sid)
-    {
-        $this->db->select("file_id");
-        $this->db->where("sid",$sid);
-        $result=$this->db->get("editor_data_files")->result_array();
+	{
+		$this->db->select("file_id");
+		$this->db->where("sid", $sid);
+		$result = $this->db->get("editor_data_files")->result_array();
 
-		if (!$result){
+		if (!$result) {
 			return 'F1';
 		}
 
-		$max=1;
-		foreach($result as $row)
-		{
-			$val=substr($row['file_id'],1);
-			if (strtoupper(substr($row['file_id'],0,1))=='F' && is_numeric($val)){
-				if ($val >$max){
-					$max=$val;
+		$max = 1;
+		foreach ($result as $row) {
+			$val = substr($row['file_id'], 1);
+			if (strtoupper(substr($row['file_id'], 0, 1)) == 'F' && is_numeric($val)) {
+				if ($val > $max) {
+					$max = $val;
 				}
 			}
 		}
 
-		return 'F'.($max +1);
+		return 'F' . ($max + 1);
 	}
 
 	function max_wght($sid)
-    {
-        $this->db->select("max(wght) as max_wght");
-        $this->db->where("sid",$sid);
-        $result=$this->db->get("editor_data_files")->row_array();
+	{
+		$this->db->select("max(wght) as max_wght");
+		$this->db->where("sid", $sid);
+		$result = $this->db->get("editor_data_files")->row_array();
 
-		if ($result && is_numeric($result['max_wght'])){
+		if ($result && is_numeric($result['max_wght'])) {
 			return $result['max_wght'];
 		}
 
@@ -862,34 +1014,33 @@ class Editor_datafile_model extends CI_Model {
 	 *  - store_data=1: keep source and CSV (no longer deletes originals after conversion)
 	 * 
 	 */
-	function cleanup($sid, $file_id=null)
+	function cleanup($sid, $file_id = null)
 	{
-		$files=[];
-		if ($file_id){
+		$files = [];
+		if ($file_id) {
 
-			$file=$this->data_file_by_id($sid,$file_id);
-			
-			if (!$file){
+			$file = $this->data_file_by_id($sid, $file_id);
+
+			if (!$file) {
 				throw new Exception("Data file not found: " . $file_id);
 			}
 
-			$files[]=$file;
-		}
-		else {
-			$files=$this->select_all($sid);
+			$files[] = $file;
+		} else {
+			$files = $this->select_all($sid);
 		}
 
 		//get project folder
-		$project_folder=$this->Editor_model->get_project_folder($sid);
+		$project_folder = $this->Editor_model->get_project_folder($sid);
 
-		$output=array(
+		$output = array(
 			'processed' => 0,
 			'deleted' => 0,
 			'skipped' => 0,
 			'files' => array()
 		);
 
-		foreach($files as $file){
+		foreach ($files as $file) {
 			$output['processed']++;
 
 			// Skip if file_physical_name is empty
@@ -905,19 +1056,19 @@ class Editor_datafile_model extends CI_Model {
 			}
 
 			//is csv file?
-			$is_csv=strtolower($this->get_file_extension($file['file_physical_name']))=='csv';
+			$is_csv = strtolower($this->get_file_extension($file['file_physical_name'])) == 'csv';
 
 			//data csv file name
-			$filename_csv=$file['file_name'].'.csv';
+			$filename_csv = $file['file_name'] . '.csv';
 
 			//original file path
-			$original_path=$project_folder.'/data/'.$file['file_physical_name'];
+			$original_path = $project_folder . '/data/' . $file['file_physical_name'];
 
 			//csv file path
-			$csv_path=$project_folder.'/data/'.$filename_csv;
+			$csv_path = $project_folder . '/data/' . $filename_csv;
 
 			// store_data==0: remove source and working CSV (clear data / metadata-only)
-			if ($file['store_data']==0){
+			if ($file['store_data'] == 0) {
 				$paths_to_delete = array();
 				if (!$is_csv) {
 					$paths_to_delete[] = array('path' => $original_path, 'name' => $file['file_physical_name'], 'type' => 'original');
@@ -953,8 +1104,13 @@ class Editor_datafile_model extends CI_Model {
 						);
 					}
 				}
-			}
-			else{
+
+				$fmt = isset($file['source_format']) ? strtolower((string) $file['source_format']) : '';
+				$ext = strtolower($this->get_file_extension($file['file_physical_name']));
+				if (in_array($fmt, array('dta', 'sav'), true) || in_array($ext, array('dta', 'sav'), true)) {
+					$this->update($file['id'], array('source_status' => 'missing'));
+				}
+			} else {
 				// store_data=1: keep source file and working CSV
 				$output['skipped']++;
 				$output['files'][] = [
@@ -965,7 +1121,6 @@ class Editor_datafile_model extends CI_Model {
 					'reason' => 'source file retained (store_data=1)',
 				];
 			}
-
 		}
 
 		return $output;
@@ -974,11 +1129,11 @@ class Editor_datafile_model extends CI_Model {
 
 	private function get_file_extension($filename)
 	{
-		if (empty($filename)){
+		if (empty($filename)) {
 			return '';
 		}
 
-		$info=pathinfo($filename);
+		$info = pathinfo($filename);
 		return $info['extension'];
 	}
 
@@ -988,7 +1143,7 @@ class Editor_datafile_model extends CI_Model {
 	 * Delete data file
 	 * 
 	 */
-	function delete_physical_file($sid,$file_id)
+	function delete_physical_file($sid, $file_id)
 	{
 		$datafile = $this->data_file_by_id($sid, $file_id);
 		if (!$datafile) {
@@ -1028,64 +1183,64 @@ class Editor_datafile_model extends CI_Model {
 		return $deleted_any;
 	}
 
-	function delete($sid,$file_id)
-    {        
+	function delete($sid, $file_id)
+	{
 		$this->Editor_model->check_project_editable($sid);
 
-        $this->db->where("sid",$sid);
-        $this->db->where("file_id",$file_id);
-        $this->db->delete("editor_data_files");
-		$this->delete_variables($sid,$file_id);
+		$this->db->where("sid", $sid);
+		$this->db->where("file_id", $file_id);
+		$this->db->delete("editor_data_files");
+		$this->delete_variables($sid, $file_id);
 	}
 
-	function delete_variables($sid,$file_id)
+	function delete_variables($sid, $file_id)
 	{
-		$this->db->where("sid",$sid);
-        $this->db->where("fid",$file_id);
-        return $this->db->delete("editor_variables");
+		$this->db->where("sid", $sid);
+		$this->db->where("fid", $file_id);
+		return $this->db->delete("editor_variables");
 	}
 
 
 	/**
-	*
-	* insert new file and return the new file id
-	*
-	* @options - array()
-	*/
-	function insert($sid,$options)
-	{		
+	 *
+	 * insert new file and return the new file id
+	 *
+	 * @options - array()
+	 */
+	function insert($sid, $options)
+	{
 		$this->Editor_model->check_project_editable($sid);
 
-		$data=array();
+		$data = array();
 		//$data['created']=date("U");
 		//$data['changed']=date("U");
-		
-		foreach($options as $key=>$value){
-			if (in_array($key,$this->data_file_fields) ){
-				$data[$key]=$value;
+
+		foreach ($options as $key => $value) {
+			if (in_array($key, $this->data_file_fields)) {
+				$data[$key] = $value;
 			}
 		}
 
-		if(!isset($data['created'])){
-			$data['created']=date("U");
+		if (!isset($data['created'])) {
+			$data['created'] = date("U");
 		}
 
-		if(!isset($data['changed'])){
-			$data['changed']=date("U");
+		if (!isset($data['changed'])) {
+			$data['changed'] = date("U");
 		}
 
 		//filename
-		if ($data['file_name']){
-			$data['file_name']=$this->filename_part($data['file_name']);
+		if ($data['file_name']) {
+			$data['file_name'] = $this->filename_part($data['file_name']);
 		}
 
-		$data['sid']=$sid;		
-		$result=$this->db->insert('editor_data_files', $data);
+		$data['sid'] = $sid;
+		$result = $this->db->insert('editor_data_files', $data);
 
-		if ($result===false){
+		if ($result === false) {
 			throw new MY_Exception($this->db->_error_message());
 		}
-		
+
 		return $this->db->insert_id();
 	}
 
@@ -1096,54 +1251,53 @@ class Editor_datafile_model extends CI_Model {
 	 */
 	function filename_part($filename)
 	{
-		$info=pathinfo($filename);
+		$info = pathinfo($filename);
 		return $info['filename'];
 	}
-	
-	
-	/**
-	*
-	* update file
-	*
-	* @options - array()
-	*/
-	function update($id,$options)
-	{
-		$data_file=$this->data_file_by_pk_id($id);
 
-		if (!$data_file){
+
+	/**
+	 *
+	 * update file
+	 *
+	 * @options - array()
+	 */
+	function update($id, $options)
+	{
+		$data_file = $this->data_file_by_pk_id($id);
+
+		if (!$data_file) {
 			throw new Exception("DATA_FILE_NOT_FOUND: " . $id);
 		}
 
 		$this->Editor_model->check_project_editable($data_file['sid']);
 
-		$data=array();
-		
-		foreach($options as $key=>$value)
-		{
-			if ($key=='id'){
+		$data = array();
+
+		foreach ($options as $key => $value) {
+			if ($key == 'id') {
 				continue;
 			}
 
-			if (in_array($key,$this->data_file_fields) ){
-				$data[$key]=$value;
+			if (in_array($key, $this->data_file_fields)) {
+				$data[$key] = $value;
 			}
 		}
 
-		$data['changed']=date("U");
+		$data['changed'] = date("U");
 
 		//filename
-		if (isset($data['file_name'])){
-			$data['file_name']=$this->filename_part($data['file_name']);
+		if (isset($data['file_name'])) {
+			$data['file_name'] = $this->filename_part($data['file_name']);
 		}
-		
-		$this->db->where('id',$id);
-		$result=$this->db->update('editor_data_files', $data);
 
-		if ($result===false){
+		$this->db->where('id', $id);
+		$result = $this->db->update('editor_data_files', $data);
+
+		if ($result === false) {
 			throw new MY_Exception($this->db->_error_message());
 		}
-		
+
 		return TRUE;
 	}
 
@@ -1158,31 +1312,31 @@ class Editor_datafile_model extends CI_Model {
 	 * @options - array of fields
 	 * 
 	 */
-	function update_by_filename($sid,$file_name,$options)
+	function update_by_filename($sid, $file_name, $options)
 	{
 		// Check if project is locked
 		$this->Editor_model->check_project_editable($sid);
 
-		foreach($options as $key=>$value){
-			if ($key=='id'){
+		foreach ($options as $key => $value) {
+			if ($key == 'id') {
 				unset($options[$key]);
 			}
 
-			if (!in_array($key,$this->data_file_fields) ){
+			if (!in_array($key, $this->data_file_fields)) {
 				unset($options[$key]);
 			}
 		}
 
-		$options['changed']=date("U");
-		
-		$this->db->where('sid',$sid);
-		$this->db->where('file_name',$file_name);
-		$result=$this->db->update('editor_data_files', $options);
+		$options['changed'] = date("U");
 
-		if ($result===false){
+		$this->db->where('sid', $sid);
+		$this->db->where('file_name', $file_name);
+		$result = $this->db->update('editor_data_files', $options);
+
+		if ($result === false) {
 			throw new MY_Exception($this->db->_error_message());
 		}
-		
+
 		return TRUE;
 	}
 
@@ -1346,26 +1500,25 @@ class Editor_datafile_model extends CI_Model {
 	function get_varcount($sid)
 	{
 		$this->db->select("sid,fid, count(*) as varcount");
-		$this->db->where("sid",$sid);
+		$this->db->where("sid", $sid);
 		$this->db->group_by("sid,fid");
-		$result= $this->db->get("editor_variables")->result_array();		
+		$result = $this->db->get("editor_variables")->result_array();
 
-		$output=array();
-		foreach($result as $row)
-		{
-			$output[$row['fid']]=$row['varcount'];
+		$output = array();
+		foreach ($result as $row) {
+			$output[$row['fid']] = $row['varcount'];
 		}
 
 		return $output;
 	}
 
 
-	function get_file_varcount($sid,$file_id)
+	function get_file_varcount($sid, $file_id)
 	{
 		$this->db->select("count(sid) as varcount");
-		$this->db->where("sid",$sid);
-		$this->db->where("fid",$file_id);
-		$result= $this->db->get("editor_variables")->row_array();
+		$this->db->where("sid", $sid);
+		$this->db->where("fid", $file_id);
+		$result = $this->db->get("editor_variables")->row_array();
 		return $result['varcount'];
 	}
 
@@ -1378,24 +1531,24 @@ class Editor_datafile_model extends CI_Model {
 	 * @is_new - boolean - for new records
 	 * 
 	 **/
-	function validate($options,$is_new=true)
-	{		
+	function validate($options, $is_new = true)
+	{
 		$this->load->library("form_validation");
 		$this->form_validation->reset_validation();
 		$this->form_validation->set_data($options);
-	
+
 		//validation rules for a new record
-		if($is_new){				
+		if ($is_new) {
 			#$this->form_validation->set_rules('surveyid', 'IDNO', 'xss_clean|trim|max_length[255]|required');
 			//$this->form_validation->set_rules('file_id', 'File ID', 'required|xss_clean|trim|max_length[50]');	
-			$this->form_validation->set_rules('file_name', 'File name', 'required|xss_clean|trim|max_length[200]');	
-			$this->form_validation->set_rules('case_count', 'Case count', 'xss_clean|trim|max_length[10]');	
-			$this->form_validation->set_rules('var_count', 'Variable count', 'xss_clean|trim|max_length[10]');	
+			$this->form_validation->set_rules('file_name', 'File name', 'required|xss_clean|trim|max_length[200]');
+			$this->form_validation->set_rules('case_count', 'Case count', 'xss_clean|trim|max_length[10]');
+			$this->form_validation->set_rules('var_count', 'Variable count', 'xss_clean|trim|max_length[10]');
 
-			
+
 			//file id
 			$this->form_validation->set_rules(
-				'file_id', 
+				'file_id',
 				'File ID',
 				array(
 					"required",
@@ -1404,34 +1557,33 @@ class Editor_datafile_model extends CI_Model {
 					"alpha_dash",
 					"xss_clean",
 					//array('validate_file_id',array($this, 'validate_file_id')),				
-				)		
+				)
 			);
-
 		}
-		
-		if ($this->form_validation->run() == TRUE){
+
+		if ($this->form_validation->run() == TRUE) {
 			return TRUE;
 		}
-		
+
 		//failed
-		$errors=$this->form_validation->error_array();
-		$error_str=$this->form_validation->error_array_to_string($errors);
-		throw new ValidationException("VALIDATION_ERROR: ".$error_str, $errors);
+		$errors = $this->form_validation->error_array();
+		$error_str = $this->form_validation->error_array_to_string($errors);
+		throw new ValidationException("VALIDATION_ERROR: " . $error_str, $errors);
 	}
 
 	//validate data file ID
 	public function validate_file_id($file_id)
-	{	
-		$sid=null;
-		if(array_key_exists('sid',$this->form_validation->validation_data)){
-			$sid=$this->form_validation->validation_data['sid'];
+	{
+		$sid = null;
+		if (array_key_exists('sid', $this->form_validation->validation_data)) {
+			$sid = $this->form_validation->validation_data['sid'];
 		}
 
 		//list of all existing FileIDs
-		$files=$this->list($sid);
+		$files = $this->list($sid);
 
-		if(in_array($file_id,$files)){
-			$this->form_validation->set_message(__FUNCTION__, 'FILE_ID already exists. The FILE_ID should be unique.' );
+		if (in_array($file_id, $files)) {
+			$this->form_validation->set_message(__FUNCTION__, 'FILE_ID already exists. The FILE_ID should be unique.');
 			return false;
 		}
 
@@ -1442,13 +1594,13 @@ class Editor_datafile_model extends CI_Model {
 	//decode all encoded fields
 	function decode_encoded_fields($data)
 	{
-		if(!$data){
+		if (!$data) {
 			return $data;
 		}
 
-		foreach($data as $key=>$value){
-			if(in_array($key,$this->encoded_fields)){
-				$data[$key]=$this->decode_metadata($value);
+		foreach ($data as $key => $value) {
+			if (in_array($key, $this->encoded_fields)) {
+				$data[$key] = $this->decode_metadata($value);
 			}
 		}
 		return $data;
@@ -1457,25 +1609,25 @@ class Editor_datafile_model extends CI_Model {
 	//decode multiple rows
 	function decode_encoded_fields_rows($data)
 	{
-		$result=array();
-		foreach($data as $row){
-			$result[]=$this->decode_encoded_fields($row);
+		$result = array();
+		foreach ($data as $row) {
+			$result[] = $this->decode_encoded_fields($row);
 		}
 		return $result;
 	}
 
 
 	//encode metadata for db storage
-    public function encode_metadata($metadata_array)
-    {
-        return base64_encode(serialize($metadata_array));
-    }
+	public function encode_metadata($metadata_array)
+	{
+		return base64_encode(serialize($metadata_array));
+	}
 
 
-    //decode metadata to array
-    public function decode_metadata($metadata_encoded)
-    {
-        return unserialize(base64_decode((string)$metadata_encoded));
+	//decode metadata to array
+	public function decode_metadata($metadata_encoded)
+	{
+		return unserialize(base64_decode((string)$metadata_encoded));
 	}
 
 
@@ -1487,126 +1639,124 @@ class Editor_datafile_model extends CI_Model {
 	function temp_upload_file($sid)
 	{
 		//upload file
-		$upload_result=$this->Editor_resource_model->upload_file($sid,$file_type='_tmp',$file_field_name='file', $remove_spaces=false);
-		$uploaded_file_name=$upload_result['file_name'];
-		$uploaded_path=$upload_result['full_path'];
+		$upload_result = $this->Editor_resource_model->upload_file($sid, $file_type = '_tmp', $file_field_name = 'file', $remove_spaces = false);
+		$uploaded_file_name = $upload_result['file_name'];
+		$uploaded_path = $upload_result['full_path'];
 
 		return [
-			'uploaded_file_name'=>$uploaded_file_name,
-			'base64'=>base64_encode($uploaded_file_name),
-			'uploaded_path'=>$uploaded_path
+			'uploaded_file_name' => $uploaded_file_name,
+			'base64' => base64_encode($uploaded_file_name),
+			'uploaded_path' => $uploaded_path
 		];
 	}
 
 	function data_file_generate_fileid($sid)
-    {
-        $this->db->select("file_id");
-        $this->db->where("sid",$sid);
-        $result=$this->db->get("editor_data_files")->result_array();
+	{
+		$this->db->select("file_id");
+		$this->db->where("sid", $sid);
+		$result = $this->db->get("editor_data_files")->result_array();
 
-		if (!$result){
+		if (!$result) {
 			return 'F1';
 		}
 
-		$max=1;
-		foreach($result as $row)
-		{
-			$val=substr($row['file_id'],1);
-			if (strtoupper(substr($row['file_id'],0,1))=='F' && is_numeric($val)){
-				if ($val >$max){
-					$max=$val;
+		$max = 1;
+		foreach ($result as $row) {
+			$val = substr($row['file_id'], 1);
+			if (strtoupper(substr($row['file_id'], 0, 1)) == 'F' && is_numeric($val)) {
+				if ($val > $max) {
+					$max = $val;
 				}
 			}
 		}
 
-		return 'F'.($max +1);
+		return 'F' . ($max + 1);
 	}
 
-	function data_file_insert($sid,$options)
-	{		
+	function data_file_insert($sid, $options)
+	{
 		// Check if project is locked
 		$this->Editor_model->check_project_editable($sid);
 
-		$data=array();
-		$data['created']=date("U");
-		$data['changed']=date("U");
-		
-		foreach($options as $key=>$value){
-			if (in_array($key,$this->data_file_fields) ){
-				$data[$key]=$value;
+		$data = array();
+		$data['created'] = date("U");
+		$data['changed'] = date("U");
+
+		foreach ($options as $key => $value) {
+			if (in_array($key, $this->data_file_fields)) {
+				$data[$key] = $value;
 			}
 		}
 
 		//filename
-		if ($data['file_name']){
-			$data['file_name']=$this->filename_part($data['file_name']);
-			
+		if ($data['file_name']) {
+			$data['file_name'] = $this->filename_part($data['file_name']);
+
 			// Validate file name if physical name is provided
 			if (isset($data['file_physical_name'])) {
 				validate_filename($data['file_physical_name'], 200);
 			}
 		}
 
-		$data['sid']=$sid;		
-		$result=$this->db->insert('editor_data_files', $data);
+		$data['sid'] = $sid;
+		$result = $this->db->insert('editor_data_files', $data);
 
-		if ($result===false){
+		if ($result === false) {
 			throw new MY_Exception($this->db->_error_message());
 		}
-		
+
 		return $this->db->insert_id();
 	}
 
 	function data_file_filename_part($filename)
 	{
-		$info=pathinfo($filename);
+		$info = pathinfo($filename);
 		return $info['filename'];
 	}
 
-	function data_file_update($id,$options)
+	function data_file_update($id, $options)
 	{
 		// Get the project ID from the data file
 		$this->db->select('sid');
 		$this->db->where('id', $id);
 		$data_file = $this->db->get('editor_data_files')->row_array();
-		
+
 		if (!$data_file) {
 			throw new Exception("DATA_FILE_NOT_FOUND: " . $id);
 		}
-		
+
 		// Check if project is locked
 		$this->Editor_model->check_project_editable($data_file['sid']);
 
-		$data=array();
-		
-		foreach($options as $key=>$value)
-		{
-			if ($key=='id'){
+		$data = array();
+
+		foreach ($options as $key => $value) {
+			if ($key == 'id') {
 				continue;
 			}
 
-			if (in_array($key,$this->data_file_fields) ){
-				$data[$key]=$value;
+			if (in_array($key, $this->data_file_fields)) {
+				$data[$key] = $value;
 			}
 		}
 
-		$data['changed']=date("U");
+		$data['changed'] = date("U");
 
 		// Handle file name change - rename physical files
-		if (isset($data['file_name'])){
+		if (isset($data['file_name'])) {
 			$new_file_name = $this->filename_part($data['file_name']);
 			$old_data_file = $this->data_file_by_pk_id($id, $data_file['sid']);
-			
+
 			if ($old_data_file && $old_data_file['file_name'] != $new_file_name) {
 				// Validate the new file name
 				validate_filename($new_file_name, 200);
-				
+
 				// Check if new file name already exists
 				$existing_file = $this->data_file_by_name($data_file['sid'], $new_file_name);
 				if ($existing_file && (int)$existing_file['id'] !== (int)$id) {
 					throw new Exception("Data file name '{$new_file_name}' already exists");
 				}
-				
+
 				$new_physical_name = $this->rename_physical_files(
 					$data_file['sid'],
 					$old_data_file['file_name'],
@@ -1621,14 +1771,14 @@ class Editor_datafile_model extends CI_Model {
 				}
 			}
 		}
-		
-		$this->db->where('id',$id);
-		$result=$this->db->update('editor_data_files', $data);
 
-		if ($result===false){
+		$this->db->where('id', $id);
+		$result = $this->db->update('editor_data_files', $data);
+
+		if ($result === false) {
 			throw new MY_Exception($this->db->_error_message());
 		}
-		
+
 		return TRUE;
 	}
 
@@ -1756,36 +1906,35 @@ class Editor_datafile_model extends CI_Model {
 	function data_files_get_varcount($sid)
 	{
 		$this->db->select("sid,fid, count(*) as varcount");
-		$this->db->where("sid",$sid);
+		$this->db->where("sid", $sid);
 		$this->db->group_by("sid,fid");
-		$result= $this->db->get("editor_variables")->result_array();		
+		$result = $this->db->get("editor_variables")->result_array();
 
-		$output=array();
-		foreach($result as $row)
-		{
-			$output[$row['fid']]=$row['varcount'];
+		$output = array();
+		foreach ($result as $row) {
+			$output[$row['fid']] = $row['varcount'];
 		}
 
 		return $output;
 	}
 
-	function validate_data_file($options,$is_new=true)
-	{		
+	function validate_data_file($options, $is_new = true)
+	{
 		$this->load->library("form_validation");
 		$this->form_validation->reset_validation();
 		$this->form_validation->set_data($options);
-	
+
 		//validation rules for a new record
-		if($is_new){				
+		if ($is_new) {
 			#$this->form_validation->set_rules('surveyid', 'IDNO', 'xss_clean|trim|max_length[255]|required');
 			//$this->form_validation->set_rules('file_id', 'File ID', 'required|xss_clean|trim|max_length[50]');	
-			$this->form_validation->set_rules('file_name', 'File name', 'required|xss_clean|trim|max_length[200]|validate_file_name');	
-			$this->form_validation->set_rules('case_count', 'Case count', 'xss_clean|trim|max_length[10]');	
-			$this->form_validation->set_rules('var_count', 'Variable count', 'xss_clean|trim|max_length[10]');	
-			
+			$this->form_validation->set_rules('file_name', 'File name', 'required|xss_clean|trim|max_length[200]|validate_file_name');
+			$this->form_validation->set_rules('case_count', 'Case count', 'xss_clean|trim|max_length[10]');
+			$this->form_validation->set_rules('var_count', 'Variable count', 'xss_clean|trim|max_length[10]');
+
 			//file id
 			$this->form_validation->set_rules(
-				'file_id', 
+				'file_id',
 				'File ID',
 				array(
 					"required",
@@ -1794,22 +1943,17 @@ class Editor_datafile_model extends CI_Model {
 					"alpha_dash",
 					"xss_clean",
 					//array('validate_file_id',array($this, 'validate_file_id')),				
-				)		
+				)
 			);
-
 		}
-				
-		if ($this->form_validation->run() == TRUE){
+
+		if ($this->form_validation->run() == TRUE) {
 			return TRUE;
 		}
-		
+
 		//failed
-		$errors=$this->form_validation->error_array();
-		$error_str=$this->form_validation->error_array_to_string($errors);
-		throw new ValidationException("VALIDATION_ERROR: ".$error_str, $errors);
+		$errors = $this->form_validation->error_array();
+		$error_str = $this->form_validation->error_array_to_string($errors);
+		throw new ValidationException("VALIDATION_ERROR: " . $error_str, $errors);
 	}
-
-
-	
 }//end-class
-	

@@ -1,6 +1,6 @@
 /// datafile add/edit form
-const VueDatafileEdit= Vue.component('datafile-edit', {
-    data: function () {    
+const VueDatafileEdit = Vue.component('datafile-edit', {
+    data: function () {
         return {
             form_local: {},
             is_dirty: false,
@@ -15,44 +15,44 @@ const VueDatafileEdit= Vue.component('datafile-edit', {
                 return "You have unsaved changes. Are you sure you want to leave?";
             }
         }.bind(this);
-        
+
         this.loadFile();
     },
     beforeRouteLeave(to, from, next) {
-        if (!this.showUnsavedMessage()){
+        if (!this.showUnsavedMessage()) {
             return false;
         }
         next();
     },
     beforeRouteUpdate(to, from, next) {
-        if (!this.showUnsavedMessage()){
+        if (!this.showUnsavedMessage()) {
             return false;
         }
         next();
     },
     watch: {
         form_local: {
-            handler: function (newVal, oldVal) {                
-                if (this.is_loading){return;}
-                if (!oldVal.file_id){return;}                
-                this.is_dirty=true;
+            handler: function (newVal, oldVal) {
+                if (this.is_loading) { return; }
+                if (!oldVal.file_id) { return; }
+                this.is_dirty = true;
             },
             deep: true
         },
     },
-    methods:{
-        showUnsavedMessage: function(){
-            if (this.is_dirty){
-                if (!confirm("You have unsaved changes. Are you sure you want to leave this page?")){
+    methods: {
+        showUnsavedMessage: function () {
+            if (this.is_dirty) {
+                if (!confirm("You have unsaved changes. Are you sure you want to leave this page?")) {
                     return false;
                 }
             }
             return true;
         },
-        saveForm: function (){    
+        saveForm: function () {
             this.saveFile();
         },
-        saveErrorMessage: function(error){
+        saveErrorMessage: function (error) {
             if (error && error.response && error.response.data) {
                 if (error.response.data.message) {
                     return error.response.data.message;
@@ -66,56 +66,56 @@ const VueDatafileEdit= Vue.component('datafile-edit', {
             }
             return this.$t('failed') || 'Save failed';
         },
-        cancelForm: function (){
-            if (this.is_dirty){
-                if (!confirm("You have unsaved changes. Are you sure you want to leave this page?")){
+        cancelForm: function () {
+            if (this.is_dirty) {
+                if (!confirm("You have unsaved changes. Are you sure you want to leave this page?")) {
                     return false;
                 }
             }
-            this.is_dirty=false;
+            this.is_dirty = false;
             router.push('/datafiles/');
         },
-        loadFile: function(){
+        loadFile: function () {
             //load file data
-            vm=this;
-            this.is_loading=true;
-            let url=CI.base_url + '/api/datafiles/'+ this.ProjectID + '/' + this.ActiveDatafileIndex;
-            axios.get( url
-            ).then(function(response){
-                vm.form_local=response.data.datafile;
-                vm.is_loading=false;
+            vm = this;
+            this.is_loading = true;
+            let url = CI.base_url + '/api/datafiles/' + this.ProjectID + '/' + this.ActiveDatafileIndex;
+            axios.get(url
+            ).then(function (response) {
+                vm.form_local = response.data.datafile;
+                vm.is_loading = false;
             })
-            .catch(function(response){
-                vm.errors=response;
-            });
+                .catch(function (response) {
+                    vm.errors = response;
+                });
         },
-        saveFile: function(){
-            vm=this;
-            vm.save_error='';
-            vm.is_saving=true;
-            let url=CI.base_url + '/api/datafiles/'+ this.ProjectID;
-            let payload=Object.assign({}, this.form_local);
+        saveFile: function () {
+            vm = this;
+            vm.save_error = '';
+            vm.is_saving = true;
+            let url = CI.base_url + '/api/datafiles/' + this.ProjectID;
+            let payload = Object.assign({}, this.form_local);
             delete payload.file_info;
-            axios.post( url, payload)
-            .then(function(response){
-                vm.is_saving=false;
-                if (response.data && response.data.status === 'failed') {
-                    vm.save_error = response.data.message || vm.$t('failed');
-                    return;
-                }
-                vm.$store.dispatch('loadDataFiles',{dataset_id:vm.ProjectID});
-                vm.is_dirty=false;
-                router.push('/datafiles/');
-            })
-            .catch(function(error){
-                vm.is_saving=false;
-                vm.save_error = vm.saveErrorMessage(error);
-            });
+            axios.post(url, payload)
+                .then(function (response) {
+                    vm.is_saving = false;
+                    if (response.data && response.data.status === 'failed') {
+                        vm.save_error = response.data.message || vm.$t('failed');
+                        return;
+                    }
+                    vm.$store.dispatch('loadDataFiles', { dataset_id: vm.ProjectID });
+                    vm.is_dirty = false;
+                    router.push('/datafiles/');
+                })
+                .catch(function (error) {
+                    vm.is_saving = false;
+                    vm.save_error = vm.saveErrorMessage(error);
+                });
         },
-        displayDash: function(){
+        displayDash: function () {
             return '—';
         },
-        stataReleaseToVersion: function(release){
+        stataReleaseToVersion: function (release) {
             const map = {
                 104: 8, 105: 9, 108: 10, 114: 11, 115: 12,
                 117: 13, 118: 14, 119: 15, 120: 16, 121: 17, 122: 18, 123: 19
@@ -132,7 +132,7 @@ const VueDatafileEdit= Vue.component('datafile-edit', {
             }
             return null;
         },
-        sourceFormatDisplay: function(){
+        sourceFormatDisplay: function () {
             const fmt = this.resolveSourceFormat();
             if (fmt === 'dta') {
                 return 'Stata';
@@ -145,7 +145,7 @@ const VueDatafileEdit= Vue.component('datafile-edit', {
             }
             return null;
         },
-        resolveSourceFormat: function(){
+        resolveSourceFormat: function () {
             const fmt = (this.form_local.source_format || '').toLowerCase();
             if (fmt) {
                 return fmt;
@@ -169,7 +169,7 @@ const VueDatafileEdit= Vue.component('datafile-edit', {
             }
             return '';
         },
-        sourceVersionDisplay: function(){
+        sourceVersionDisplay: function () {
             const fmt = this.resolveSourceFormat();
             const version = this.form_local.source_format_version;
             if (version === null || version === undefined || version === '') {
@@ -187,7 +187,7 @@ const VueDatafileEdit= Vue.component('datafile-edit', {
             }
             return null;
         },
-        sourceFileNameDisplay: function(){
+        sourceFileNameDisplay: function () {
             if (this.form_local.source_upload_filename) {
                 return this.form_local.source_upload_filename;
             }
@@ -200,21 +200,21 @@ const VueDatafileEdit= Vue.component('datafile-edit', {
             }
             return this.displayDash();
         },
-        sourceFileSizeDisplay: function(){
+        sourceFileSizeDisplay: function () {
             const original = this.form_local.file_info && this.form_local.file_info.original;
             if (original && original.file_exists && original.file_size) {
                 return original.file_size;
             }
             return this.displayDash();
         },
-        workingDataSizeDisplay: function(){
+        workingDataSizeDisplay: function () {
             const csv = this.form_local.file_info && this.form_local.file_info.csv;
             if (csv && csv.file_exists && csv.file_size) {
                 return csv.file_size;
             }
             return this.displayDash();
         },
-        sourceStatusDisplay: function(){
+        sourceStatusDisplay: function () {
             const status = (this.form_local.source_status || 'unknown').toLowerCase();
             const fmt = (this.form_local.source_format || '').toLowerCase();
             const original = this.form_local.file_info && this.form_local.file_info.original;
@@ -226,7 +226,7 @@ const VueDatafileEdit= Vue.component('datafile-edit', {
             if (status === 'unknown') {
                 return { label: this.$t('source_original_format_unknown'), warning: false };
             }
-            if ((fmt === 'dta' || fmt === 'sav') && (status === 'present' || onDisk)) {
+            if ((fmt === 'dta' || fmt === 'sav') && onDisk) {
                 return { label: this.$t('source_file_stored'), warning: false };
             }
             if (fmt === 'dta' || fmt === 'sav') {
@@ -235,19 +235,19 @@ const VueDatafileEdit= Vue.component('datafile-edit', {
             return null;
         }
     },
-    computed:{
-        ActiveDatafileIndex(){
+    computed: {
+        ActiveDatafileIndex() {
             return this.$route.params.file_id;
         },
-        ProjectID(){
+        ProjectID() {
             return this.$store.state.project_id;
         },
-        uploadedAsCsvNote: function(){
+        uploadedAsCsvNote: function () {
             const fmt = (this.form_local.source_format || '').toLowerCase();
             const status = (this.form_local.source_status || '').toLowerCase();
             return fmt === 'csv' && status === 'not_applicable';
         },
-        showSourceSection: function(){
+        showSourceSection: function () {
             if (this.uploadedAsCsvNote) {
                 return false;
             }
@@ -262,7 +262,7 @@ const VueDatafileEdit= Vue.component('datafile-edit', {
             const physical = (this.form_local.file_physical_name || '').toLowerCase();
             return physical.endsWith('.dta') || physical.endsWith('.sav');
         }
-    },  
+    },
     template: `
             <div class="datafile-edit-component container-fluid" >
 
@@ -385,5 +385,5 @@ const VueDatafileEdit= Vue.component('datafile-edit', {
                 </section>
 
             </div>          
-            `    
+            `
 })

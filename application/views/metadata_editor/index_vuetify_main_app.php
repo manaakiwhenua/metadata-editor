@@ -154,6 +154,7 @@
             echo $this->load->view("metadata_editor/vue-form-main-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-form-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-form-preview-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-bounding-box-preview-map-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-nested-section-preview-component.js",null,true);
             
             echo $this->load->view("metadata_editor/vue-files-component.js",null,true);
@@ -174,6 +175,7 @@
             echo $this->load->view("metadata_editor/vue-data-explorer-host-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-dialog-datafile-export-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-dialog-batch-export-component.js",null,true);
+            echo $this->load->view("metadata_editor/vue-dialog-datafiles-sum-stats-options-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-microdata-resource-datafile-links-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-microdata-resource-details-component.js",null,true);
             echo $this->load->view("metadata_editor/vue-external-resources-generate-microdata-component.js",null,true);
