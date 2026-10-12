@@ -73,7 +73,7 @@ class Project_export_yaml_map_parser
         $field_mappings = $rule->field_mappings ?? [];
         $transformer = $rule->transformer ?? null;
         $result_value = $incoming_value;
-        $value_map = $rule->value_map ?? [];
+        $parameters = $rule->parameters ?? [];
 
         if ($result_value === null) {
             $result_value = $this->map_to_default($result_value, $rule->default_value, $mapping_defaults);
@@ -92,7 +92,7 @@ class Project_export_yaml_map_parser
                 $result_value = $transformer_manager->call(
                     $transformer,
                     $result_value,
-                    $value_map
+                    $parameters
                 );
             }
             return $result_value;
@@ -109,7 +109,7 @@ class Project_export_yaml_map_parser
         );
 
         // If there is only one result object and the mapping expects a single object, return a single object
-        if (count($result_objects) === 1 && $rule->mode === 'merge') {
+        if (count($result_objects) === 1 && $rule->mode === 'single_object') {
             return $result_objects[0];
         }
         return $result_objects;

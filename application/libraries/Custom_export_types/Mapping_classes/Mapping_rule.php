@@ -25,7 +25,6 @@ class Mapping_rule
         $this->target = $mapping_fields['target'] ?? null;
         $this->targets = $mapping_fields['targets'] ?? null;
         $this->transformer = $mapping_fields['transform'] ?? null;
-        $this->value_map = $mapping_fields['value_map'] ?? null;
         $this->mode = $mapping_fields['mode'] ?? null;
         $this->filter = $mapping_fields['filter'] ?? [];
         $this->parameters = $mapping_fields['parameters'] ?? [];

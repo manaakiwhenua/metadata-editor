@@ -17,10 +17,6 @@
 #   JSON:API member `data.type: dois`. Mapped metadata is written below
 #   `data.attributes` using the paths recorded in each destination.
 #
-# - Without `mode`, the transformed value sets the target property.
-#   `mode: append` adds the transformed item or items to an existing DataCite
-#   collection instead of replacing that collection. Empty results add nothing.
-#
 # - `filter` retains only source collection entries whose named fields exactly
 #   match the configured values before the transformation runs.
 #
@@ -177,7 +173,7 @@ mappings:
     target:
       json_path: data.attributes.types      
     transform: null
-    mode: merge
+    mode: single_object
     field_mappings:
       - source: "@value"
         target:
@@ -235,9 +231,10 @@ mappings:
         target:
           json_path: nameType
         transform: transform_using_value_map
-        value_map:
-          person: Personal
-          organisation: Organizational
+        parameters:
+          value_map:
+            person: Personal
+            organisation: Organizational
       - source: orcid
         target:
           json_path: nameIdentifiers
@@ -278,9 +275,10 @@ mappings:
         target:
           json_path: nameType
         transform: transform_using_value_map
-        value_map:
-          person: Personal
-          organisation: Organizational
+        parameters:
+          value_map:
+            person: Personal
+            organisation: Organizational
       - source: orcid
         target:
           json_path: nameIdentifiers
@@ -324,9 +322,10 @@ mappings:
         target:
           json_path: nameType
         transform: transform_using_value_map
-        value_map:
-          person: Personal
-          organisation: Organizational
+        parameters:
+          value_map:
+            person: Personal
+            organisation: Organizational
       - source: orcid
         target:
           json_path: nameIdentifiers
@@ -370,9 +369,10 @@ mappings:
         target:
           json_path: nameType
         transform: transform_using_value_map
-        value_map:
-          person: Personal
-          organisation: Organizational
+        parameters:
+          value_map:
+            person: Personal
+            organisation: Organizational
       - source: orcid
         target:
           json_path: nameIdentifiers
@@ -416,9 +416,10 @@ mappings:
         target:
           json_path: nameType
         transform: transform_using_value_map
-        value_map:
-          person: Personal
-          organisation: Organizational
+        parameters:
+          value_map:
+            person: Personal
+            organisation: Organizational
       - source: orcid
         target:
           json_path: nameIdentifiers
@@ -465,7 +466,7 @@ mappings:
     target:
       json_path: data.attributes.publisher
     transform: publisher
-    mode: merge
+    mode: single_object
     field_mappings:
       - source: "@value"
         target:
@@ -672,18 +673,19 @@ mappings:
         target:
           json_path: relationType
         transform: transform_using_value_map
-        value_map:
-          isDerivedFrom: IsDerivedFrom
-          isPartOf: IsPartOf
-          hasPart: HasPart
-          isDocumentedBy: IsDocumentedBy
-          isDescribedBy: IsDescribedBy
-          references: References
-          cites: Cites
-          isVersionOf: IsVersionOf
-          isNewVersionOf: IsNewVersionOf
-          requires: Requires
-          other: Other
+        parameters:
+          value_map:
+            isDerivedFrom: IsDerivedFrom
+            isPartOf: IsPartOf
+            hasPart: HasPart
+            isDocumentedBy: IsDocumentedBy
+            isDescribedBy: IsDescribedBy
+            references: References
+            cites: Cites
+            isVersionOf: IsVersionOf
+            isNewVersionOf: IsNewVersionOf
+            requires: Requires
+            other: Other
       - source: relationTypeInformation
         applies_to: relatedIdentifiers
         target:
@@ -705,18 +707,19 @@ mappings:
         target:
           json_path: relationType
         transform: transform_using_value_map
-        value_map:
-          isDerivedFrom: IsDerivedFrom
-          isPartOf: IsPartOf
-          hasPart: HasPart
-          isDocumentedBy: IsDocumentedBy
-          isDescribedBy: IsDescribedBy
-          references: References
-          cites: Cites
-          isVersionOf: IsVersionOf
-          isNewVersionOf: IsNewVersionOf
-          requires: Requires
-          other: Other
+        parameters:
+          value_map:
+            isDerivedFrom: IsDerivedFrom
+            isPartOf: IsPartOf
+            hasPart: HasPart
+            isDocumentedBy: IsDocumentedBy
+            isDescribedBy: IsDescribedBy
+            references: References
+            cites: Cites
+            isVersionOf: IsVersionOf
+            isNewVersionOf: IsNewVersionOf
+            requires: Requires
+            other: Other
       - source: relationTypeInformation
         applies_to: relatedItems
         target:
