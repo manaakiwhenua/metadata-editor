@@ -57,7 +57,10 @@ class Project_export_yaml_map_parser
         return $result_json;
     }
 
-    private function apply_mapping_rule(Mapping_rule $rule, array | string $incoming_json, string $path_delimiter, Project_export_transformer_manager $transformer_manager, Nested_path_helper $nested_path_helper, array $mapping_defaults)
+    /**
+     * Apply a single mapping rule. This function is used recursively to apply mapping rules at different levels of the incoming JSON structure. The incoming JSON can be either an array or a string, depending on which level of mapping rule is being called.
+     */
+    private function apply_mapping_rule(Mapping_rule $rule, array | string $incoming_json, string $path_delimiter, Project_export_transformer_manager $transformer_manager, Nested_path_helper $nested_path_helper, array $mapping_defaults): mixed
     {
         $incoming_value_json_path = $rule->source;
 
@@ -70,6 +73,7 @@ class Project_export_yaml_map_parser
         $field_mappings = $rule->field_mappings ?? [];
         $transformer = $rule->transformer ?? null;
         $result_value = $incoming_value;
+        $value_map = $rule->value_map ?? [];
 
         if ($result_value === null) {
             $result_value = $this->map_to_default($result_value, $rule->default_value, $mapping_defaults);
@@ -87,7 +91,8 @@ class Project_export_yaml_map_parser
             if ($result_value && $transformer) {
                 $result_value = $transformer_manager->call(
                     $transformer,
-                    $result_value
+                    $result_value,
+                    $value_map
                 );
             }
             return $result_value;
@@ -102,13 +107,16 @@ class Project_export_yaml_map_parser
             fn($row) => $this->build_result_object_from_field_mappings($rule->field_mappings, $row, $path_delimiter, $transformer_manager, $nested_path_helper, $mapping_defaults),
             $result_value
         );
+
+        // If there is only one result object and the mapping expects a single object, return a single object
+        if (count($result_objects) === 1 && $rule->mode === 'merge') {
+            return $result_objects[0];
+        }
         return $result_objects;
     }
 
-    /**
-     * Recursively builds a result object from the given field mappings and row data. Each field mapping is resolved, and the resulting values are placed into the output object according to their target paths.
-     */
-    private function build_result_object_from_field_mappings(array $field_mappings, $row, string $path_delimiter, $transformer_manager, $nested_path_helper, $mapping_defaults): array
+
+    private function build_result_object_from_field_mappings(array $field_mappings, array | string $row, string $path_delimiter, Project_export_transformer_manager $transformer_manager, Nested_path_helper $nested_path_helper, array $mapping_defaults): array
     {
         $output_object = [];
         foreach ($field_mappings as $field_mapping) {
@@ -118,15 +126,6 @@ class Project_export_yaml_map_parser
             if ($value !== null && $target_path !== null) {
                 $output_object[$target_path] = $value;
             }
-            // $output_object['logs'] = [
-            //     'target path' => ($target_path ?? 'null'),
-            //     'resolved value' => $value,
-            //     'field mapping' => $field_mapping->source ?? null,
-            //     'nested_path_helper output_object' => $nested_path_helper->get_value_from_path($row, $field_mapping->source ?? null, $path_delimiter),
-            //     'field map default' => $field_mapping->default_value ?? null,
-            //     'mapped to default' => $this->map_to_default($nested_path_helper->get_value_from_path($row, $field_mapping->source ?? null, $path_delimiter), $field_mapping->default_value ?? null, $mapping_defaults),
-
-            // ];
         }
 
         return $output_object;

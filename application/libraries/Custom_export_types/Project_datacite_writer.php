@@ -38,7 +38,7 @@ class Project_datacite_writer implements IProject_export_writer
 	{
 		$project_json = $this->get_project_json($project_id, $options);
 		$datacite_json = $this->map_to_datacite_json($project_json);
-		file_put_contents($output_file, trim(json_encode($datacite_json)) . PHP_EOL);
+		file_put_contents($output_file, trim(json_encode($datacite_json, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)) . PHP_EOL);
 	}
 
 	private function get_project_json(string $project_id, array	$options = array()): array

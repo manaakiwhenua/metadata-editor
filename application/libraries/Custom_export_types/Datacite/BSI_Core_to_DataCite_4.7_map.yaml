@@ -34,20 +34,16 @@
 #   `value` supplies a generated constant rather than a value;
 #   `value_from_parameter` and `default_value` copy named configured values.
 #
-# - `target_json` is the complete JSON destination. `[]` identifies one member
-#   of an output collection. A leaf `transform` names a small value conversion.
-#
 # - `value_map` explicitly lists a controlled-value conversion.
-#   `when_source_present` and `when_any_source_present` conditionally emit
+#
+# -  `when_source_present` and `when_any_source_present` conditionally emit
 #   generated output only when the named relative source value exists.
 #
 # - `applies_to` identifies a conditional output branch produced by the parent
 #   transformation, such as RelatedIdentifier versus RelatedItem.
 #
-# - `defaults` contains reusable values. A parameter ending in `_default`
-#   names the corresponding entry in `defaults`.
-#
-# - `constants` writes fixed DataCite values that do not depend on source data.
+# - `defaults` contains reusable values. 
+
 #
 # - A missing or empty optional source produces no target value. Required-field
 #   checks and the resulting user messages are handled outside this file.
@@ -59,23 +55,10 @@
 # Transformations are names from the transformer registry/factory in the code. They
 # are not executable expressions in this YAML.
 #
-# - copy_value: copy one source value without changing it.
-#
-# - copy_values: copy all non-empty values from a source collection.
-#
 # - strip_to_doi_identifier: recognise a bare DOI, `doi:` value, or DOI URL and
 #   return the canonical DOI string 
 #
 # - alternative_titles: create AlternativeTitle entries for all supplied values.
-#
-# - creator_agent: turn all filtered agent rows into DataCite Creators, mapping
-#   name, person/organisation type, ORCID and affiliation where supplied.
-#
-# - contributor_agent: turn all filtered agent rows into DataCite Contributors
-#   and apply the configured DataCite contributor type.
-#
-# - funding_reference: turn all filtered funder rows into FundingReferences,
-#   using the agent name as the DataCite funder name.
 #
 # - publisher: create the DataCite publisher value from the supplied publisher name.
 #
@@ -120,8 +103,6 @@
 #   entry without creating an empty entry when neither value is present.
 #
 # Leaf transformations used inside `field_mappings`:
-# - agent_type_to_datacite_name_type: apply the adjacent value_map;
-#   `person` becomes `Personal` and `organisation` becomes `Organizational`.
 #
 # - normalise_orcid: trim the value, verify the ORCID pattern and retain its
 #   canonical `https://orcid.org/...` URI form.
@@ -160,11 +141,20 @@ profile:
 defaults:
   metadata_language: en
   datacite_type: dois
+  resource_type_general: Dataset
   alternative_title_type: AlternativeTitle
+  name_identifier_scheme_type: ORCID
+  name_identifier_scheme_uri: https://orcid.org
+  custodian_type: DataManager
+  point_of_contact_type: ContactPerson
+  rights_holder_type: RightsHolder
+  data_collector_type: DataCollector
+  other_contributor_type: Other
+  funder_type: FundingReference
 
 mappings:
 
-  #TODO check how 'id' and 'type' are supposed to be mapped. All examples show these as present outside of the attributes block as 'dois' and the normalized doi identifier.
+  #TODO check how 'id' and 'type' are supposed to be mapped. All examples show these as present outside of the attributes block as 'dois' and the normalized doi identifier, but they're not described in the metadata properties docs.
   - id: primary_datacite_identifier
     source: optional_additional_metadata.resourceIdentifier
     target:
@@ -185,14 +175,18 @@ mappings:
   - id: resource_type
     source: required_metadata.resourceType
     target:
-      json_path: data.attributes.types.resourceType
+      json_path: data.attributes.types      
     transform: null
+    mode: merge
+    field_mappings:
+      - source: "@value"
+        target:
+          json_path: resourceType
+      - source: null
+        target:
+          json_path: resourceTypeGeneral
+        default_value: resource_type_general
 
-  - id: resource_type_general_controlled_vocab
-    source: required_metadata.resourceType
-    target:
-      json_path: data.attributes.types.resourceTypeGeneral
-    transform: null
 
   # Convert the resource identifier into the canonical DOI identifier that
   # identifies the DataCite record's dataset.
@@ -227,14 +221,12 @@ mappings:
         default_value: alternative_title_type
 
   # Select agents whose role is `author` and add them as DataCite Creators.
-  # The transform also normalises person/organisation codes and ORCIDs.
   - id: creators
     source: required_metadata.agents
     filter:
       role: author
     target:
       json_path: data.attributes.creators
-    transform: creator_agent
     field_mappings:
       - source: name
         target:
@@ -242,25 +234,33 @@ mappings:
       - source: agentType
         target:
           json_path: nameType
-        transform: agent_type_to_datacite_name_type
+        transform: transform_using_value_map
         value_map:
           person: Personal
           organisation: Organizational
       - source: orcid
         target:
-          json_path: nameIdentifiers[].nameIdentifier
-        transform: normalise_orcid
-      - value: ORCID
-        when_source_present: orcid
-        target:
-          json_path: nameIdentifiers[].nameIdentifierScheme
-      - value: https://orcid.org
-        when_source_present: orcid
-        target:
-          json_path: nameIdentifiers[].schemeUri
+          json_path: nameIdentifiers
+        field_mappings:
+          - source: "@value"
+            target:
+              json_path: nameIdentifier
+            transform: normalise_orcid
+          - source: null
+            target:
+              json_path: nameIdentifierScheme
+            default_value: name_identifier_scheme_type
+          - source: null
+            target:
+              json_path: schemeUri
+            default_value: name_identifier_scheme_uri
       - source: affiliation
         target:
-          json_path: affiliation[].name
+          json_path: affiliation
+        field_mappings:
+          - source: "@value"
+            target:
+              json_path: name
 
   # Select agents whose role is `custodian` and add them as DataManager
   # Contributors; this expresses custodianship using the closest DataCite role.
@@ -270,10 +270,6 @@ mappings:
       role: custodian
     target:
       json_path: data.attributes.contributors
-    mode: append
-    transform: contributor_agent
-    parameters:
-      contributor_type: DataManager
     field_mappings:
       - source: name
         target:
@@ -281,29 +277,38 @@ mappings:
       - source: agentType
         target:
           json_path: nameType
-        transform: agent_type_to_datacite_name_type
+        transform: transform_using_value_map
         value_map:
           person: Personal
           organisation: Organizational
       - source: orcid
         target:
-          json_path: nameIdentifiers[].nameIdentifier
-        transform: normalise_orcid
-      - value: ORCID
-        when_source_present: orcid
-        target:
-          json_path: nameIdentifiers[].nameIdentifierScheme
-      - value: https://orcid.org
-        when_source_present: orcid
-        target:
-          json_path: nameIdentifiers[].schemeUri
+          json_path: nameIdentifiers
+        field_mappings:
+          - source: "@value"
+            target:
+              json_path: nameIdentifier
+            transform: normalise_orcid
+          - source: null
+            target:
+              json_path: nameIdentifierScheme
+            default_value: name_identifier_scheme_type
+          - source: null
+            target:
+              json_path: schemeUri
+            default_value: name_identifier_scheme_uri
       - source: affiliation
         target:
-          json_path: affiliation[].name
-      - value_from_parameter: contributor_type
+          json_path: affiliation
+        field_mappings:
+          - source: "@value"
+            target:
+              json_path: name
+      - source: null
         target:
           json_path: contributorType
-
+        default_value: custodian_type
+    
   # Select `pointOfContact` agents and add them as ContactPerson Contributors.
   - id: points_of_contact
     source: required_metadata.agents
@@ -311,10 +316,6 @@ mappings:
       role: pointOfContact
     target:
       json_path: data.attributes.contributors
-    mode: append
-    transform: contributor_agent
-    parameters:
-      contributor_type: ContactPerson
     field_mappings:
       - source: name
         target:
@@ -322,28 +323,37 @@ mappings:
       - source: agentType
         target:
           json_path: nameType
-        transform: agent_type_to_datacite_name_type
+        transform: transform_using_value_map
         value_map:
           person: Personal
           organisation: Organizational
       - source: orcid
         target:
-          json_path: nameIdentifiers[].nameIdentifier
-        transform: normalise_orcid
-      - value: ORCID
-        when_source_present: orcid
-        target:
-          json_path: nameIdentifiers[].nameIdentifierScheme
-      - value: https://orcid.org
-        when_source_present: orcid
-        target:
-          json_path: nameIdentifiers[].schemeUri
+          json_path: nameIdentifiers
+        field_mappings:
+          - source: "@value"
+            target:
+              json_path: nameIdentifier
+            transform: normalise_orcid
+          - source: null
+            target:
+              json_path: nameIdentifierScheme
+            default_value: name_identifier_scheme_type
+          - source: null
+            target:
+              json_path: schemeUri
+            default_value: name_identifier_scheme_uri
       - source: affiliation
         target:
-          json_path: affiliation[].name
-      - value_from_parameter: contributor_type
+          json_path: affiliation
+        field_mappings:
+          - source: "@value"
+            target:
+              json_path: name
+      - source: null
         target:
-          json_path : contributorType
+          json_path: contributorType
+        default_value: point_of_contact_type
 
   # Select `dataCollector` agents and add them as DataCollector Contributors.
   - id: data_collectors
@@ -352,10 +362,6 @@ mappings:
       role: dataCollector
     target:
       json_path: data.attributes.contributors
-    mode: append
-    transform: contributor_agent
-    parameters:
-      contributor_type: DataCollector
     field_mappings:
       - source: name
         target:
@@ -363,28 +369,37 @@ mappings:
       - source: agentType
         target:
           json_path: nameType
-        transform: agent_type_to_datacite_name_type
+        transform: transform_using_value_map
         value_map:
           person: Personal
           organisation: Organizational
       - source: orcid
         target:
-          json_path: nameIdentifiers[].nameIdentifier
-        transform: normalise_orcid
-      - value: ORCID
-        when_source_present: orcid
-        target:
-          json_path: nameIdentifiers[].nameIdentifierScheme
-      - value: https://orcid.org
-        when_source_present: orcid
-        target:
-          json_path: nameIdentifiers[].schemeUri
+          json_path: nameIdentifiers
+        field_mappings:
+          - source: "@value"
+            target:
+              json_path: nameIdentifier
+            transform: normalise_orcid
+          - source: null
+            target:
+              json_path: nameIdentifierScheme
+            default_value: name_identifier_scheme_type
+          - source: null
+            target:
+              json_path: schemeUri
+            default_value: name_identifier_scheme_uri
       - source: affiliation
         target:
-          json_path: affiliation[].name
-      - value_from_parameter: contributor_type
+          json_path: affiliation
+        field_mappings:
+          - source: "@value"
+            target:
+              json_path: name
+      - source: null
         target:
           json_path: contributorType
+        default_value: data_collector_type
 
   # Select generic `contributor` agents and add them as Other Contributors.
   - id: other_contributors
@@ -393,10 +408,6 @@ mappings:
       role: contributor
     target:
       json_path: data.attributes.contributors
-    mode: append
-    transform: contributor_agent
-    parameters:
-      contributor_type: Other
     field_mappings:
       - source: name
         target:
@@ -404,28 +415,37 @@ mappings:
       - source: agentType
         target:
           json_path: nameType
-        transform: agent_type_to_datacite_name_type
+        transform: transform_using_value_map
         value_map:
           person: Personal
           organisation: Organizational
       - source: orcid
         target:
-          json_path: nameIdentifiers[].nameIdentifier
-        transform: normalise_orcid
-      - value: ORCID
-        when_source_present: orcid
-        target:
-          json_path: nameIdentifiers[].nameIdentifierScheme
-      - value: https://orcid.org
-        when_source_present: orcid
-        target:
-          json_path: nameIdentifiers[].schemeUri
+          json_path: nameIdentifiers
+        field_mappings:
+          - source: "@value"
+            target:
+              json_path: nameIdentifier
+            transform: normalise_orcid
+          - source: null
+            target:
+              json_path: nameIdentifierScheme
+            default_value: name_identifier_scheme_type
+          - source: null
+            target:
+              json_path: schemeUri
+            default_value: name_identifier_scheme_uri
       - source: affiliation
         target:
-          json_path: affiliation[].name
-      - value_from_parameter: contributor_type
+          json_path: affiliation
+        field_mappings:
+          - source: "@value"
+            target:
+              json_path: name
+      - source: null
         target:
           json_path: contributorType
+        default_value: other_contributor_type
 
   # Select `funder` agents and add their names as DataCite FundingReferences.
   - id: funders
@@ -434,8 +454,6 @@ mappings:
       role: funder
     target:
       json_path: data.attributes.fundingReferences
-    mode: append
-    transform: funding_reference
     field_mappings:
       - source: name
         target:
@@ -447,6 +465,7 @@ mappings:
     target:
       json_path: data.attributes.publisher
     transform: publisher
+    mode: merge
     field_mappings:
       - source: "@value"
         target:
@@ -464,7 +483,6 @@ mappings:
     source: optional_additional_metadata.datePublished
     target:
       json_path: data.attributes.dates
-    mode: append
     transform: datacite_date
     parameters:
       date_type: Issued
@@ -481,7 +499,6 @@ mappings:
     source: required_metadata.dateCreated
     target:
       json_path: data.attributes.dates
-    mode: append
     transform: datacite_date
     parameters:
       date_type: Created
@@ -499,7 +516,6 @@ mappings:
     source: optional_additional_metadata.dateModified
     target:
       json_path: data.attributes.dates
-    mode: append
     transform: updated_dates
     field_mappings:
       - source: date
@@ -525,7 +541,6 @@ mappings:
     source: required_metadata.description
     target:
       json_path: data.attributes.descriptions
-    mode: append
     transform: description
     parameters:
       description_type: Abstract
@@ -546,7 +561,6 @@ mappings:
     source: optional_additional_metadata.audience
     target:
       json_path: data.attributes.descriptions
-    mode: append
     transform: prefixed_description
     parameters:
       description_type: Other
@@ -569,7 +583,6 @@ mappings:
     source: optional_additional_metadata.provenance
     target:
       json_path: data.attributes.descriptions
-    mode: append
     transform: prefixed_description
     parameters:
       description_type: Other
@@ -592,7 +605,6 @@ mappings:
     source: optional_additional_metadata.comments
     target:
       json_path: data.attributes.descriptions
-    mode: append
     transform: prefixed_description
     parameters:
       description_type: Other
@@ -615,7 +627,6 @@ mappings:
     source: required_metadata.keywords
     target:
       json_path: data.attributes.subjects
-    mode: append
     transform: subjects
     field_mappings:
       - source: "@value"
@@ -627,12 +638,7 @@ mappings:
     source: optional_additional_metadata.dataFormat
     target:
       json_path: data.attributes.formats
-    mode: append
-    transform: copy_values
-    field_mappings:
-      - source: "@value"
-        target:
-          json_path: data.attributes.formats[]
+    transform: null
 
   # Copy the current BSI dataset version to DataCite version.
   - id: dataset_version
@@ -647,9 +653,8 @@ mappings:
   - id: related_resources
     source: optional_additional_metadata.relatedResources
     targets:
-        json_path: data.attributes.relatedIdentifiers
-        json_path: data.attributes.relatedItems
-    mode: append
+      - json_path: data.attributes.relatedIdentifiers
+      - json_path: data.attributes.relatedItems
     transform: related_resources
     field_mappings:
       - source: uri
@@ -666,7 +671,7 @@ mappings:
         applies_to: relatedIdentifiers
         target:
           json_path: relationType
-        transform: relation_type_to_datacite
+        transform: transform_using_value_map
         value_map:
           isDerivedFrom: IsDerivedFrom
           isPartOf: IsPartOf
@@ -686,7 +691,11 @@ mappings:
       - source: resource
         applies_to: relatedItems
         target:
-          json_path: titles[].title
+          json_path: titles
+        field_mappings:
+          - source: resource
+            target:
+              json_path: title
       - value: Other
         applies_to: relatedItems
         target:
@@ -695,7 +704,7 @@ mappings:
         applies_to: relatedItems
         target:
           json_path: relationType
-        transform: relation_type_to_datacite
+        transform: transform_using_value_map
         value_map:
           isDerivedFrom: IsDerivedFrom
           isPartOf: IsPartOf
@@ -730,9 +739,8 @@ mappings:
   - id: temporal_coverage
     source: optional_additional_metadata.temporalCoverage
     targets:
-        json_path: data.attributes.dates
-        json_path: data.attributes.descriptions
-    mode: append
+      - json_path: data.attributes.dates
+      - json_path: data.attributes.descriptions
     transform: temporal_coverage
     parameters:
       language_default: metadata_language
@@ -768,7 +776,6 @@ mappings:
     source: optional_additional_metadata.geographicCoverage.geographicElement
     target:
       json_path: data.attributes.geoLocations
-    mode: append
     transform: geographic_elements
     field_mappings:
       - source: geographicDescription
@@ -792,17 +799,14 @@ mappings:
     source: optional_additional_metadata.rightsHolder
     target:
       json_path: data.attributes.contributors
-    mode: append
-    transform: rights_holder_contributor
-    parameters:
-      contributor_type: RightsHolder
     field_mappings:
       - source: "@value"
         target:
           json_path: name
-      - value_from_parameter: contributor_type
+      - source: null
         target:
           json_path: contributorType
+        default_value: rights_holder_type
 
   # Convert the BSI Core access-right type and optional explanation into a DataCite
   # Rights entry, including normalisation of the access-right code.
@@ -810,7 +814,6 @@ mappings:
     source: optional_additional_metadata.accessRights
     target:
       json_path: data.attributes.rightsList
-    mode: append
     transform: access_rights
     parameters:
       access_type_labels:
@@ -837,7 +840,6 @@ mappings:
       uri: optional_additional_metadata.licenseURI
     target:
       json_path: data.attributes.rightsList
-    mode: append
     transform: licence_rights
     field_mappings:
       - source: details

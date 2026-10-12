@@ -8,6 +8,7 @@ class Mapping_rule
     public readonly ?array $target;
     public readonly ?array $targets;
     public readonly ?string $transformer;
+    public readonly ?array $value_map;
     public readonly ?string $mode;
     public readonly array $filter;
     public readonly array $parameters;
@@ -24,6 +25,7 @@ class Mapping_rule
         $this->target = $mapping_fields['target'] ?? null;
         $this->targets = $mapping_fields['targets'] ?? null;
         $this->transformer = $mapping_fields['transform'] ?? null;
+        $this->value_map = $mapping_fields['value_map'] ?? null;
         $this->mode = $mapping_fields['mode'] ?? null;
         $this->filter = $mapping_fields['filter'] ?? [];
         $this->parameters = $mapping_fields['parameters'] ?? [];
