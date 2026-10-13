@@ -43,4 +43,22 @@ class Nested_path_helper
 
         return $result;
     }
+
+    public function merge_output_arrays(array $base, array $addition, string $path = ''): array
+    {
+        if (array_is_list($base) && array_is_list($addition)) {
+            return array_merge($base, $addition);
+        }
+        foreach ($addition as $key => $value) {
+            $here = ltrim("$path.$key", '.');
+            if (!array_key_exists($key, $base)) {
+                $base[$key] = $value;
+            } elseif (is_array($base[$key]) && is_array($value)) {
+                $base[$key] = $this->merge_output_arrays($base[$key], $value, $here);
+            } else {
+                throw new LogicException("Mapping rules collide at '$here'");
+            }
+        }
+        return $base;
+    }
 }

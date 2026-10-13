@@ -1,10 +1,12 @@
 <?php if (! defined('BASEPATH')) exit('No direct script access allowed');
 
-require_once 'application/libraries/Custom_export_types/IProject_export_writer.php';
-require_once 'application/libraries/Custom_export_types/Mapping_classes/Schema_transform_mapping_rules.php';
+require_once APPPATH . 'libraries/Custom_export_types/IProject_export_writer.php';
+require_once APPPATH . 'libraries/Custom_export_types/Mapping_classes/Schema_transform_mapping_rules.php';
 
 class Project_datacite_writer implements IProject_export_writer
 {
+	private $ci;
+
 	/**
 	 * Constructor
 	 */
@@ -38,7 +40,17 @@ class Project_datacite_writer implements IProject_export_writer
 	{
 		$project_json = $this->get_project_json($project_id, $options);
 		$datacite_json = $this->map_to_datacite_json($project_json);
-		file_put_contents($output_file, trim(json_encode($datacite_json, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)) . PHP_EOL);
+		$encoded_json = trim(json_encode($datacite_json, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)) . PHP_EOL;
+
+		if ($encoded_json === false) {
+			throw new Exception("Failed to encode Datacite JSON");
+		}
+
+		$file_written = file_put_contents($output_file, $encoded_json);
+
+		if ($file_written === false) {
+			throw new Exception("Failed to write Datacite JSON to output file");
+		}
 	}
 
 	private function get_project_json(string $project_id, array	$options = array()): array
@@ -69,18 +81,8 @@ class Project_datacite_writer implements IProject_export_writer
 
 		$datacite_map = new Schema_transform_mapping_rules($datacite_map_metadata, $datacite_mapping_rules, $datacite_defaults);
 
-		$inner_datacite_json = $this->ci->project_export_yaml_map_parser->apply_export_mappings($datacite_map, $project_json);
-		$completed_datacite_json = $this->build_full_datacite_structure($inner_datacite_json);
+		$datacite_json = $this->ci->project_export_yaml_map_parser->apply_export_mappings($datacite_map, $project_json);
 
-		return $completed_datacite_json;
-	}
-
-	private function build_full_datacite_structure(array $data): array
-	{
-		$additional_datacite_structures = [
-			'relationships' => [],
-		];
-
-		return array_merge($data, $additional_datacite_structures);
+		return $datacite_json;
 	}
 }

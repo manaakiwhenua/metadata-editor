@@ -1,7 +1,7 @@
 <?php
 
-require_once 'application/libraries/Custom_export_types/Mapping_classes/Mapping_rule.php';
-require_once 'application/libraries/Custom_export_types/Mapping_classes/Mapping_metadata.php';
+require_once APPPATH . 'libraries/Custom_export_types/Mapping_classes/Mapping_rule.php';
+require_once APPPATH . 'libraries/Custom_export_types/Mapping_classes/Mapping_metadata.php';
 
 class Schema_transform_mapping_rules
 {

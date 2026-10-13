@@ -5,7 +5,7 @@ class Mapping_rule
     public readonly ?string $id;
     public readonly ?string $source;
     public readonly ?array $sources;
-    public readonly ?array $target;
+    public readonly ?string $target;
     public readonly ?array $targets;
     public readonly ?string $transformer;
     public readonly ?array $value_map;
@@ -24,7 +24,7 @@ class Mapping_rule
         $this->sources = $mapping_fields['sources'] ?? null;
         $this->target = $mapping_fields['target'] ?? null;
         $this->targets = $mapping_fields['targets'] ?? null;
-        $this->transformer = $mapping_fields['transform'] ?? null;
+        $this->transformer = $mapping_fields['transformer'] ?? null;
         $this->mode = $mapping_fields['mode'] ?? null;
         $this->filter = $mapping_fields['filter'] ?? [];
         $this->parameters = $mapping_fields['parameters'] ?? [];
@@ -37,5 +37,18 @@ class Mapping_rule
 
         $this->default_value = $mapping_fields['default_value'] ?? null;
         $this->original_raw_fields = $mapping_fields;
+
+        $this->validate_mapping_rule();
+    }
+
+    private function validate_mapping_rule(): void
+    {
+        if ($this->transformer && $this->field_mappings) {
+            throw new Exception("Datacite mapping error: Top-level transformation cannot be applied when field mappings are present for rule: " . $this->id);
+        }
+
+        if (!$this->target && !$this->targets) {
+            throw new Exception("Datacite mapping error: Either target or targets must be set for rule: " . $this->id);
+        }
     }
 }

@@ -1,8 +1,8 @@
 <?php
 
-require_once 'application/libraries/Custom_export_types/Transformers/Date_transformers.php';
-require_once 'application/libraries/Custom_export_types/Transformers/Url_transformers.php';
-require_once 'application/libraries/Custom_export_types/Transformers/String_transformers.php';
+require_once APPPATH . 'libraries/Custom_export_types/Transformers/Date_transformers.php';
+require_once APPPATH . 'libraries/Custom_export_types/Transformers/Url_transformers.php';
+require_once APPPATH . 'libraries/Custom_export_types/Transformers/String_transformers.php';
 
 class Project_export_transformer_manager
 {
@@ -16,16 +16,14 @@ class Project_export_transformer_manager
         // add the other transformers here
     );
 
-    public function call(string $name, mixed $input, array $parameters = array()): array | string
+    public function call(string $name, mixed $input, array $parameters = array()): mixed
     {
-        //TODO add graceful handling for unknown transformers
         if (is_null($input)) {
-            return ''; // Return empty string if input is null
+            return null;
         }
 
         if (!isset($this->transformer_map[$name])) {
-            // throw new Exception("Unknown transform in export: " . $name);
-            return ''; // While we're building the transformer map, return empty string for unknown transformers
+            throw new Exception("Datacite mapping error: Unknown transform in Datacite mapping: " . $name);
         }
 
         // Call_user_func will call the function passed to it as an array of [class, method] with the given input and parameters

@@ -2,13 +2,14 @@
 
 use Symfony\Component\Yaml\Yaml;
 
-require_once 'application/libraries/Custom_export_types/Mapping_classes/Nested_path_helper.php';
-require_once 'application/libraries/Custom_export_types/Project_export_transformer_manager.php';
-require_once 'application/libraries/Custom_export_types/Mapping_classes/Mapping_rule.php';
-require_once 'application/libraries/Custom_export_types/Mapping_classes/Schema_transform_mapping_rules.php';
+require_once APPPATH . 'libraries/Custom_export_types/Mapping_classes/Nested_path_helper.php';
+require_once APPPATH . 'libraries/Custom_export_types/Project_export_transformer_manager.php';
+require_once APPPATH . 'libraries/Custom_export_types/Mapping_classes/Mapping_rule.php';
+require_once APPPATH . 'libraries/Custom_export_types/Mapping_classes/Schema_transform_mapping_rules.php';
 
 class Project_export_yaml_map_parser
 {
+    private const RULE_SELF_VALUE = '@value';
 
     public function __construct()
     {
@@ -28,11 +29,9 @@ class Project_export_yaml_map_parser
 
     /**
      * Apply mapping rules to the project JSON and generate result JSON
-     *
-     * @param Mapping_rule[] $mapping_rules - Array of mapping rules which give the source, target, and transformation details for mapping input to output
-     * @param string $path_delimiter - Path notation for accessing nested values
-     * @param array $incoming_json - Incoming project JSON data
-     * @return array - Generated JSON
+     * @param Schema_transform_mapping_rules $map - The mapping rules and defaults for the export
+     * @param array $incoming_json - The incoming project JSON data
+     * @return array - The resulting JSON after applying the mapping rules
      */
     public function apply_export_mappings(Schema_transform_mapping_rules $map, array $incoming_json): array
     {
@@ -40,72 +39,77 @@ class Project_export_yaml_map_parser
         $nested_path_helper = new Nested_path_helper();
         $path_delimiter = $map->map_metadata->path_delimiter;
         $mapping_rules = $map->mapping_rules;
-        $mapping_defaults = $map->mapping_defaults ?? [];
+        $mapping_defaults = $map->mapping_defaults;
 
         $result_json = [];
 
         foreach ($mapping_rules as $rule) {
 
             $output_value = $this->apply_mapping_rule($rule, $incoming_json, $path_delimiter, $transformer_manager, $nested_path_helper, $mapping_defaults);
-            $output_path = $rule->target['json_path'] ?? null;
+            $output_path = $rule->target ?? null;
 
             if ($output_value !== null && $output_path) {
                 $output = $nested_path_helper->build_object_from_path($output_value, $output_path, $path_delimiter);
-                $result_json = array_merge_recursive($result_json, $output); // array_merge_recursive travels down into the paths and adds values at the correct levels            
+                $result_json = $nested_path_helper->merge_output_arrays($result_json, $output);
             }
         }
         return $result_json;
     }
 
     /**
-     * Apply a single mapping rule. This function is used recursively to apply mapping rules at different levels of the incoming JSON structure. The incoming JSON can be either an array or a string, depending on which level of mapping rule is being called.
+     * Apply a single mapping rule. This function is used recursively to apply mapping rules at different levels of the incoming JSON structure. The incoming scope is either the whole project JSON, or a value within the JSON, depending on the level of recursion.
      */
-    private function apply_mapping_rule(Mapping_rule $rule, array | string $incoming_json, string $path_delimiter, Project_export_transformer_manager $transformer_manager, Nested_path_helper $nested_path_helper, array $mapping_defaults): mixed
+    private function apply_mapping_rule(Mapping_rule $rule, mixed $scope, string $path_delimiter, Project_export_transformer_manager $transformer_manager, Nested_path_helper $nested_path_helper, array $mapping_defaults): mixed
     {
-        $incoming_value_json_path = $rule->source;
+        $result_value = $this->get_value_from_source($rule, $scope, $path_delimiter, $nested_path_helper);
+        $result_value ??= $this->map_to_default($result_value, $rule->default_value, $mapping_defaults);
 
-        if ($incoming_value_json_path === '@value') {
-            $incoming_value = $incoming_json; // In this situation, we're dealing with a field mapping that uses the entire incoming JSON as its value
-        } else {
-            $incoming_value = $nested_path_helper->get_value_from_path($incoming_json, $incoming_value_json_path, $path_delimiter);
-        }
-
-        $field_mappings = $rule->field_mappings ?? [];
-        $transformer = $rule->transformer ?? null;
-        $result_value = $incoming_value;
-        $parameters = $rule->parameters ?? [];
-
-        if ($result_value === null) {
-            $result_value = $this->map_to_default($result_value, $rule->default_value, $mapping_defaults);
-        }
-
-        if (isset($rule->filter) && !empty($rule->filter) && is_array($result_value)) {
+        if ($rule->filter && is_array($result_value)) {
             $result_value = $this->filter_values($result_value, $rule->filter);
         }
 
-        if ($result_value === null) {
+        if ($result_value === null || is_array($result_value) && empty($result_value)) {
             return null; // Skip this mapping if the incoming value is null after filtering and applying defaults
         }
 
-        if (empty($field_mappings)) {
-            if ($result_value && $transformer) {
+        if (!$rule->field_mappings) {
+            if ($result_value !== null && $rule->transformer) {
                 $result_value = $transformer_manager->call(
-                    $transformer,
+                    $rule->transformer,
                     $result_value,
-                    $parameters
+                    $rule->parameters
                 );
             }
-            return $result_value;
+            return $result_value ?? null;
         }
 
         // If there ARE field mappings, the result value is an object that needs its fields to be mapped into specific datacite object fields before return.
-        if (!is_array($result_value) || !array_is_list($result_value)) {
-            $result_value = [$result_value];
+        $result_objects = $this->build_result_objects($rule, $result_value, $path_delimiter, $transformer_manager, $nested_path_helper, $mapping_defaults);
+        return $result_objects;
+    }
+
+    private function get_value_from_source(Mapping_rule $rule, mixed $scope, string $path_delimiter, Nested_path_helper $nested_path_helper): mixed
+    {
+        $incoming_value_json_path = $rule->source;
+
+        if ($incoming_value_json_path === self::RULE_SELF_VALUE) {
+            $incoming_value = $scope; // In this situation, we're dealing with a field mapping that uses the incoming data as its value
+        } else {
+            $incoming_value = $nested_path_helper->get_value_from_path($scope, $incoming_value_json_path, $path_delimiter);
+        }
+        return $incoming_value;
+    }
+
+    private function build_result_objects(Mapping_rule $rule, mixed $value, string $path_delimiter, Project_export_transformer_manager $transformer_manager, Nested_path_helper $nested_path_helper, array $mapping_defaults): mixed
+    {
+
+        if (!is_array($value) || !array_is_list($value)) {
+            $value = [$value];
         }
 
         $result_objects = array_map(
             fn($row) => $this->build_result_object_from_field_mappings($rule->field_mappings, $row, $path_delimiter, $transformer_manager, $nested_path_helper, $mapping_defaults),
-            $result_value
+            $value
         );
 
         // If there is only one result object and the mapping expects a single object, return a single object
@@ -116,12 +120,12 @@ class Project_export_yaml_map_parser
     }
 
 
-    private function build_result_object_from_field_mappings(array $field_mappings, array | string $row, string $path_delimiter, Project_export_transformer_manager $transformer_manager, Nested_path_helper $nested_path_helper, array $mapping_defaults): array
+    private function build_result_object_from_field_mappings(array $field_mappings, mixed $row, string $path_delimiter, Project_export_transformer_manager $transformer_manager, Nested_path_helper $nested_path_helper, array $mapping_defaults): array
     {
         $output_object = [];
         foreach ($field_mappings as $field_mapping) {
             $value = $this->apply_mapping_rule($field_mapping, $row, $path_delimiter, $transformer_manager, $nested_path_helper, $mapping_defaults);
-            $target_path = $field_mapping->target ? $field_mapping->target['json_path'] : null;
+            $target_path = $field_mapping->target;
 
             if ($value !== null && $target_path !== null) {
                 $output_object[$target_path] = $value;
@@ -158,7 +162,7 @@ class Project_export_yaml_map_parser
         $include_item = true;
 
         foreach ($filter_array as $filter_key => $filter_value) {
-            if (!isset($item[$filter_key]) || $item[$filter_key] != $filter_value) {
+            if (!isset($item[$filter_key]) || $item[$filter_key] !== $filter_value) {
                 $include_item = false;
                 break;
             }

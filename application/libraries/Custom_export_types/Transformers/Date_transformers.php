@@ -13,14 +13,4 @@ final class Date_transformers
 
         return $date->format('Y');
     }
-
-    static function datacite_date($input, $parameters)
-    {
-        return '';
-    }
-
-    static function updated_dates($input, $parameters)
-    {
-        return '';
-    }
 }
