@@ -2,6 +2,9 @@
 
 require_once APPPATH . 'libraries/Custom_export_types/IProject_export_writer.php';
 require_once APPPATH . 'libraries/Custom_export_types/Mapping_classes/Schema_transform_mapping_rules.php';
+require_once APPPATH . 'libraries/Custom_export_types/Project_export_mapping_resolver.php';
+require_once APPPATH . 'libraries/Custom_export_types/Project_export_transformer_manager.php';
+require_once APPPATH . 'libraries/Custom_export_types/Mapping_classes/Nested_path_helper.php';
 
 class Project_datacite_writer implements IProject_export_writer
 {
@@ -40,13 +43,13 @@ class Project_datacite_writer implements IProject_export_writer
 	{
 		$project_json = $this->get_project_json($project_id, $options);
 		$datacite_json = $this->map_to_datacite_json($project_json);
-		$encoded_json = trim(json_encode($datacite_json, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)) . PHP_EOL;
+		$encoded_json = json_encode($datacite_json, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 
 		if ($encoded_json === false) {
 			throw new Exception("Failed to encode Datacite JSON");
 		}
 
-		$file_written = file_put_contents($output_file, $encoded_json);
+		$file_written = file_put_contents($output_file, $encoded_json . PHP_EOL);
 
 		if ($file_written === false) {
 			throw new Exception("Failed to write Datacite JSON to output file");
@@ -81,7 +84,13 @@ class Project_datacite_writer implements IProject_export_writer
 
 		$datacite_map = new Schema_transform_mapping_rules($datacite_map_metadata, $datacite_mapping_rules, $datacite_defaults);
 
-		$datacite_json = $this->ci->project_export_yaml_map_parser->apply_export_mappings($datacite_map, $project_json);
+		$mapping_resolver = new Project_export_mapping_resolver(
+			$datacite_map,
+			new Project_export_transformer_manager(),
+			new Nested_path_helper()
+		);
+
+		$datacite_json = $mapping_resolver->apply_export_mappings($project_json);
 
 		return $datacite_json;
 	}

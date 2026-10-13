@@ -4,7 +4,7 @@ class Nested_path_helper
 {
     public function __construct() {}
 
-    public function get_value_from_path(array | string $incoming_data, string | null $path, string $path_delimiter): mixed
+    public function get_value_from_path(mixed $incoming_data, string | null $path, string $path_delimiter): mixed
     {
         if ($path === null) {
             return null;
@@ -23,9 +23,8 @@ class Nested_path_helper
         return $value;
     }
 
-    public function build_object_from_path(array | string $input_value, string $output_path, string $path_delimiter)
+    public function build_object_from_path(mixed $input_value, string $output_path, string $path_delimiter): array
     {
-
         $path_parts = explode($path_delimiter, $output_path);
         $result = [];
         $current = &$result;
@@ -56,7 +55,7 @@ class Nested_path_helper
             } elseif (is_array($base[$key]) && is_array($value)) {
                 $base[$key] = $this->merge_output_arrays($base[$key], $value, $here);
             } else {
-                throw new LogicException("Mapping rules collide at '$here'");
+                throw new Exception("Mapping rules collide at: " . $here);
             }
         }
         return $base;
