@@ -53,7 +53,7 @@ class Project_export_mapping_resolver
         $value = $this->get_value_from_source($rule, $scope);
         $value ??= $rule->default_value; // Apply default value if the current value is null
 
-        if ($rule->filter && is_array($value)) {
+        if ($rule->filter && is_array($value) && array_is_list($value)) {
             $value = $this->filter_values($value, $rule->filter);
         }
 
@@ -64,7 +64,7 @@ class Project_export_mapping_resolver
         // If there ARE field mappings, the result value is an object that needs its fields to be mapped into specific datacite object fields before return.
         $value = $this->apply_field_mappings($rule, $value);
 
-        return $value;
+        return ($value === [] || $value === '') ? null : $value;
     }
 
     private function get_value_from_source(Mapping_rule $rule, mixed $scope): mixed
@@ -80,25 +80,28 @@ class Project_export_mapping_resolver
         return $incoming_value;
     }
 
-    private function filter_values(array $incoming_array, array $filter_array)
+    // We are only filtering arrays containing objects, as filtering requires key-value pairs to match against. Arrays containing simple values are ignored.
+    private function filter_values(array $incoming_array, array $filter_key_value)
     {
         $filtered_items = [];
 
         foreach ($incoming_array as $item) {
-            $include_item = $this->check_if_value_matches_all_filters($item, $filter_array);
+            if (is_array($item)) {
+                $include_item = $this->check_if_value_matches_all_filters($item, $filter_key_value);
 
-            if ($include_item) {
-                $filtered_items[] = $item;
+                if ($include_item) {
+                    $filtered_items[] = $item;
+                }
             }
         }
         return $filtered_items;
     }
 
-    private function check_if_value_matches_all_filters(array $item, array $filter_array): bool
+    private function check_if_value_matches_all_filters(array $item, array $filter_key_value): bool
     {
         $include_item = true;
 
-        foreach ($filter_array as $filter_key => $filter_value) {
+        foreach ($filter_key_value as $filter_key => $filter_value) {
             if (!isset($item[$filter_key]) || $item[$filter_key] !== $filter_value) {
                 $include_item = false;
                 break;
@@ -145,7 +148,8 @@ class Project_export_mapping_resolver
             return $result_object_array ?? null;
         }
 
-        if (count($result_object_array) !== 1) {
+        // More than one object should cause an exception when the mode is single object, but zero objects is okay, as optional fields exist
+        if (count($result_object_array) > 1) {
             throw new Exception("Mapping rule expected a single object, but produced " . count($result_object_array) . " objects");
         }
 
@@ -155,12 +159,15 @@ class Project_export_mapping_resolver
     private function build_field_mapped_object(array $field_mappings, mixed $row): array
     {
         $output_object = [];
+        $path_delimiter = $this->map->map_metadata->path_delimiter;
+
         foreach ($field_mappings as $field_mapping) {
             $value = $this->apply_mapping_rule($field_mapping, $row);
             $target_path = $field_mapping->target;
 
             if ($value !== null && $target_path !== null) {
-                $output_object[$target_path] = $value;
+                $field_value = $this->nested_path_helper->build_object_from_path($value, $target_path, $path_delimiter);
+                $output_object = $this->nested_path_helper->merge_output_arrays($output_object, $field_value);
             }
         }
 
