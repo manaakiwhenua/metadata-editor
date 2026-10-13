@@ -1,0 +1,72 @@
+{
+    "data": {
+        "id": "10.7931/abcde",
+        "type": "dois",
+        "attributes": {
+            "types": {
+                "resourceType": "Dataset",
+                "resourceTypeGeneral": "Dataset"
+            },
+            "doi": "10.7931/abcde",
+            "titles": [
+                {
+                    "title": "Subtropical perennial food production systems in New Zealand"
+                },
+                {
+                    "title": "An alternative title",
+                    "titleType": "AlternativeTitle"
+                },
+                {
+                    "title": "Another alternative title",
+                    "titleType": "AlternativeTitle"
+                }
+            ],
+            "creators": [
+                {
+                    "name": "Doe, Jane",
+                    "nameType": "Personal",
+                    "affiliation": [
+                        {
+                            "name": "Bioeconomy Science Institute Maiangi Taiao"
+                        }
+                    ]
+                }
+            ],
+            "contributors": [
+                {
+                    "name": "Carberry, Josiah",
+                    "nameType": "Personal",
+                    "nameIdentifiers": [
+                        {
+                            "nameIdentifier": "https://orcid.org/0000-0002-1825-0097",
+                            "nameIdentifierScheme": "ORCID",
+                            "schemeUri": "https://orcid.org"
+                        }
+                    ],
+                    "affiliation": [
+                        {
+                            "name": "Wesleyan University"
+                        }
+                    ],
+                    "contributorType": "DataManager"
+                },
+                {
+                    "name": "Doe, John",
+                    "nameType": "Personal",
+                    "affiliation": [
+                        {
+                            "name": "Bioeconomy Science Institute Maiangi Taiao"
+                        }
+                    ],
+                    "contributorType": "DataCollector"
+                }
+            ],
+            "fundingReferences": [
+                {
+                    "funderName": "Bioeconomy Science Institute Maiangi Taiao"
+                }
+            ],
+            "publicationYear": "2024"
+        }
+    }
+}
