@@ -45,9 +45,17 @@ class Nested_path_helper
 
     public function merge_output_arrays(array $base, array $addition, string $path = ''): array
     {
-        if (array_is_list($base) && array_is_list($addition)) {
+        $base_is_list = array_is_list($base);
+        $addition_is_list = array_is_list($addition);
+
+        if ($base_is_list && $addition_is_list) {
             return array_merge($base, $addition);
         }
+
+        if (($base !== [] && $base_is_list) || ($addition !== [] && $addition_is_list)) {
+            throw new LogicException("Cannot merge a list with an object at '$path'");
+        }
+
         foreach ($addition as $key => $value) {
             $here = ltrim("$path.$key", '.');
             if (!array_key_exists($key, $base)) {
