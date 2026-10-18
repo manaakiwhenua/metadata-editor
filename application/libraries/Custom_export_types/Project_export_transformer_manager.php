@@ -21,7 +21,7 @@ class Project_export_transformer_manager
         }
 
         if (!isset($this->transformer_map[$name])) {
-            throw new Exception("Datacite mapping error: Unknown transform in Datacite mapping: " . $name);
+            throw new Exception("Mapping error: Unknown transform in mapping: " . $name);
         }
 
         // Call_user_func will call the function passed to it as an array of [class, method] with the given input and parameters

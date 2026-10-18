@@ -8,8 +8,9 @@ class Mapping_metadata
     public readonly array $target;
     public readonly ?string $path_delimiter;
     public readonly array $original_raw_fields;
+    public readonly array $defaults;
 
-    public function __construct(array $metadata_array)
+    public function __construct(array $metadata_array, array $defaults = [])
     {
         $this->id = $metadata_array['id'] ?? null;
         $this->version = $metadata_array['version'] ?? null;
@@ -17,5 +18,6 @@ class Mapping_metadata
         $this->target = $metadata_array['target'] ?? [];
         $this->path_delimiter = $metadata_array['path_delimiter'] ?? '.';
         $this->original_raw_fields = $metadata_array ?? [];
+        $this->defaults = $defaults;
     }
 }

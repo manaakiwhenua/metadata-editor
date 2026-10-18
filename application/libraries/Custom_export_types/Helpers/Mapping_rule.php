@@ -12,7 +12,7 @@ class Mapping_rule
     public readonly ?string $mode;
     public readonly array $filter;
     public readonly array $parameters;
-    public readonly array $field_mappings;
+    public readonly array $inner_object_mappings;
     public readonly ?string $default_value_id;
     public readonly mixed $default_value;
     public readonly array $original_raw_fields;
@@ -35,10 +35,10 @@ class Mapping_rule
         $this->default_value = $mapping_defaults[$this->default_value_id] ?? null;
         $this->original_raw_fields = $mapping_fields;
 
-        //Field mappings is another, inner array of Mapping_rule, for the fields of objects within the main mapping rule.
-        $this->field_mappings = array_map(
+        //Inner_object_mappings is another, inner array of Mapping_rule, for the fields of objects within the main mapping rule.
+        $this->inner_object_mappings = array_map(
             fn($field_mapping) => new Mapping_rule($field_mapping, $mapping_defaults),
-            $mapping_fields['field_mappings'] ?? [],
+            $mapping_fields['inner_object_mappings'] ?? [],
         );
 
         $this->validate_mapping_defaults();
@@ -49,21 +49,21 @@ class Mapping_rule
     private function validate_targets(): void
     {
         if (!$this->target && !$this->targets) {
-            throw new Exception("Datacite mapping error: Either target or targets must be set for rule: " . $this->id . " With source: " . $this->source);
+            throw new Exception("Mapping error: Either target or targets must be set for rule: " . $this->id . " With source: " . $this->source);
         }
     }
 
     private function validate_mapping_defaults(): void
     {
         if ($this->default_value_id !== null && $this->default_value === null) {
-            throw new Exception("Datacite mapping error: Default value id '" . ($this->default_value_id ?? 'unknown') . "' is unknown or empty.");
+            throw new Exception("Mapping error: Default value id '" . ($this->default_value_id ?? 'unknown') . "' is unknown or empty.");
         }
     }
 
     private function validate_transformers(): void
     {
-        if ($this->transformer && $this->field_mappings) {
-            throw new Exception("Datacite mapping error: Top-level transformation cannot be applied when field mappings are present. Check and correct rule: '" . $this->id . "'.");
+        if ($this->transformer && $this->inner_object_mappings) {
+            throw new Exception("Mapping error: Top-level transformation cannot be applied when inner object mappings are present. Check and correct rule: '" . $this->id . "'.");
         }
     }
 }

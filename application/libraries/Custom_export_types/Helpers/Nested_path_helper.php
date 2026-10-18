@@ -26,18 +26,10 @@ class Nested_path_helper
     public function build_object_from_path(mixed $input_value, string $output_path, string $path_delimiter): array
     {
         $path_parts = explode($path_delimiter, $output_path);
-        $result = [];
-        $current = &$result;
+        $result = $input_value;
 
-        foreach ($path_parts as $index => $part) {
-            if ($index === count($path_parts) - 1) {
-                $current[$part] = $input_value;
-            } else {
-                if (!isset($current[$part]) || !is_array($current[$part])) {
-                    $current[$part] = [];
-                }
-                $current = &$current[$part];
-            }
+        for ($i = count($path_parts) - 1; $i >= 0; $i--) {
+            $result = [$path_parts[$i] => $result];
         }
 
         return $result;

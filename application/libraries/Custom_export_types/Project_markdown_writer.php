@@ -8,6 +8,7 @@ require_once APPPATH . 'libraries/Custom_export_types/Metadata_provenance.php';
 
 class Project_markdown_writer implements IProject_export_writer
 {
+	private $ci;
 	/**
 	 * Constructor
 	 */

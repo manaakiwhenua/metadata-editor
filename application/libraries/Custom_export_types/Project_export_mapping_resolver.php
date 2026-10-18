@@ -1,9 +1,9 @@
 <?php
 
-require_once APPPATH . 'libraries/Custom_export_types/Mapping_classes/Nested_path_helper.php';
+require_once APPPATH . 'libraries/Custom_export_types/Helpers/Nested_path_helper.php';
 require_once APPPATH . 'libraries/Custom_export_types/Project_export_transformer_manager.php';
-require_once APPPATH . 'libraries/Custom_export_types/Mapping_classes/Mapping_rule.php';
-require_once APPPATH . 'libraries/Custom_export_types/Mapping_classes/Schema_transform_mapping_rules.php';
+require_once APPPATH . 'libraries/Custom_export_types/Helpers/Mapping_rule.php';
+require_once APPPATH . 'libraries/Custom_export_types/Helpers/Schema_transform_mapping_rules.php';
 
 class Project_export_mapping_resolver
 {
@@ -57,12 +57,12 @@ class Project_export_mapping_resolver
             $value = $this->filter_values($value, $rule->filter);
         }
 
-        if (!$rule->field_mappings) {
+        if (!$rule->inner_object_mappings) {
             return $this->transform($rule, $value);
         }
 
-        // If there ARE field mappings, the result value is an object that needs its fields to be mapped into specific datacite object fields before return.
-        $value = $this->apply_field_mappings($rule, $value);
+        // If there ARE inner object mappings, the result value is an object that needs its fields to be mapped into specific target object fields before return.
+        $value = $this->apply_inner_object_mappings($rule, $value);
 
         return ($value === [] || $value === '') ? null : $value;
     }
@@ -73,7 +73,7 @@ class Project_export_mapping_resolver
         $path_delimiter = $this->map->map_metadata->path_delimiter;
 
         if ($incoming_value_json_path === self::RULE_SELF_VALUE) {
-            $incoming_value = $scope; // In this situation, we're dealing with a field mapping that uses the incoming data as its value
+            $incoming_value = $scope; // In this situation, we're dealing with an inner object mapping that uses the incoming data as its value
         } else {
             $incoming_value = $this->nested_path_helper->get_value_from_path($scope, $incoming_value_json_path, $path_delimiter);
         }
@@ -125,7 +125,7 @@ class Project_export_mapping_resolver
         return $result_value ?? null;
     }
 
-    private function apply_field_mappings(Mapping_rule $rule, mixed $value): mixed
+    private function apply_inner_object_mappings(Mapping_rule $rule, mixed $value): mixed
     {
         if ($value === null) {
             return null;
@@ -138,7 +138,7 @@ class Project_export_mapping_resolver
         $result_object_array = [];
 
         foreach ($value as $array_item) {
-            $result_object = $this->build_field_mapped_object($rule->field_mappings, $array_item);
+            $result_object = $this->build_field_mapped_object($rule->inner_object_mappings, $array_item);
             if (!empty($result_object)) {
                 $result_object_array[] = $result_object;
             }
@@ -156,12 +156,12 @@ class Project_export_mapping_resolver
         return $result_object_array[0] ?? null;
     }
 
-    private function build_field_mapped_object(array $field_mappings, mixed $row): array
+    private function build_field_mapped_object(array $inner_object_mappings, mixed $row): array
     {
         $output_object = [];
         $path_delimiter = $this->map->map_metadata->path_delimiter;
 
-        foreach ($field_mappings as $field_mapping) {
+        foreach ($inner_object_mappings as $field_mapping) {
             $value = $this->apply_mapping_rule($field_mapping, $row);
             $target_path = $field_mapping->target;
 

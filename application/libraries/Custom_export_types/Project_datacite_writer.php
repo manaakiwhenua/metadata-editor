@@ -1,10 +1,10 @@
 <?php if (! defined('BASEPATH')) exit('No direct script access allowed');
 
 require_once APPPATH . 'libraries/Custom_export_types/IProject_export_writer.php';
-require_once APPPATH . 'libraries/Custom_export_types/Mapping_classes/Schema_transform_mapping_rules.php';
+require_once APPPATH . 'libraries/Custom_export_types/Helpers/Schema_transform_mapping_rules.php';
 require_once APPPATH . 'libraries/Custom_export_types/Project_export_mapping_resolver.php';
 require_once APPPATH . 'libraries/Custom_export_types/Project_export_transformer_manager.php';
-require_once APPPATH . 'libraries/Custom_export_types/Mapping_classes/Nested_path_helper.php';
+require_once APPPATH . 'libraries/Custom_export_types/Helpers/Nested_path_helper.php';
 
 class Project_datacite_writer implements IProject_export_writer
 {
