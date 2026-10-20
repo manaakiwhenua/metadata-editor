@@ -76,7 +76,6 @@ class Project_datacite_writer implements IProject_export_writer
 
 	private function map_to_datacite_json(array $project_json): array
 	{
-
 		$datacite_map_raw = $this->ci->project_export_yaml_map_parser->parse_yaml_map($this->ci->config->item('bsi_core_to_datacite'));
 		$datacite_map_metadata = $datacite_map_raw['profile'] ?? [];
 		$datacite_mapping_rules = $datacite_map_raw['mappings'] ?? [];
