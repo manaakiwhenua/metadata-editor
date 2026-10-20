@@ -1,10 +1,10 @@
 <?php if (! defined('BASEPATH')) exit('No direct script access allowed');
 
 require_once APPPATH . 'libraries/Custom_export_types/IProject_export_writer.php';
-require_once APPPATH . 'libraries/Custom_export_types/Mapping_classes/Schema_transform_mapping_rules.php';
+require_once APPPATH . 'libraries/Custom_export_types/Helpers/Schema_transform_mapping_rules.php';
 require_once APPPATH . 'libraries/Custom_export_types/Project_export_mapping_resolver.php';
 require_once APPPATH . 'libraries/Custom_export_types/Project_export_transformer_manager.php';
-require_once APPPATH . 'libraries/Custom_export_types/Mapping_classes/Nested_path_helper.php';
+require_once APPPATH . 'libraries/Custom_export_types/Helpers/Nested_path_helper.php';
 
 class Project_datacite_writer implements IProject_export_writer
 {
@@ -76,7 +76,6 @@ class Project_datacite_writer implements IProject_export_writer
 
 	private function map_to_datacite_json(array $project_json): array
 	{
-
 		$datacite_map_raw = $this->ci->project_export_yaml_map_parser->parse_yaml_map($this->ci->config->item('bsi_core_to_datacite'));
 		$datacite_map_metadata = $datacite_map_raw['profile'] ?? [];
 		$datacite_mapping_rules = $datacite_map_raw['mappings'] ?? [];
