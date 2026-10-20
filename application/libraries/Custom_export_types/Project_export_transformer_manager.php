@@ -14,14 +14,14 @@ class Project_export_transformer_manager
         // add the other transformers here
     );
 
-    public function call(string $name, mixed $input, array $parameters = array()): mixed
+    public function call(string $name, string $export_type, mixed $input, array $parameters = array()): mixed
     {
         if (is_null($input)) {
             return null;
         }
 
         if (!isset($this->transformer_map[$name])) {
-            throw new Exception("Mapping error: Unknown transform in mapping: " . $name);
+            throw new Exception("Mapping error in export: '" . $export_type . "': Unknown transform in mapping: " . $name);
         }
 
         // Call_user_func will call the function passed to it as an array of [class, method] with the given input and parameters

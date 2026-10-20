@@ -118,6 +118,7 @@ class Project_export_mapping_resolver
 
         $result_value = $this->transformer_manager->call(
             $rule->transformer,
+            $this->map->map_metadata->id,
             $result_value,
             $rule->parameters
         );
