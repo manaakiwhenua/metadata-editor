@@ -3,14 +3,16 @@
 
 class Metadata_provenance
 {
-        /** @var string */
+    /** @var string */
     public $provenance_title;
     /** @var string */
     public $provenance_generation_text;
-  
+    /** @var CI_Controller */
+    private $ci;
+
     public function __construct(string $generated_on_local_datetime, string $timezone)
     {
-        $this->ci =& get_instance();
+        $this->ci = &get_instance();
         $this->ci->load->helper('language');
         $this->ci->lang->load('project');
 
@@ -23,8 +25,7 @@ class Metadata_provenance
 
     public function get_provenance_text_markdown()
     {
-        $markdown_divider = "\n\n***\n\n";                  
+        $markdown_divider = "\n\n***\n\n";
         return $this->provenance_title . $markdown_divider . $this->provenance_generation_text . $markdown_divider;
-
     }
 }

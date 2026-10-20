@@ -3,11 +3,12 @@
 use League\HTMLToMarkdown\HtmlConverter;
 use League\HTMLToMarkdown\Converter\TableConverter;
 
-require_once 'application/libraries/Custom_export_types/IProject_export_writer.php';
-require_once 'application/libraries/Custom_export_types/Metadata_provenance.php';
+require_once APPPATH . 'libraries/Custom_export_types/IProject_export_writer.php';
+require_once APPPATH . 'libraries/Custom_export_types/Metadata_provenance.php';
 
 class Project_markdown_writer implements IProject_export_writer
 {
+	private $ci;
 	/**
 	 * Constructor
 	 */
