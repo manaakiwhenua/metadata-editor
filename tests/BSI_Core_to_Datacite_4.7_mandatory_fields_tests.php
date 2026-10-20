@@ -28,7 +28,5 @@ $bsi_core_mandatory_fields_json = json_decode(file_get_contents($bsi_core_mandat
 
 $expected_datacite = json_decode(file_get_contents($expected_datacite_file), true, 512, JSON_THROW_ON_ERROR);
 
-$mapping_metadata = ['path_delimiter' => '.'];
-
 // Test mapping of BSI Core mandatory fields to DataCite 4.7 mandatory fields
-assert_eq($expected_datacite, run_mapping($mapping_metadata, $datacite_mapping_rules, $bsi_core_mandatory_fields_json, $datacite_defaults), 'Mandatory fields mapping');
+assert_eq($expected_datacite, run_mapping($datacite_map_metadata, $datacite_mapping_rules, $bsi_core_mandatory_fields_json, $datacite_defaults), 'Mandatory fields mapping');
