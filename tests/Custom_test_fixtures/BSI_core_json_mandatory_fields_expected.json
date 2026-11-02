@@ -1,0 +1,82 @@
+{
+    "required_metadata": {
+        "resourceType": "Dataset",
+        "title": "Subtropical perennial food production systems in New Zealand",
+        "description": "A dataset on subtropical perennial food production systems in New Zealand.",
+        "agents": [
+            {
+                "agentType": "person",
+                "name": "Doe, Jane",
+                "role": "author",
+                "affiliation": "Bioeconomy Science Institute Maiangi Taiao"
+            },
+            {
+                "agentType": "person",
+                "name": "Doe, John",
+                "role": "dataCollector",
+                "affiliation": "Bioeconomy Science Institute Maiangi Taiao"
+            },
+            {
+                "agentType": "person",
+                "name": "Carberry, Josiah",
+                "role": "custodian",
+                "affiliation": "Wesleyan University",
+                "orcid": "https://orcid.org/0000-0002-1825-0097"
+            },
+            {
+                "agentType": "organization",
+                "name": "Bioeconomy Science Institute Maiangi Taiao",
+                "role": "funder",
+                "affiliation": "Bioeconomy Science Institute Maiangi Taiao"
+            }
+        ],
+        "dateCreated": "2024-10-02T02:16:33.834833Z",
+        "keywords": [
+            "subtropical",
+            "perennial",
+            "food production",
+            "New Zealand"
+        ]
+    },
+    "optional_additional_metadata": {
+        "resourceIdentifier": "https://doi.org/10.7931/abcde",
+        "datasetVersion": "1",
+        "licenseDetails": "CC-BY 4.0 (Attribution)",
+        "licenseURI": "https://creativecommons.org/licenses/by/4.0",
+        "dataFormat": [
+            "XLSX",
+            "TSV"
+        ],
+        "temporalCoverage": {
+            "start": "2016",
+            "end": "2018"
+        },
+        "geographicCoverage": {
+            "geographicElement": [
+                {
+                    "geographicBoundingBox": {
+                        "westBoundLongitude": 165.08,
+                        "eastBoundLongitude": 179.35,
+                        "southBoundLatitude": -48.25,
+                        "northBoundLatitude": -33.64
+                    },
+                    "geographicDescription": "New Zealand (North and South Islands, Great Barrier Island/Aotea and Stewart Island/Rakiura)"
+                }
+            ]
+        },
+        "comments": "A comment",
+        "relatedResources": [
+            {
+                "resource": "A resource",
+                "relationType": "hasPart",
+                "uri": "google.com"
+            }
+        ],
+        "rightsHolder": "Bioeconomy Science Institute Maiangi Taiao",
+        "alternativeTitle": [
+            "An alternative title",
+            "Another alternative title"
+        ],
+        "datePublished": "2024-12"
+    }
+}

@@ -2,18 +2,15 @@
 
 final class Date_transformers
 {
-    static function year_from_date($date)
+    static function year_from_date(string $input)
     {
-        return '';
-    }
+        $input = trim($input);
+        $date = date_create($input);
 
-    static function datacite_date($date)
-    {
-        return '';
-    }
+        if (!$date) {
+            throw new InvalidArgumentException("Invalid date input: {$input}. Expected format: 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.");
+        }
 
-    static function updated_dates($dates)
-    {
-        return '';
+        return $date->format('Y');
     }
 }

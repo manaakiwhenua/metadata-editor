@@ -1,9 +1,15 @@
 <?php if (! defined('BASEPATH')) exit('No direct script access allowed');
 
-require_once 'application/libraries/Custom_export_types/Mapping_classes/Schema_transform_mapping_rules.php';
+require_once APPPATH . 'libraries/Custom_export_types/IProject_export_writer.php';
+require_once APPPATH . 'libraries/Custom_export_types/Helpers/Schema_transform_mapping_rules.php';
+require_once APPPATH . 'libraries/Custom_export_types/Project_export_mapping_resolver.php';
+require_once APPPATH . 'libraries/Custom_export_types/Project_export_transformer_manager.php';
+require_once APPPATH . 'libraries/Custom_export_types/Helpers/Nested_path_helper.php';
 
 class Project_datacite_writer implements IProject_export_writer
 {
+	private $ci;
+
 	/**
 	 * Constructor
 	 */
@@ -33,5 +39,58 @@ class Project_datacite_writer implements IProject_export_writer
 	 * @return void	 
 	 *  
 	 */
-	public function generate(string $project_id, string $output_file, array $options = array()): void {}
+	public function generate(string $project_id, string $output_file, array $options = array()): void
+	{
+		$project_json = $this->get_project_json($project_id, $options);
+		$datacite_json = $this->map_to_datacite_json($project_json);
+		$encoded_json = json_encode($datacite_json, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+
+		if ($encoded_json === false) {
+			throw new Exception("Failed to encode Datacite JSON");
+		}
+
+		$file_written = file_put_contents($output_file, $encoded_json . PHP_EOL);
+
+		if ($file_written === false) {
+			throw new Exception("Failed to write Datacite JSON to output file");
+		}
+	}
+
+	private function get_project_json(string $project_id, array	$options = array()): array
+	{
+		$project_json_filepath = $this->ci->project_json_writer->generate_project_json($project_id, $options);
+
+		if (!is_readable($project_json_filepath)) {
+			throw new Exception("Failed to read project JSON export");
+		}
+
+		$json_raw = file_get_contents($project_json_filepath);
+		$project_json = json_decode($json_raw, true);
+
+		if ($project_json === null && json_last_error() !== JSON_ERROR_NONE) {
+			throw new Exception("Invalid JSON export for project");
+		}
+
+		return $project_json;
+	}
+
+	private function map_to_datacite_json(array $project_json): array
+	{
+		$datacite_map_raw = $this->ci->project_export_yaml_map_parser->parse_yaml_map($this->ci->config->item('bsi_core_to_datacite'));
+		$datacite_map_metadata = $datacite_map_raw['profile'] ?? [];
+		$datacite_mapping_rules = $datacite_map_raw['mappings'] ?? [];
+		$datacite_defaults = $datacite_map_raw['defaults'] ?? [];
+
+		$datacite_map = new Schema_transform_mapping_rules($datacite_map_metadata, $datacite_mapping_rules, $datacite_defaults);
+
+		$mapping_resolver = new Project_export_mapping_resolver(
+			$datacite_map,
+			new Project_export_transformer_manager(),
+			new Nested_path_helper()
+		);
+
+		$datacite_json = $mapping_resolver->apply_export_mappings($project_json);
+
+		return $datacite_json;
+	}
 }
